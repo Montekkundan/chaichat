@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import { Geist } from "next/font/google";
 import ConvexClientProvider from "~/components/providers/ConvexClientProvider";
 import { ClerkProvider } from "@clerk/nextjs";
+import { ThemeProvider } from "~/components/providers/theme-provider";
 
 export const metadata: Metadata = {
 	title: "Create T3 App",
@@ -20,11 +21,18 @@ export default function RootLayout({
 	children,
 }: Readonly<{ children: React.ReactNode }>) {
 	return (
-		<html lang="en" className={`${geist.variable}`}>
+		<html lang="en" className={`${geist.variable}`} suppressHydrationWarning>
 			<body>
 				<ClerkProvider>
 					<ConvexClientProvider>
-						{children}
+						<ThemeProvider
+							attribute="class"
+							defaultTheme="system"
+							enableSystem
+							disableTransitionOnChange
+						>
+							{children}
+						</ThemeProvider>
 					</ConvexClientProvider>
 				</ClerkProvider>
 			</body>
