@@ -9,11 +9,13 @@
 		"check:unsafe": "biome check --write --unsafe .",
 		"check:write": "biome check --write .",
 		"dev": "next dev --turbo",
+		"dev:convex": "convex dev",
 		"preview": "next build && next start",
 		"start": "next start",
 		"typecheck": "tsc --noEmit"
 	},
 	"dependencies": {
+		"@clerk/nextjs": "^6.21.0",
 		"@t3-oss/env-nextjs": "^0.12.0",
 		"class-variance-authority": "^0.7.1",
 		"clsx": "^2.1.1",
