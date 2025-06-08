@@ -8,6 +8,10 @@ import {
 	SidebarTrigger,
 	useSidebar,
 } from "~/components/ui/sidebar";
+import { PromptInputCentered } from "~/components/PromptInputCentered";
+import { PromptInputBottom } from "~/components/PromptInputBottom";
+import React from "react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "~/components/ui/tooltip";
 
 export default function Home() {
 	return (
@@ -22,9 +26,15 @@ export default function Home() {
 function MainContentWithInset() {
 	const { state } = useSidebar();
 	const collapsed = state === "collapsed";
+	const [hasChat, setHasChat] = React.useState(false); // TODO: Replace with real chat state
+	const [prompt, setPrompt] = React.useState("");
+	const handlePromptSubmit = () => {
+		// TODO: Implement submit logic
+		setPrompt("");
+	};
 
 	return (
-		<div className="relative w-full flex-1 bg-sidebar">
+		<div className="relative w-full flex-1 overflow-hidden bg-sidebar">
 			<div
 				className={`absolute top-0 bottom-0 w-full overflow-hidden border-chat-border border-t border-l bg-secondary bg-fixed transition-all ease-snappy max-sm:border-none ${!collapsed ? "sm:translate-y-3.5 sm:rounded-tl-2xl" : ""}`}
 			>
@@ -34,8 +44,21 @@ function MainContentWithInset() {
 						<div className="absolute top-0 right-24 blur-fallback:hidden h-full w-8 bg-gradient-to-l from-gradient-noise-top to-transparent" />
 						<div className="absolute top-0 right-0 blur-fallback:hidden h-full w-24 bg-gradient-noise-top" />
 					</div>
-					<div className="p-4">
-						<h1>Hello</h1>
+					<div className="flex min-h-[60vh] flex-col p-4">
+						<div className="flex-1" />
+						{hasChat ? (
+							<PromptInputBottom
+								value={prompt}
+								onValueChange={setPrompt}
+								onSubmit={handlePromptSubmit}
+							/>
+						) : (
+							<PromptInputCentered
+								value={prompt}
+								onValueChange={setPrompt}
+								onSubmit={handlePromptSubmit}
+							/>
+						)}
 					</div>
 				</SidebarInset>
 			</div>
@@ -52,6 +75,7 @@ function TopLeftControls() {
 		<div
 			className={`pointer-events-auto fixed top-2 left-2 z-50 flex flex-row gap-0.5 rounded-md p-1 ${collapsedBg}`}
 		>
+      <TooltipProvider delayDuration={0}>
 			<motion.div
 				key="collapsed-controls"
 				initial={false}
@@ -61,7 +85,18 @@ function TopLeftControls() {
 				className="flex flex-row gap-0.5 p-1"
 				// style={state === "collapsed" ? { backdropFilter: "blur(4px)" } : {}}
 			>
-				<SidebarTrigger className="inline-flex h-7 w-7 items-center justify-center gap-2 rounded-md bg-transparent p-0" />
+        <Tooltip>
+          <TooltipTrigger asChild>
+              <SidebarTrigger className="inline-flex h-7 w-7 items-center justify-center gap-2 rounded-md bg-transparent p-0" />
+          </TooltipTrigger>
+          <TooltipContent side="top" className="px-2 py-1 text-xs">
+            Pan top
+            <kbd className="-me-1 ms-2 inline-flex h-5 max-h-full items-center rounded border border-border bg-background px-1 font-[inherit] text-[0.625rem] font-medium text-muted-foreground/70">
+              ⌘T
+            </kbd>
+          </TooltipContent>
+        </Tooltip>
+				
 				<AnimatePresence>
 					{state === "collapsed" && (
 						<>
@@ -102,6 +137,7 @@ function TopLeftControls() {
 					)}
 				</AnimatePresence>
 			</motion.div>
+      </TooltipProvider>
 		</div>
 	);
 }
