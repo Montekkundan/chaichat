@@ -22,7 +22,7 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
 	return (
 		<html lang="en" className={`${geist.variable}`} suppressHydrationWarning>
-			<body>
+			<body className="bg-sidebar">
 				<ClerkProvider>
 					<ConvexClientProvider>
 						<ThemeProvider
