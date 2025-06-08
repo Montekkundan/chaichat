@@ -27,7 +27,7 @@ export function MessageList({
 	showAvatar = false,
 }: MessageListProps) {
 	return (
-		<div className="w-full max-w-xl mx-auto flex flex-col gap-8 mb-40">
+		<div className="mx-auto mb-40 flex w-full max-w-xl flex-col gap-8">
 			{messages.map((message) => (
 				<MessageWithActions
 					key={message.id}

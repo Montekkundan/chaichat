@@ -9,7 +9,7 @@ import { useParams, useSearchParams } from "next/navigation";
 import { useEffect, useRef } from "react";
 import { MessageList } from "~/components/message-list";
 import { PromptInputBox } from "~/components/prompt-input";
-import { db } from '~/db';
+import { db } from "~/db";
 
 export default function ChatPage() {
 	const { chatId } = useParams();
@@ -59,7 +59,7 @@ export default function ChatPage() {
 
 	const handleAssistantMessage = async (assistantContent: string) => {
 		const alreadyInConvex = convexMessages?.some(
-			m => m.role === "assistant" && m.content === assistantContent
+			(m) => m.role === "assistant" && m.content === assistantContent,
 		);
 		if (!alreadyInConvex) {
 			await addMessage({
@@ -115,23 +115,29 @@ export default function ChatPage() {
 	useEffect(() => {
 		if (convexMessages && convexMessages.length > 0) {
 			// Remove all Dexie messages for this chatId before putting new ones
-			db.messages.where('chatId').equals(chatIdConvex).delete().then(() => {
-				db.messages.bulkPut(convexMessages);
-			});
-			const userIds = Array.from(new Set(convexMessages.map(m => m.userId)));
-			Promise.all(userIds.map(async (id) => {
-				if (!id || id === "assistant") return;
-				const user = await db.users.get(id);
-				if (!user) {
-					try {
-						const res = await fetch(`/api/clerk-user/${id}`);
-						if (res.ok) {
-							const profile = await res.json();
-							await db.users.put(profile);
-						}
-					} catch {}
-				}
-			}));
+			db.messages
+				.where("chatId")
+				.equals(chatIdConvex)
+				.delete()
+				.then(() => {
+					db.messages.bulkPut(convexMessages);
+				});
+			const userIds = Array.from(new Set(convexMessages.map((m) => m.userId)));
+			Promise.all(
+				userIds.map(async (id) => {
+					if (!id || id === "assistant") return;
+					const user = await db.users.get(id);
+					if (!user) {
+						try {
+							const res = await fetch(`/api/clerk-user/${id}`);
+							if (res.ok) {
+								const profile = await res.json();
+								await db.users.put(profile);
+							}
+						} catch {}
+					}
+				}),
+			);
 		}
 	}, [convexMessages, chatIdConvex]);
 
@@ -140,38 +146,61 @@ export default function ChatPage() {
 		let active = true;
 		async function fetchLocalMessages() {
 			if (chatIdConvex) {
-				const localMessages = await db.messages.where('chatId').equals(chatIdConvex).toArray();
+				const localMessages = await db.messages
+					.where("chatId")
+					.equals(chatIdConvex)
+					.toArray();
 				localMessages.sort((a, b) => {
-					const aTime = a.createdAt ?? (a as { _creationTime?: number })._creationTime ?? 0;
-					const bTime = b.createdAt ?? (b as { _creationTime?: number })._creationTime ?? 0;
+					const aTime =
+						a.createdAt ?? (a as { _creationTime?: number })._creationTime ?? 0;
+					const bTime =
+						b.createdAt ?? (b as { _creationTime?: number })._creationTime ?? 0;
 					return aTime - bTime;
 				});
 				if (active && localMessages.length > 0) {
-					setMessages(localMessages.map((m) => ({ id: m._id, role: m.role, content: m.content })));
+					setMessages(
+						localMessages.map((m) => ({
+							id: m._id,
+							role: m.role,
+							content: m.content,
+						})),
+					);
 				}
 			}
 		}
 		fetchLocalMessages();
-		return () => { active = false; };
+		return () => {
+			active = false;
+		};
 	}, [chatIdConvex, setMessages]);
 
 	// Always use Convex as source of truth after initial load
 	useEffect(() => {
-		type ConvexMsg = { _id: string; role: string; content: string; _creationTime?: number };
+		type ConvexMsg = {
+			_id: string;
+			role: string;
+			content: string;
+			_creationTime?: number;
+		};
 		function isConvexMsg(m: unknown): m is ConvexMsg {
 			return (
-				typeof m === 'object' && m !== null &&
-				'_id' in m && 'role' in m && 'content' in m
+				typeof m === "object" &&
+				m !== null &&
+				"_id" in m &&
+				"role" in m &&
+				"content" in m
 			);
 		}
 		if (convexMessages) {
 			const unique = new Map();
-			const mapped: ConvexMsg[] = convexMessages.filter(isConvexMsg).map(m => ({
-				_id: m._id,
-				role: m.role,
-				content: m.content,
-				_creationTime: (m as { _creationTime?: number })._creationTime,
-			}));
+			const mapped: ConvexMsg[] = convexMessages
+				.filter(isConvexMsg)
+				.map((m) => ({
+					_id: m._id,
+					role: m.role,
+					content: m.content,
+					_creationTime: (m as { _creationTime?: number })._creationTime,
+				}));
 			const sorted = mapped.sort((a, b) => {
 				if (a._creationTime && b._creationTime) {
 					return a._creationTime - b._creationTime;
@@ -194,9 +223,7 @@ export default function ChatPage() {
 	return (
 		<div className="flex h-[calc(100vh-64px)] max-h-screen flex-col">
 			<div className="flex-1 overflow-y-auto px-4 py-6">
-				<MessageList
-					messages={mappedMessages}
-				/>
+				<MessageList messages={mappedMessages} />
 			</div>
 			<div className="px-4 pb-4">
 				<PromptInputBox

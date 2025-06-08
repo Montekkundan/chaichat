@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { PromptInputBox } from "~/components/prompt-input";
 import { Button } from "~/components/ui/button";
-import { db } from '~/db';
+import { db } from "~/db";
 
 const SUGGESTIONS = [
 	"Summarize this text",

@@ -8,8 +8,9 @@ import { useMutation, useQuery } from "convex/react";
 import { Search, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 
+import { DeleteChatModal } from "~/components/modals/delete-chat-modal";
 import {
 	Sidebar,
 	SidebarContent,
@@ -19,11 +20,9 @@ import {
 	SidebarMenuButton,
 	SidebarMenuItem,
 } from "~/components/ui/sidebar";
+import { db } from "~/db";
+import type { Chat } from "~/db";
 import { Button } from "./ui/button";
-import { db } from '~/db';
-import type { Chat } from '~/db';
-import { DeleteChatModal } from '~/components/modals/delete-chat-modal';
-
 
 export function AppSidebar() {
 	const { user } = useUser();
@@ -76,12 +75,14 @@ export function AppSidebar() {
 			if (user) {
 				if (debouncedSearch.trim()) {
 					result = await db.chats
-						.where('userId')
+						.where("userId")
 						.equals(user.id)
-						.filter(chat => chat.name.toLowerCase().includes(debouncedSearch.toLowerCase()))
+						.filter((chat) =>
+							chat.name.toLowerCase().includes(debouncedSearch.toLowerCase()),
+						)
 						.toArray();
 				} else {
-					result = await db.chats.where('userId').equals(user.id).toArray();
+					result = await db.chats.where("userId").equals(user.id).toArray();
 				}
 			}
 			if (active) setDisplayedChats(result);
@@ -113,9 +114,11 @@ export function AppSidebar() {
 			await deleteChat({ chatId: chatToDelete as Id<"chats"> });
 			// Remove from Dexie (chat and its messages)
 			await db.chats.delete(chatToDelete);
-			await db.messages.where('chatId').equals(chatToDelete).delete();
-			setDisplayedChats((prev) => prev.filter(chat => chat._id !== chatToDelete));
-			router.push('/');
+			await db.messages.where("chatId").equals(chatToDelete).delete();
+			setDisplayedChats((prev) =>
+				prev.filter((chat) => chat._id !== chatToDelete),
+			);
+			router.push("/");
 			setDeleteModalOpen(false);
 			setChatToDelete(null);
 		}
@@ -140,7 +143,7 @@ export function AppSidebar() {
 							placeholder="Search your threads..."
 							className="w-full rounded-md border border-muted bg-background px-3 py-2 pl-10 text-sm focus:outline-none"
 							value={search}
-							onChange={e => setSearch(e.target.value)}
+							onChange={(e) => setSearch(e.target.value)}
 						/>
 						<Search className="absolute top-2.5 left-2 h-4 w-4 text-muted-foreground" />
 					</div>
@@ -153,7 +156,9 @@ export function AppSidebar() {
 					</div>
 					<SidebarMenu>
 						{isLoading ? (
-							<div className="px-4 py-2 text-xs text-muted-foreground">Searching...</div>
+							<div className="px-4 py-2 text-muted-foreground text-xs">
+								Searching...
+							</div>
 						) : (
 							displayedChats?.map((chat) => (
 								<SidebarMenuItem
