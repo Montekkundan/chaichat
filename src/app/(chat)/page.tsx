@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { PromptInputBox } from "~/components/prompt-input";
 import { Button } from "~/components/ui/button";
+import { db } from '~/db';
 
 const SUGGESTIONS = [
 	"Summarize this text",
@@ -36,6 +37,13 @@ export default function Home() {
 				userId: user?.id || "anonymous",
 				role: "user",
 				content: prompt,
+			});
+			// Only put in Dexie after Convex returns
+			await db.chats.put({
+				_id: chatId,
+				name: prompt.slice(0, 30) || "New Chat",
+				userId: user?.id || "anonymous",
+				createdAt: Date.now(),
 			});
 			setInput("");
 			router.push(`/chat/${chatId}?q=${encodeURIComponent(prompt)}`);

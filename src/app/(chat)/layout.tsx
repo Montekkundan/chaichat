@@ -35,12 +35,12 @@ function MainContentWithInset({ children }: { children: ReactNode }) {
 				className={`absolute top-0 bottom-0 w-full overflow-hidden border-chat-border border-t border-l bg-secondary bg-fixed transition-all ease-snappy max-sm:border-none ${!collapsed ? "sm:translate-y-3.5 sm:rounded-tl-2xl" : ""}`}
 			>
 				<SidebarInset>
-					<div className="absolute inset-x-3 top-0 z-10 box-content overflow-hidden border-chat-border bg-gradient-noise-top/80 blur-fallback:bg-gradient-noise-top backdrop-blur-md transition-[transform,border] ease-snappy max-sm:hidden sm:h-3.5">
+					<div className="absolute inset-x-3 top-0 z-10 box-content overflow-hidden border-chat-border bg-gradient-noise-top/80 blur-fallback:bg-gradient-noise-top transition-[transform,border] ease-snappy max-sm:hidden sm:h-3.5">
 						<div className="absolute top-0 left-0 blur-fallback:hidden h-full w-8 bg-gradient-to-r from-gradient-noise-top to-transparent" />
 						<div className="absolute top-0 right-24 blur-fallback:hidden h-full w-8 bg-gradient-to-l from-gradient-noise-top to-transparent" />
 						<div className="absolute top-0 right-0 blur-fallback:hidden h-full w-24 bg-gradient-noise-top" />
 					</div>
-					<div className="flex min-h-[60vh] flex-col p-4">{children}</div>
+					<div className="flex min-h-[60vh] flex-col">{children}</div>
 				</SidebarInset>
 			</div>
 		</div>

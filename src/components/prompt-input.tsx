@@ -147,7 +147,7 @@ export function PromptInputBox({
 
 	if (position === "bottom") {
 		return (
-			<div className="fixed inset-x-0 bottom-0 z-20 flex w-full justify-center bg-secondary/80 p-4 backdrop-blur-md">
+			<div className="fixed inset-x-0 bottom-0 z-20 flex w-full justify-center p-4">
 				{mainContent}
 			</div>
 		);

@@ -27,21 +27,19 @@ export function MessageList({
 	showAvatar = false,
 }: MessageListProps) {
 	return (
-		<div className="mx-auto w-full max-w-xl">
-			<div className="flex max-h-[80vh] flex-col gap-8 overflow-y-auto p-4">
-				{messages.map((message) => (
-					<MessageWithActions
-						key={message.id}
-						message={message}
-						showAvatar={showAvatar}
-					/>
-				))}
-			</div>
+		<div className="w-full max-w-xl mx-auto flex flex-col gap-8 mb-40">
+			{messages.map((message) => (
+				<MessageWithActions
+					key={message.id}
+					message={message}
+					showAvatar={showAvatar}
+				/>
+			))}
 		</div>
 	);
 }
 
-function MessageWithActions({
+export function MessageWithActions({
 	message,
 	showAvatar,
 }: {

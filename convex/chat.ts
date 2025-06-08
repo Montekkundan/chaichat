@@ -63,6 +63,7 @@ export const getMessages = query({
 export const deleteChat = mutation({
   args: { chatId: v.id("chats") },
   handler: async (ctx, { chatId }) => {
+    // Delete all messages for this chat
     const messages = await ctx.db
       .query("messages")
       .withIndex("by_chat", (q) => q.eq("chatId", chatId))
@@ -70,6 +71,21 @@ export const deleteChat = mutation({
     for (const message of messages) {
       await ctx.db.delete(message._id);
     }
+    // Now delete the chat itself
     await ctx.db.delete(chatId);
+  },
+});
+
+export const searchChats = query({
+  args: { userId: v.string(), query: v.string() },
+  handler: async (ctx, { userId, query }) => {
+    const lowerQuery = query.toLowerCase();
+    const chats = await ctx.db
+      .query("chats")
+      .filter((q) => q.eq(q.field("userId"), userId))
+      .collect();
+    return chats.filter((chat) =>
+      chat.name.toLowerCase().includes(lowerQuery)
+    );
   },
 });
