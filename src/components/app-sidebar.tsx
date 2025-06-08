@@ -1,7 +1,8 @@
+"use client";
 import { useUser } from "@clerk/nextjs";
 import { SignInButton } from "@clerk/nextjs";
 import { Unauthenticated } from "convex/react";
-import { Search } from "lucide-react";
+import { Search, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -14,22 +15,55 @@ import {
 	SidebarMenuItem,
 } from "~/components/ui/sidebar";
 import { Button } from "./ui/button";
+import { useQuery, useMutation } from "convex/react";
+import { api } from "@/convex/_generated/api";
+import { useState } from "react";
+import { Dialog, DialogContent, DialogTitle } from "~/components/ui/dialog";
+import type { Id } from '@/convex/_generated/dataModel';
 
 export function AppSidebar() {
 	const { user } = useUser();
 	const router = useRouter();
-	// Example chat list
-	const chats = [{ id: 1, name: "Greeting" }];
+	const chats = useQuery(api.chat.listChats, user ? { userId: user.id } : "skip");
+	const deleteChat = useMutation(api.chat.deleteChat);
+
+	const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+	const [chatToDelete, setChatToDelete] = useState<string | null>(null);
+	const [hoveredChatId, setHoveredChatId] = useState<string | null>(null);
 
 	const handleProfileClick = (e: React.MouseEvent | React.KeyboardEvent) => {
 		router.push("/settings/subscription");
+	};
+
+	const handleNewChat = async () => {
+		router.push("/");
+	};
+
+	const handleDeleteClick = (chatId: string) => {
+		setChatToDelete(chatId);
+		setDeleteModalOpen(true);
+	};
+
+	const handleConfirmDelete = async () => {
+		if (chatToDelete) {
+			await deleteChat({ chatId: chatToDelete as Id<'chats'> });
+			setDeleteModalOpen(false);
+			setChatToDelete(null);
+		}
+	};
+
+	const handleCancelDelete = () => {
+		setDeleteModalOpen(false);
+		setChatToDelete(null);
 	};
 
 	return (
 		<Sidebar>
 			<SidebarHeader>
 				<div className="py-1 text-center text-xl tracking-tight">ChaiChat</div>
-				<Button className="cursor-pointer">New Chat</Button>
+				<Button className="cursor-pointer" onClick={handleNewChat}>
+					New Chat
+				</Button>
 				<div className="mb-4">
 					<div className="relative">
 						<input
@@ -44,16 +78,35 @@ export function AppSidebar() {
 			<SidebarContent>
 				<div className="px-2">
 					<div className="mb-2 font-semibold text-muted-foreground text-xs">
-						Today
+						Your Chats
 					</div>
 					<SidebarMenu>
-						{chats.map((chat) => (
-							<SidebarMenuItem key={chat.id}>
+						{chats?.map((chat) => (
+							<SidebarMenuItem
+								key={chat._id}
+								className="relative"
+								onMouseEnter={() => setHoveredChatId(chat._id)}
+								onMouseLeave={() => setHoveredChatId(null)}
+							>
 								<SidebarMenuButton asChild>
-									<Link href={`/chat/${chat.id}`}>
+									<Link href={`/chat/${chat._id}`}>
 										<span>{chat.name}</span>
 									</Link>
 								</SidebarMenuButton>
+								{/* Delete icon, only visible on hover of this item */}
+								{hoveredChatId === chat._id && (
+									<button
+										type="button"
+										className="absolute right-2 top-1/2 -translate-y-1/2 opacity-100 transition-opacity duration-200 p-1 rounded-full hover:bg-destructive/10 hover:text-destructive"
+										onClick={(e) => {
+											e.preventDefault();
+											handleDeleteClick(chat._id);
+										}}
+										aria-label="Delete chat"
+									>
+										<X className="size-4" />
+									</button>
+								)}
 							</SidebarMenuItem>
 						))}
 					</SidebarMenu>
@@ -88,6 +141,29 @@ export function AppSidebar() {
 					</div>
 				)}
 			</SidebarFooter>
+
+			{/* Delete confirmation modal */}
+			<Dialog open={deleteModalOpen} onOpenChange={setDeleteModalOpen}>
+				<DialogContent className="max-w-md rounded-2xl bg-muted p-0 text-muted-foreground">
+					<div className="p-6 pb-2">
+						<DialogTitle className="mb-2 font-semibold text-lg text-white">
+							Delete Chat
+						</DialogTitle>
+						<div className="mb-4 border-white/10 border-b" />
+						<div className="mb-6 text-sm text-white/80">
+							Are you sure you want to delete this chat and all its messages? This action cannot be undone.
+						</div>
+						<div className="flex justify-end gap-2">
+							<Button variant="ghost" onClick={handleCancelDelete}>
+								Cancel
+							</Button>
+							<Button variant="destructive" onClick={handleConfirmDelete}>
+								Delete
+							</Button>
+						</div>
+					</div>
+				</DialogContent>
+			</Dialog>
 		</Sidebar>
 	);
 }

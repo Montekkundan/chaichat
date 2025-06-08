@@ -1,43 +1,26 @@
 "use client";
-import { AnimatePresence, motion } from "framer-motion";
-import { Plus, Search } from "lucide-react";
-import React from "react";
-import { PromptInputBottom } from "~/components/PromptInputBottom";
-import { PromptInputCentered } from "~/components/PromptInputCentered";
+import type { ReactNode } from "react";
+import { SidebarProvider, SidebarTrigger, useSidebar } from "~/components/ui/sidebar";
 import { AppSidebar } from "~/components/app-sidebar";
-import {
-	SidebarInset,
-	SidebarProvider,
-	SidebarTrigger,
-	useSidebar,
-} from "~/components/ui/sidebar";
-import {
-	Tooltip,
-	TooltipContent,
-	TooltipProvider,
-	TooltipTrigger,
-} from "~/components/ui/tooltip";
+import { SidebarInset } from "~/components/ui/sidebar";
+import { TooltipContent } from "~/components/ui/tooltip";
+import { AnimatePresence, motion } from "framer-motion";
+import { Tooltip, TooltipTrigger, TooltipProvider } from "~/components/ui/tooltip";
+import { Search, Plus } from "lucide-react";
 
-export default function Home() {
+export default function ChatLayout({ children }: { children: ReactNode }) {
 	return (
 		<SidebarProvider>
 			<TopLeftControls />
 			<AppSidebar />
-			<MainContentWithInset />
+			<MainContentWithInset>{children}</MainContentWithInset>
 		</SidebarProvider>
 	);
 }
 
-function MainContentWithInset() {
+function MainContentWithInset({ children }: { children: ReactNode }) {
 	const { state } = useSidebar();
 	const collapsed = state === "collapsed";
-	const [hasChat, setHasChat] = React.useState(false); // TODO: Replace with real chat state
-	const [prompt, setPrompt] = React.useState("");
-	const handlePromptSubmit = () => {
-		// TODO: Implement submit logic
-		setPrompt("");
-	};
-
 	return (
 		<div className="relative w-full flex-1 overflow-hidden bg-sidebar">
 			<div
@@ -50,20 +33,7 @@ function MainContentWithInset() {
 						<div className="absolute top-0 right-0 blur-fallback:hidden h-full w-24 bg-gradient-noise-top" />
 					</div>
 					<div className="flex min-h-[60vh] flex-col p-4">
-						<div className="flex-1" />
-						{hasChat ? (
-							<PromptInputBottom
-								value={prompt}
-								onValueChange={setPrompt}
-								onSubmit={handlePromptSubmit}
-							/>
-						) : (
-							<PromptInputCentered
-								value={prompt}
-								onValueChange={setPrompt}
-								onSubmit={handlePromptSubmit}
-							/>
-						)}
+						{children}
 					</div>
 				</SidebarInset>
 			</div>
@@ -88,7 +58,6 @@ function TopLeftControls() {
 					exit={{ opacity: 0 }}
 					transition={{ type: "spring", stiffness: 300, damping: 30 }}
 					className="flex flex-row gap-0.5 p-1"
-					// style={state === "collapsed" ? { backdropFilter: "blur(4px)" } : {}}
 				>
 					<Tooltip>
 						<TooltipTrigger asChild>
@@ -146,3 +115,5 @@ function TopLeftControls() {
 		</div>
 	);
 }
+
+export { TopLeftControls };
