@@ -1,3 +1,3 @@
 export default function AttachmentsPage() {
-  return <div>Attachments Settings</div>;
-} 
+	return <div>Attachments Settings</div>;
+}

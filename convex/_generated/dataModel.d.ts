@@ -8,7 +8,7 @@
  * @module
  */
 
-import { AnyDataModel } from "convex/server";
+import type { AnyDataModel } from "convex/server";
 import type { GenericId } from "convex/values";
 
 /**
@@ -44,7 +44,7 @@ export type Doc = any;
  * strings when type checking.
  */
 export type Id<TableName extends TableNames = TableNames> =
-  GenericId<TableName>;
+	GenericId<TableName>;
 
 /**
  * A type describing your Convex data model.
