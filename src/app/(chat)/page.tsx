@@ -1,10 +1,10 @@
 "use client";
+import { api } from "@/convex/_generated/api";
+import { useUser } from "@clerk/nextjs";
+import { useMutation } from "convex/react";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { PromptInputBox } from "~/components/prompt-input";
-import { useMutation } from "convex/react";
-import { useUser } from "@clerk/nextjs";
-import { useRouter } from "next/navigation";
-import { api } from "@/convex/_generated/api";
 import { Button } from "~/components/ui/button";
 
 const SUGGESTIONS = [
@@ -45,16 +45,18 @@ export default function Home() {
 	};
 
 	return (
-		<div className="flex flex-col items-center w-full bg-secondary min-h-screen">
-			<div className="w-full max-w-xl flex flex-col gap-6 mx-auto pt-16">
-				<h1 className="text-2xl font-semibold text-center mb-4">How can I help you?</h1>
+		<div className="flex min-h-screen w-full flex-col items-center bg-secondary">
+			<div className="mx-auto flex w-full max-w-xl flex-col gap-6 pt-16">
+				<h1 className="mb-4 text-center font-semibold text-2xl">
+					How can I help you?
+				</h1>
 				<PromptInputBox
 					value={input}
 					onValueChange={setInput}
 					onSubmit={() => handlePromptSubmit()}
 					isLoading={isLoading}
 				/>
-				<div className="flex flex-wrap justify-center gap-3 mt-4">
+				<div className="mt-4 flex flex-wrap justify-center gap-3">
 					{SUGGESTIONS.map((suggestion) => (
 						<Button
 							key={suggestion}
@@ -71,5 +73,3 @@ export default function Home() {
 		</div>
 	);
 }
-
-

@@ -1,12 +1,20 @@
 "use client";
+import { AnimatePresence, motion } from "framer-motion";
+import { Plus, Search } from "lucide-react";
 import type { ReactNode } from "react";
-import { SidebarProvider, SidebarTrigger, useSidebar } from "~/components/ui/sidebar";
 import { AppSidebar } from "~/components/app-sidebar";
+import {
+	SidebarProvider,
+	SidebarTrigger,
+	useSidebar,
+} from "~/components/ui/sidebar";
 import { SidebarInset } from "~/components/ui/sidebar";
 import { TooltipContent } from "~/components/ui/tooltip";
-import { AnimatePresence, motion } from "framer-motion";
-import { Tooltip, TooltipTrigger, TooltipProvider } from "~/components/ui/tooltip";
-import { Search, Plus } from "lucide-react";
+import {
+	Tooltip,
+	TooltipProvider,
+	TooltipTrigger,
+} from "~/components/ui/tooltip";
 
 export default function ChatLayout({ children }: { children: ReactNode }) {
 	return (
@@ -32,9 +40,7 @@ function MainContentWithInset({ children }: { children: ReactNode }) {
 						<div className="absolute top-0 right-24 blur-fallback:hidden h-full w-8 bg-gradient-to-l from-gradient-noise-top to-transparent" />
 						<div className="absolute top-0 right-0 blur-fallback:hidden h-full w-24 bg-gradient-noise-top" />
 					</div>
-					<div className="flex min-h-[60vh] flex-col p-4">
-						{children}
-					</div>
+					<div className="flex min-h-[60vh] flex-col p-4">{children}</div>
 				</SidebarInset>
 			</div>
 		</div>

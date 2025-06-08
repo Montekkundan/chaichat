@@ -2,6 +2,7 @@
 
 import { ArrowUp, Paperclip, Square, X } from "lucide-react";
 import { useRef, useState } from "react";
+import { CookiePreferencesModal } from "~/components/modals/cookie-preferences-modal";
 import { Button } from "~/components/ui/button";
 import {
 	PromptInput,
@@ -9,7 +10,6 @@ import {
 	PromptInputActions,
 	PromptInputTextarea,
 } from "~/components/ui/prompt-input";
-import { CookiePreferencesModal } from "~/components/modals/cookie-preferences-modal";
 
 export function PromptInputBox({
 	value,
@@ -85,7 +85,9 @@ export function PromptInputBox({
 				<PromptInputActions className="flex items-center justify-between gap-2 pt-2">
 					<PromptInputAction tooltip="Attach files">
 						<label
-							htmlFor={position === "bottom" ? "file-upload-bottom" : "file-upload"}
+							htmlFor={
+								position === "bottom" ? "file-upload-bottom" : "file-upload"
+							}
 							className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-2xl hover:bg-secondary-foreground/10"
 						>
 							<input
@@ -93,7 +95,9 @@ export function PromptInputBox({
 								multiple
 								onChange={handleFileChange}
 								className="hidden"
-								id={position === "bottom" ? "file-upload-bottom" : "file-upload"}
+								id={
+									position === "bottom" ? "file-upload-bottom" : "file-upload"
+								}
 								ref={uploadInputRef}
 							/>
 							<Paperclip className="size-5 text-primary" />

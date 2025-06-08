@@ -1,10 +1,15 @@
 "use client";
+import { api } from "@/convex/_generated/api";
+import type { Id } from "@/convex/_generated/dataModel";
 import { useUser } from "@clerk/nextjs";
 import { SignInButton } from "@clerk/nextjs";
 import { Unauthenticated } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { Search, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { Dialog, DialogContent, DialogTitle } from "~/components/ui/dialog";
 import {
 	Sidebar,
 	SidebarContent,
@@ -15,16 +20,14 @@ import {
 	SidebarMenuItem,
 } from "~/components/ui/sidebar";
 import { Button } from "./ui/button";
-import { useQuery, useMutation } from "convex/react";
-import { api } from "@/convex/_generated/api";
-import { useState } from "react";
-import { Dialog, DialogContent, DialogTitle } from "~/components/ui/dialog";
-import type { Id } from '@/convex/_generated/dataModel';
 
 export function AppSidebar() {
 	const { user } = useUser();
 	const router = useRouter();
-	const chats = useQuery(api.chat.listChats, user ? { userId: user.id } : "skip");
+	const chats = useQuery(
+		api.chat.listChats,
+		user ? { userId: user.id } : "skip",
+	);
 	const deleteChat = useMutation(api.chat.deleteChat);
 
 	const [deleteModalOpen, setDeleteModalOpen] = useState(false);
@@ -46,7 +49,7 @@ export function AppSidebar() {
 
 	const handleConfirmDelete = async () => {
 		if (chatToDelete) {
-			await deleteChat({ chatId: chatToDelete as Id<'chats'> });
+			await deleteChat({ chatId: chatToDelete as Id<"chats"> });
 			setDeleteModalOpen(false);
 			setChatToDelete(null);
 		}
@@ -97,7 +100,7 @@ export function AppSidebar() {
 								{hoveredChatId === chat._id && (
 									<button
 										type="button"
-										className="absolute right-2 top-1/2 -translate-y-1/2 opacity-100 transition-opacity duration-200 p-1 rounded-full hover:bg-destructive/10 hover:text-destructive"
+										className="-translate-y-1/2 absolute top-1/2 right-2 rounded-full p-1 opacity-100 transition-opacity duration-200 hover:bg-destructive/10 hover:text-destructive"
 										onClick={(e) => {
 											e.preventDefault();
 											handleDeleteClick(chat._id);
@@ -151,7 +154,8 @@ export function AppSidebar() {
 						</DialogTitle>
 						<div className="mb-4 border-white/10 border-b" />
 						<div className="mb-6 text-sm text-white/80">
-							Are you sure you want to delete this chat and all its messages? This action cannot be undone.
+							Are you sure you want to delete this chat and all its messages?
+							This action cannot be undone.
 						</div>
 						<div className="flex justify-end gap-2">
 							<Button variant="ghost" onClick={handleCancelDelete}>
