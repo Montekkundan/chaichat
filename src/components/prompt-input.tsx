@@ -51,7 +51,7 @@ export function PromptInputBox({
 	};
 
 	const mainContent = (
-		<div className="w-full max-w-xl">
+		<div className="w-full max-w-3xl">
 			<PromptInput
 				value={value}
 				onValueChange={onValueChange}

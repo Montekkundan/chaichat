@@ -40,7 +40,7 @@ function MainContentWithInset({ children }: { children: ReactNode }) {
 						<div className="absolute top-0 right-24 blur-fallback:hidden h-full w-8 bg-gradient-to-l from-gradient-noise-top to-transparent" />
 						<div className="absolute top-0 right-0 blur-fallback:hidden h-full w-24 bg-gradient-noise-top" />
 					</div>
-					<div className="flex min-h-[60vh] flex-col">{children}</div>
+					<div>{children}</div>
 				</SidebarInset>
 			</div>
 		</div>

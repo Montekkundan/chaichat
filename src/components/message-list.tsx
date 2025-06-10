@@ -9,13 +9,19 @@ import {
 	MessageActions,
 	MessageAvatar,
 	MessageContent,
-} from "~/components/ui/message";
+} from "~/components/prompt-kit/message";
 
 export type MessageListMessage = {
 	id: string;
 	role: "user" | "assistant";
 	content: string | string[];
 };
+
+import {
+	ChatContainerRoot, ChatContainerContent,
+	ChatContainerScrollAnchor
+} from "~/components/prompt-kit/chat-container"
+import { ScrollButton } from "~/components/prompt-kit/scroll-button"
 
 type MessageListProps = {
 	messages: MessageListMessage[];
@@ -27,14 +33,38 @@ export function MessageList({
 	showAvatar = false,
 }: MessageListProps) {
 	return (
-		<div className="mx-auto mb-40 flex w-full max-w-xl flex-col gap-8">
-			{messages.map((message) => (
-				<MessageWithActions
-					key={message.id}
-					message={message}
-					showAvatar={showAvatar}
-				/>
-			))}
+		<div className="">
+			<ChatContainerRoot className="h-full">
+				<ChatContainerContent className="bg-red-500">
+					<div className="">
+						<div>Message 1</div>
+						{messages.map((msg) => {
+							const content = Array.isArray(msg.content) ? msg.content.join("") : msg.content;
+							const isUser = msg.role === "user";
+							return (
+								<div
+									key={msg.id}
+									className={`flex gap-3 ${isUser ? "justify-end" : "justify-start"}`}
+								>
+									<div
+										className={`prose whitespace-normal break-words rounded-lg p-2
+											${isUser
+												? "bg-secondary text-foreground"
+												: "bg-secondary text-foreground"
+											}`}
+									>
+										{content}
+									</div>
+								</div>
+							);
+						})}
+					</div>
+				</ChatContainerContent>
+				<ChatContainerScrollAnchor />
+				<div className="absolute right-4 bottom-4">
+					<ScrollButton className="shadow-sm" />
+				</div>
+			</ChatContainerRoot>
 		</div>
 	);
 }

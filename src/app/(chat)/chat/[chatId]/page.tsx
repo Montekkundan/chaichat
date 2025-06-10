@@ -7,7 +7,7 @@ import { useUser } from "@clerk/nextjs";
 import { useMutation, useQuery } from "convex/react";
 import { useParams, useSearchParams } from "next/navigation";
 import { useEffect, useRef } from "react";
-import { MessageList } from "~/components/message-list";
+import { Conversation } from "~/components/chat/conversation";
 import { PromptInputBox } from "~/components/prompt-input";
 import { db } from "~/db";
 
@@ -221,19 +221,17 @@ export default function ChatPage() {
 	}));
 
 	return (
-		<div className="flex h-[calc(100vh-64px)] max-h-screen flex-col">
-			<div className="flex-1 overflow-y-auto px-4 py-6">
-				<MessageList messages={mappedMessages} />
-			</div>
-			<div className="px-4 pb-4">
-				<PromptInputBox
-					value={input}
-					onValueChange={setInput}
-					onSubmit={handleSend}
-					position="bottom"
-					isLoading={isLoading}
-				/>
-			</div>
+		<div className="relative flex flex-col h-screen w-full bg-secondary">
+			{/* Conversation area */}
+				<Conversation messages={mappedMessages} />
+			{/* Floating input */}
+			<PromptInputBox
+				value={input}
+				onValueChange={setInput}
+				onSubmit={handleSend}
+				position="bottom"
+				isLoading={isLoading}
+			/>
 		</div>
 	);
 }
