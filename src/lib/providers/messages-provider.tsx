@@ -22,6 +22,8 @@ interface MessagesContextType {
   setSelectedModel: (model: string) => void;
   sendMessage: (message: string) => Promise<void>;
   createNewChat: (initialMessage: string, model: string) => Promise<string>;
+  changeModel: (model: string) => Promise<void>;
+  regenerateMessage: (messageIndex: number, newModel?: string) => Promise<void>;
   stop: () => void;
   reload: () => void;
 }
@@ -50,6 +52,12 @@ export function MessagesProvider({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedModel, setSelectedModel] = useState(initialModel);
   
+  // Track regeneration context - use useRef to persist across re-renders
+  const regenerationContext = useRef<{
+    parentMessageId: string;
+    version: number;
+  } | null>(null);
+  
   const chatIdConvex = chatId as Id<"chats"> | undefined;
   
   // Convex queries and mutations
@@ -59,12 +67,16 @@ export function MessagesProvider({
   );
   const addMessage = useMutation(api.chat.addMessage);
   const createChat = useMutation(api.chat.createChat);
+  const updateChatModel = useMutation(api.chat.updateChatModel);
+  const markAsOriginalVersion = useMutation(api.chat.markAsOriginalVersion);
 
   // Transform Convex messages for AI SDK
   const initialMessages = convexMessages?.map((m) => ({
     id: m._id,
     role: m.role,
     content: m.content,
+    model: m.model, // Include model in message data
+    convexId: m._id, // Keep track of the Convex ID for versioning
   })) ?? [];
 
   // AI SDK useChat hook
@@ -87,12 +99,60 @@ export function MessagesProvider({
 
       // Store assistant message in Convex
       if (message.role === "assistant") {
-        await addMessage({
-          chatId: chatIdConvex,
-          userId: "assistant", 
-          role: "assistant",
-          content: message.content,
-        });
+        try {
+          // Check if this is a regenerated message
+          if (regenerationContext.current) {
+            // Mark the original message as version 1 if this is the first regeneration
+            await markAsOriginalVersion({ 
+              messageId: regenerationContext.current.parentMessageId as Id<"messages"> 
+            });
+
+            // This is a regenerated message - create version with parent relationship
+            const convexMessageId = await addMessage({
+              chatId: chatIdConvex,
+              userId: "assistant", 
+              role: "assistant",
+              content: message.content,
+              model: selectedModel,
+              parentMessageId: regenerationContext.current.parentMessageId as Id<"messages">,
+              version: regenerationContext.current.version,
+            });
+
+            // Update the AI SDK message with the convexId
+            setMessages(currentMessages => 
+              currentMessages.map(msg => 
+                msg.id === message.id 
+                  ? { ...msg, convexId: convexMessageId }
+                  : msg
+              )
+            );
+
+            // Clear regeneration context
+            regenerationContext.current = null;
+          } else {
+            // This is a new original message
+            const convexMessageId = await addMessage({
+              chatId: chatIdConvex,
+              userId: "assistant", 
+              role: "assistant",
+              content: message.content,
+              model: selectedModel,
+            });
+
+            // Update the AI SDK message with the convexId for version tracking
+            setMessages(currentMessages => 
+              currentMessages.map(msg => 
+                msg.id === message.id 
+                  ? { ...msg, convexId: convexMessageId }
+                  : msg
+              )
+            );
+          }
+        } catch (error) {
+          console.error("Failed to save assistant message:", error);
+          // Clear regeneration context on error
+          regenerationContext.current = null;
+        }
       }
     },
     onError: (error) => {
@@ -112,6 +172,7 @@ export function MessagesProvider({
           id: m._id,
           role: m.role,
           content: m.content,
+          convexId: m._id, // Preserve Convex ID for version tracking
         }))
       );
     }
@@ -139,6 +200,18 @@ export function MessagesProvider({
     return newChatId;
   };
 
+  const changeModel = useCallback(async (model: string): Promise<void> => {
+    setSelectedModel(model);
+    
+    // Update the chat's current model if we have a chatId
+    if (chatIdConvex) {
+      await updateChatModel({
+        chatId: chatIdConvex,
+        model: model,
+      });
+    }
+  }, [chatIdConvex, updateChatModel]);
+
   const sendMessage = useCallback(async (messageContent: string) => {
     if (!messageContent.trim() || !user?.id || !chatIdConvex) return;
     if (isSubmitting) return;
@@ -162,6 +235,7 @@ export function MessagesProvider({
         userId: user.id,
         role: "user",
         content: messageContent,
+        model: selectedModel,
       });
 
       // Use append method to trigger AI response
@@ -223,6 +297,81 @@ export function MessagesProvider({
     hasSentPending.current = false;
   }, []);
 
+  const regenerateMessage = useCallback(async (messageIndex: number, newModel?: string) => {
+    if (!user?.id || !chatIdConvex || messageIndex < 0) return;
+    if (isSubmitting) return;
+
+    setIsSubmitting(true);
+
+    try {
+      // Find the assistant message to regenerate
+      const assistantMessage = messages[messageIndex];
+      
+      if (!assistantMessage || assistantMessage.role !== "assistant") {
+        console.error("Could not find assistant message to regenerate");
+        return;
+      }
+
+      // Get the convexId from the message
+      const convexId = (assistantMessage as MessageAISDK & { convexId?: string }).convexId;
+      
+      // For existing messages without convexId, use the message ID (which should be the Convex ID)
+      const actualConvexId = convexId || assistantMessage.id;
+      
+      if (!actualConvexId) {
+        console.error("No ID found for message - cannot regenerate");
+        return;
+      }
+
+      // Find the user message that prompted this assistant response
+      const userMessage = messages[messageIndex - 1];
+      if (!userMessage || userMessage.role !== "user") {
+        console.error("Could not find user message to regenerate from");
+        return;
+      }
+
+      // Update the model if a new one was selected
+      const modelToUse = newModel || selectedModel;
+      if (newModel && newModel !== selectedModel) {
+        await changeModel(newModel);
+      }
+
+      // Set up regeneration context - use the actualConvexId as parent and get next version
+      // For now, we'll use a simple version incrementing approach
+      const nextVersion = 2; // Start with version 2 for the first regeneration
+
+      regenerationContext.current = {
+        parentMessageId: actualConvexId,
+        version: nextVersion,
+      };
+
+      // Remove the assistant message and any messages after it from the UI temporarily
+      const messagesToKeep = messages.slice(0, messageIndex);
+      setMessages(messagesToKeep);
+
+      // Use reload from useChat to regenerate the response
+      await reload({
+        body: {
+          chatId: chatIdConvex,
+          userId: user.id,
+          model: modelToUse,
+          isAuthenticated: true,
+          systemPrompt: SYSTEM_PROMPT_DEFAULT,
+        },
+      });
+
+    } catch (error) {
+      console.error("Failed to regenerate message:", error);
+      regenerationContext.current = null; // Clear context on error
+      toast({
+        title: "Failed to regenerate message",
+        status: "error",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [user?.id, chatIdConvex, selectedModel, messages, setMessages, reload, changeModel, isSubmitting]);
+
   return (
     <MessagesContext.Provider
       value={{
@@ -236,6 +385,8 @@ export function MessagesProvider({
         setSelectedModel,
         sendMessage,
         createNewChat,
+        changeModel,
+        regenerateMessage,
         stop,
         reload,
       }}

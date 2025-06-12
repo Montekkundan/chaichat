@@ -5,7 +5,8 @@ export default defineSchema({
   chats: defineTable({
     name: v.string(),
     userId: v.string(),
-    model: v.string(),
+    initialModel: v.string(), // Model used when chat was created
+    currentModel: v.string(),  // Current model being used
     createdAt: v.number(),
   }),
   messages: defineTable({
@@ -13,6 +14,13 @@ export default defineSchema({
     userId: v.string(),
     role: v.union(v.literal("user"), v.literal("assistant")),
     content: v.string(),
+    model: v.string(),
     createdAt: v.number(),
-  }).index("by_chat", ["chatId"]).index("by_user", ["userId"]),
+    parentMessageId: v.optional(v.id("messages")), // Links to the original message
+    version: v.optional(v.number()), // Version number (1, 2, 3, etc.)
+    isActive: v.optional(v.boolean()),
+  }).index("by_chat", ["chatId"])
+    .index("by_user", ["userId"])
+    .index("by_parent", ["parentMessageId"])
+    .index("by_chat_active", ["chatId", "isActive"]),
 });

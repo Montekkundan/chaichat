@@ -26,6 +26,7 @@ type ChatRequest = {
   isAuthenticated: boolean
   systemPrompt: string
   agentId?: string
+  regenerateMessageId?: string 
 }
 
 export async function POST(req: Request) {
@@ -40,6 +41,7 @@ export async function POST(req: Request) {
       isAuthenticated,
       systemPrompt,
       agentId,
+      regenerateMessageId,
     } = body as ChatRequest
 
     if (!messages || !chatId || !userId) {

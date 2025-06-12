@@ -7,28 +7,34 @@ type MessageProps = {
   variant: MessageType["role"]
   children: string
   id: string
+  message?: MessageType
   attachments?: MessageType["experimental_attachments"]
   isLast?: boolean
   onDelete: (id: string) => void
   onEdit: (id: string, newText: string) => void
   onReload: () => void
+  onRegenerate?: (model: string) => void
   hasScrollAnchor?: boolean
   parts?: MessageType["parts"]
   status?: "streaming" | "ready" | "submitted" | "error"
+  model?: string
 }
 
 export function Message({
   variant,
   children,
   id,
+  message,
   attachments,
   isLast,
   onDelete,
   onEdit,
   onReload,
+  onRegenerate,
   hasScrollAnchor,
   parts,
   status,
+  model,
 }: MessageProps) {
   const [copied, setCopied] = useState(false)
 
@@ -37,6 +43,9 @@ export function Message({
     setCopied(true)
     setTimeout(() => setCopied(false), 500)
   }
+
+  // Extract convexId from message object
+  const convexId = (message as MessageType & { convexId?: string })?.convexId
 
   if (variant === "user") {
     return (
@@ -58,13 +67,17 @@ export function Message({
   if (variant === "assistant") {
     return (
       <MessageAssistant
+        id={id}
+        convexId={convexId}
         copied={copied}
         copyToClipboard={copyToClipboard}
         onReload={onReload}
+        onRegenerate={onRegenerate}
         isLast={isLast}
         hasScrollAnchor={hasScrollAnchor}
         parts={parts}
         status={status}
+        model={model}
       >
         {children}
       </MessageAssistant>

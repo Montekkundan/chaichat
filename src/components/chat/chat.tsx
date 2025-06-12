@@ -27,6 +27,8 @@ export default function Chat() {
         setSelectedModel,
         sendMessage,
         createNewChat,
+        changeModel,
+        regenerateMessage,
         stop,
     } = useMessages();
 
@@ -37,7 +39,7 @@ export default function Chat() {
             messages,
             setMessages: () => {}, // Not needed with provider
             setInput,
-            setSelectedModel,
+            setSelectedModel: changeModel,
             selectedModel,
             chatId: chatIdString || null,
             user: user as unknown as User | null,
@@ -107,6 +109,7 @@ export default function Chat() {
                         onDelete={handleDelete}
                         onEdit={handleEdit}
                         onReload={handleReload}
+                        onRegenerate={regenerateMessage}
                     />
                 )}
             </AnimatePresence>

@@ -5,15 +5,18 @@ import {
 import { Loader } from "~/components/prompt-kit/loader"
 import { ScrollButton } from "~/components/prompt-kit/scroll-button"
 import type { Message as MessageType } from "@ai-sdk/react"
+
+type MessageWithModel = MessageType & { model?: string }
 import { useRef } from "react"
 import { Message } from "./message"
 
 type ConversationProps = {
-  messages: MessageType[]
+  messages: MessageWithModel[]
   status?: "streaming" | "ready" | "submitted" | "error"
   onDelete: (id: string) => void
   onEdit: (id: string, newText: string) => void
   onReload: () => void
+  onRegenerate?: (messageIndex: number, model: string) => void
 }
 
 export function Conversation({
@@ -22,6 +25,7 @@ export function Conversation({
   onDelete,
   onEdit,
   onReload,
+  onRegenerate,
 }: ConversationProps) {
   const initialMessageCount = useRef(messages.length)
 
@@ -55,15 +59,18 @@ export function Conversation({
               <Message
                 key={message.id}
                 id={message.id}
+                message={message}
                 variant={message.role}
                 attachments={message.experimental_attachments}
                 isLast={isLast}
                 onDelete={onDelete}
                 onEdit={onEdit}
                 onReload={onReload}
+                onRegenerate={onRegenerate ? (model: string) => onRegenerate(index, model) : undefined}
                 hasScrollAnchor={hasScrollAnchor}
                 parts={message.parts}
                 status={status}
+                model={message.model}
               >
                 {message.content}
               </Message>
