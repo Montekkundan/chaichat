@@ -5,6 +5,7 @@ import type { Metadata } from "next";
 import { Geist } from "next/font/google";
 import ConvexClientProvider from "~/components/providers/convex-client-provider";
 import { ThemeProvider } from "~/components/providers/theme-provider";
+import { ChatsProvider } from "~/lib/providers/chats-provider";
 
 export const metadata: Metadata = {
 	title: "Create T3 App",
@@ -31,7 +32,9 @@ export default function RootLayout({
 							enableSystem
 							disableTransitionOnChange
 						>
-							{children}
+							<ChatsProvider>
+								{children}
+							</ChatsProvider>
 						</ThemeProvider>
 					</ConvexClientProvider>
 				</ClerkProvider>

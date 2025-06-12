@@ -15,6 +15,8 @@ import { type Message as MessageAISDK, streamText, type ToolSet } from "ai"
 import { cleanMessagesForTools } from "./utils"
 
 export const maxDuration = 60
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
 
 type ChatRequest = {
   messages: MessageAISDK[]
@@ -28,6 +30,8 @@ type ChatRequest = {
 
 export async function POST(req: Request) {
   try {
+    const body = await req.json();
+    
     const {
       messages,
       chatId,
@@ -36,10 +40,9 @@ export async function POST(req: Request) {
       isAuthenticated,
       systemPrompt,
       agentId,
-    } = (await req.json()) as ChatRequest
+    } = body as ChatRequest
 
     if (!messages || !chatId || !userId) {
-		console.log("🛑 Error, missing information", messages, chatId, userId)
       return new Response(
         JSON.stringify({ error: "Error, missing information" }),
         { status: 400 }

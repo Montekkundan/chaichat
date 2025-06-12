@@ -2,13 +2,14 @@ import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 
 export const createChat = mutation({
-  args: { name: v.string(), userId: v.string() },
-  handler: async (ctx, { name, userId }) => {
+  args: { name: v.string(), userId: v.string(), model: v.string() },
+  handler: async (ctx, { name, userId, model }) => {
     const identity = await ctx.auth.getUserIdentity();
     const actualUserId = identity?.subject || userId;
     const chatId = await ctx.db.insert("chats", {
       name,
       userId: actualUserId,
+      model,
       createdAt: Date.now(),
     });
     return chatId;

@@ -5,6 +5,7 @@ export default defineSchema({
   chats: defineTable({
     name: v.string(),
     userId: v.string(),
+    model: v.string(),
     createdAt: v.number(),
   }),
   messages: defineTable({
