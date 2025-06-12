@@ -5,6 +5,9 @@ export interface Chat {
 	name: string;
 	userId: string;
 	createdAt: number;
+	currentModel: string;
+	initialModel: string;
+	_creationTime: number;
 }
 
 export interface Message {
@@ -13,7 +16,13 @@ export interface Message {
 	userId: string;
 	role: "user" | "assistant";
 	content: string;
+	model: string;
 	createdAt: number;
+	_creationTime: number;
+	// Version fields for message versioning
+	parentMessageId?: string;
+	version?: number;
+	isActive?: boolean;
 }
 
 export interface UserProfile {
@@ -29,10 +38,21 @@ export class ChaiChatDB extends Dexie {
 
 	constructor() {
 		super("ChaiChatDB");
-		this.version(1).stores({
-			chats: "_id, userId, name, createdAt",
-			messages: "_id, chatId, userId, createdAt",
+		this.version(2).stores({
+			chats: "_id, userId, name, createdAt, currentModel",
+			messages: "_id, chatId, userId, createdAt, parentMessageId, version, isActive, model",
 			users: "id, fullName",
+		}).upgrade(tx => {
+			// Migration for version 2
+			return tx.table("messages").toCollection().modify(message => {
+				if (message.isActive === undefined) {
+					message.isActive = true;
+				}
+				// Ensure model field exists for existing messages
+				if (!message.model) {
+					message.model = "gpt-4o"; // Default model for existing messages
+				}
+			});
 		});
 	}
 }

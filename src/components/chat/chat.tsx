@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Conversation } from "~/components/chat/conversation";
 import { ChatInput } from "~/components/prompt-input";
 import { cn } from "~/lib/utils";
@@ -16,6 +16,7 @@ export default function Chat() {
     const { user } = useUser();
     const router = useRouter();
     const [isCreatingChat, setIsCreatingChat] = useState(false);
+    const [hasNavigated, setHasNavigated] = useState(false);
 
     const {
         messages,
@@ -33,6 +34,19 @@ export default function Chat() {
     } = useMessages();
 
     const chatIdString = Array.isArray(chatId) ? chatId[0] : chatId;
+    
+    // Track navigation for animation purposes
+    useEffect(() => {
+        if (chatIdString && !hasNavigated) {
+            setHasNavigated(true);
+        }
+    }, [chatIdString, hasNavigated]);
+
+    // Determine if we should show onboarding (home page with no messages)
+    const showOnboarding = !chatIdString && messages.length === 0;
+    
+    // Determine if we should animate the input position
+    const shouldAnimateInput = hasNavigated || messages.length > 0;
 
     const { handleInputChange, handleModelChange, handleDelete, handleEdit } =
         useChatHandlers({
@@ -78,65 +92,97 @@ export default function Chat() {
     return (
         <div
             className={cn(
-                "@container/main relative flex h-full flex-col items-center justify-end md:justify-center"
+                "@container/main relative flex h-full flex-col",
+                showOnboarding ? "items-center justify-center" : ""
             )}
         >
-            <AnimatePresence initial={false} mode="popLayout">
-                {!chatId && messages.length === 0 ? (
+            {showOnboarding ? (
+                <div className="flex flex-col items-center justify-center flex-1 w-full">
+                    <AnimatePresence initial={false} mode="popLayout">
+                        <motion.div
+                            key="onboarding"
+                            className="mx-auto max-w-[50rem] mb-8"
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -20 }}
+                            transition={{ duration: 0.3, ease: "easeOut" }}
+                        >
+                            <h1 className="mb-6 text-3xl font-medium tracking-tight">
+                                What&apos;s on your mind?
+                            </h1>
+                        </motion.div>
+                    </AnimatePresence>
+                    
                     <motion.div
-                        key="onboarding"
-                        className="absolute bottom-[60%] mx-auto max-w-[50rem] md:relative md:bottom-auto"
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
+                        className="w-full max-w-3xl mx-auto"
                         layout="position"
-                        layoutId="onboarding"
+                        layoutId="chat-input-container"
                         transition={{
                             layout: {
-                                duration: 0,
+                                duration: shouldAnimateInput ? 0.4 : 0,
+                                ease: "easeInOut"
                             },
                         }}
                     >
-                        <h1 className="mb-6 text-3xl font-medium tracking-tight">
-                            What&apos;s on your mind?
-                        </h1>
+                        <ChatInput
+                            value={input}
+                            onValueChange={handleInputChange}
+                            onSend={handleSend}
+                            isSubmitting={isLoading}
+                            onSelectModel={handleModelChange}
+                            selectedModel={selectedModel}
+                            isUserAuthenticated={!!user?.id}
+                            stop={stop}
+                            status={status}
+                        />
                     </motion.div>
-                ) : (
-                    <Conversation
-                        key="conversation"
-                        messages={messages}
-                        status={status}
-                        onDelete={handleDelete}
-                        onEdit={handleEdit}
-                        onReload={handleReload}
-                        onRegenerate={regenerateMessage}
-                    />
-                )}
-            </AnimatePresence>
-            <motion.div
-                className={cn(
-                    "relative inset-x-0 bottom-0 z-50 mx-auto w-full max-w-3xl"
-                )}
-                layout="position"
-                layoutId="chat-input-container"
-                transition={{
-                    layout: {
-                        duration: messages.length === 1 ? 0.3 : 0,
-                    },
-                }}
-            >
-                <ChatInput
-                    value={input}
-                    onValueChange={handleInputChange}
-                    onSend={handleSend}
-                    isSubmitting={isLoading}
-                    onSelectModel={handleModelChange}
-                    selectedModel={selectedModel}
-                    isUserAuthenticated={!!user?.id}
-                    stop={stop}
-                    status={status}
-                />
-            </motion.div>
+                </div>
+            ) : (
+                <>
+                    <AnimatePresence initial={false} mode="popLayout">
+                        <motion.div
+                            key="conversation"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            transition={{ duration: 0.3 }}
+                            className="flex-1 w-full overflow-auto"
+                        >
+                            <Conversation
+                                messages={messages}
+                                status={status}
+                                onDelete={handleDelete}
+                                onEdit={handleEdit}
+                                onReload={handleReload}
+                                onRegenerate={regenerateMessage}
+                            />
+                        </motion.div>
+                    </AnimatePresence>
+                    
+                    <motion.div
+                        className="relative inset-x-0 bottom-0 z-50 mx-auto w-full max-w-3xl"
+                        layout="position"
+                        layoutId="chat-input-container"
+                        transition={{
+                            layout: {
+                                duration: shouldAnimateInput ? 0.4 : 0,
+                                ease: "easeInOut"
+                            },
+                        }}
+                    >
+                        <ChatInput
+                            value={input}
+                            onValueChange={handleInputChange}
+                            onSend={handleSend}
+                            isSubmitting={isLoading}
+                            onSelectModel={handleModelChange}
+                            selectedModel={selectedModel}
+                            isUserAuthenticated={!!user?.id}
+                            stop={stop}
+                            status={status}
+                        />
+                    </motion.div>
+                </>
+            )}
         </div>
     );
 }

@@ -1,18 +1,14 @@
 "use client";
 
-import { api } from "@/convex/_generated/api";
-import type { Id } from "@/convex/_generated/dataModel";
-import { useUser } from "@clerk/nextjs";
-import { useMutation, useQuery } from "convex/react";
-import { createContext, useContext, useEffect, useState } from "react";
-import { toast } from "~/components/ui/toast";
-import { MODEL_DEFAULT } from "~/lib/config";
+import { createContext, useContext } from "react";
+import { useCache } from "./cache-provider";
 
 type Chat = {
-  _id: Id<"chats">;
+  _id: string;
   name: string;
   userId: string;
-  model: string;
+  currentModel: string;
+  initialModel: string;
   createdAt: number;
   _creationTime: number;
 };
@@ -50,47 +46,15 @@ export function ChatsProvider({
 }: {
   children: React.ReactNode;
 }) {
-  const { user } = useUser();
-  const [isLoading, setIsLoading] = useState(false);
-  const [chats, setChats] = useState<Chat[]>([]);
-
-  // Convex queries and mutations
-  const convexChats = useQuery(
-    api.chat.listChats,
-    user?.id ? { userId: user.id } : "skip"
-  );
-  const createChatMutation = useMutation(api.chat.createChat);
-  const deleteChatMutation = useMutation(api.chat.deleteChat);
-
-  // Sync Convex chats to local state
-  useEffect(() => {
-    if (convexChats) {
-      setChats(convexChats as Chat[]);
-      setIsLoading(false);
-    } else if (user?.id) {
-      setIsLoading(true);
-    }
-  }, [convexChats, user?.id]);
+  const cache = useCache();
 
   const refresh = async () => {
-    if (!user?.id) return;
-    setIsLoading(true);
-    // Convex will automatically refresh the query
-    setIsLoading(false);
+    await cache.refreshCache();
   };
 
   const updateTitle = async (id: string, title: string) => {
-    const prev = [...chats];
-    setChats((prev) => prev.map((c) => (c._id === id ? { ...c, name: title } : c)));
-    
-    try {
-      // TODO: Implement updateChatTitle mutation in Convex
-      // await updateChatTitleMutation({ chatId: id as Id<"chats">, title });
-      console.log("Update title not implemented yet:", id, title);
-    } catch (error) {
-      setChats(prev);
-      toast({ title: "Failed to update title", status: "error" });
-    }
+    // TODO: Implement updateChatTitle mutation in Convex when needed
+    console.log("Update title not implemented yet:", id, title);
   };
 
   const deleteChat = async (
@@ -98,17 +62,9 @@ export function ChatsProvider({
     currentChatId?: string,
     redirect?: () => void
   ) => {
-    const prev = [...chats];
-    setChats((prev) => prev.filter((c) => c._id !== id));
-
-    try {
-      await deleteChatMutation({ chatId: id as Id<"chats"> });
-      if (id === currentChatId && redirect) {
-        redirect();
-      }
-    } catch (error) {
-      setChats(prev);
-      toast({ title: "Failed to delete chat", status: "error" });
+    await cache.deleteChat(id);
+    if (id === currentChatId && redirect) {
+      redirect();
     }
   };
 
@@ -116,66 +72,36 @@ export function ChatsProvider({
     title?: string,
     model?: string
   ): Promise<string | undefined> => {
-    if (!user?.id) return;
-
-    const optimisticId = `optimistic-${Date.now().toString()}`;
-    const optimisticChat: Chat = {
-      _id: optimisticId as Id<"chats">,
-      name: title || "New Chat",
-      userId: user.id,
-      model: model || MODEL_DEFAULT,
-      createdAt: Date.now(),
-      _creationTime: Date.now(),
-    };
-
-    setChats((prev) => [optimisticChat, ...prev]);
-
     try {
-      const newChatId = await createChatMutation({
-        name: title || "New Chat",
-        userId: user.id,
-        model: model || MODEL_DEFAULT,
-      });
-
-      // Replace optimistic chat with real one
-      setChats((prev) =>
-        prev.map((c) => (c._id === optimisticId ? { ...optimisticChat, _id: newChatId } : c))
-      );
-
-      return newChatId;
+      return await cache.createChat(title || "New Chat", model || "gpt-4o");
     } catch (error) {
-      // Remove optimistic chat on error
-      setChats((prev) => prev.filter((c) => c._id !== optimisticId));
-      toast({ title: "Failed to create chat", status: "error" });
+      console.error("Failed to create chat:", error);
+      return undefined;
     }
   };
 
   const resetChats = () => {
-    setChats([]);
+    // This will be handled by the cache provider
+    cache.refreshCache();
   };
 
   const getChatById = (id: string) => {
-    return chats.find((c) => c._id === id);
+    return cache.getChat(id);
   };
 
   const updateChatModel = async (id: string, model: string) => {
-    const prev = [...chats];
-    setChats((prev) => prev.map((c) => (c._id === id ? { ...c, model } : c)));
+    await cache.updateChatModel(id, model);
+  };
 
-    try {
-      // TODO: Implement updateChatModel mutation in Convex
-      // await updateChatModelMutation({ chatId: id as Id<"chats">, model });
-      console.log("Update model not implemented yet:", id, model);
-    } catch (error) {
-      setChats(prev);
-      toast({ title: "Failed to update model", status: "error" });
-    }
+  // Mock setter for compatibility - the cache provider manages state
+  const setChats = () => {
+    console.warn("setChats is deprecated, use cache provider methods instead");
   };
 
   return (
     <ChatsContext.Provider
       value={{
-        chats,
+        chats: cache.chats,
         refresh,
         updateTitle,
         deleteChat,
@@ -184,7 +110,7 @@ export function ChatsProvider({
         resetChats,
         getChatById,
         updateChatModel,
-        isLoading,
+        isLoading: cache.isLoading,
       }}
     >
       {children}

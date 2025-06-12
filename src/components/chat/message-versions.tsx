@@ -1,13 +1,15 @@
 "use client"
 
-import { useState, useEffect, useMemo } from "react"
+import { useState, useMemo } from "react"
 import { CaretLeft, CaretRight } from "@phosphor-icons/react"
 import { Button } from "~/components/ui/button"
 import { cn } from "~/lib/utils"
+import { MessageContentSkeleton } from "./message-content-skeleton"
+import { useCache } from "~/lib/providers/cache-provider"
 import { useQuery, useMutation } from "convex/react"
 import { api } from "@/convex/_generated/api"
 import type { Id } from "@/convex/_generated/dataModel"
-import { MessageContentSkeleton } from "./message-content-skeleton"
+import type { Message } from "~/db"
 
 type MessageVersionsProps = {
   messageId: string
@@ -23,23 +25,30 @@ export function MessageVersions({
   className 
 }: MessageVersionsProps) {
   const [isLoadingVersion, setIsLoadingVersion] = useState(false)
+  const cache = useCache()
   
-  const messageIdTyped = useMemo(() => (convexId || messageId) as Id<"messages">, [convexId, messageId])
+  // Only use convexId if it exists - don't fallback to AI SDK messageId
+  // AI SDK generates IDs like "msg-..." which are not valid Convex IDs
+  const actualConvexId = convexId
   
+  // Get all versions of this message using Convex query
+  // Only run query if we have a valid Convex ID
   const versions = useQuery(
     api.chat.getMessageVersions,
-    convexId ? { messageId: messageIdTyped } : "skip"
+    actualConvexId ? { messageId: actualConvexId as Id<"messages"> } : "skip"
   )
   
-  const switchVersion = useMutation(api.chat.switchMessageVersion)
+  const switchVersionMutation = useMutation(api.chat.switchMessageVersion)
   
+  // Find the current active version index - memoize to prevent recalculation
   const currentVersionIndex = useMemo(() => {
     if (!versions || versions.length === 0) return 0
-    const activeIndex = versions.findIndex(v => v.isActive)
+    const activeIndex = versions.findIndex((v) => v.isActive)
     return activeIndex !== -1 ? activeIndex : 0
   }, [versions])
   
-  if (!versions || versions.length <= 1) {
+  // If there's only one version or no valid convex ID, just render the children
+  if (!actualConvexId || !versions || versions.length <= 1) {
     return <div className={className}>{children}</div>
   }
   
@@ -55,7 +64,7 @@ export function MessageVersions({
         setIsLoadingVersion(true)
         
         try {
-          await switchVersion({ messageId: versionToActivate._id })
+          await switchVersionMutation({ messageId: versionToActivate._id })
           await new Promise(resolve => setTimeout(resolve, 150))
         } catch (error) {
           console.error("Failed to switch version:", error)
@@ -75,7 +84,7 @@ export function MessageVersions({
         setIsLoadingVersion(true)
         
         try {
-          await switchVersion({ messageId: versionToActivate._id })
+          await switchVersionMutation({ messageId: versionToActivate._id })
           await new Promise(resolve => setTimeout(resolve, 150))
         } catch (error) {
           console.error("Failed to switch version:", error)

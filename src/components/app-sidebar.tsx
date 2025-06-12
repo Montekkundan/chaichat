@@ -1,14 +1,11 @@
 "use client";
-import { api } from "@/convex/_generated/api";
-import type { Id } from "@/convex/_generated/dataModel";
 import { useUser } from "@clerk/nextjs";
 import { SignInButton } from "@clerk/nextjs";
 import { Unauthenticated } from "convex/react";
-import { useMutation, useQuery } from "convex/react";
 import { Search, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 
 import { DeleteChatModal } from "~/components/modals/delete-chat-modal";
 import {
@@ -20,20 +17,18 @@ import {
 	SidebarMenuButton,
 	SidebarMenuItem,
 } from "~/components/ui/sidebar";
-import { db } from "~/db";
-import type { Chat } from "~/db";
 import { Button } from "./ui/button";
+import { useCache } from "~/lib/providers/cache-provider";
 
 export function AppSidebar() {
 	const { user } = useUser();
 	const router = useRouter();
+	const cache = useCache();
 	const [search, setSearch] = useState("");
 	const [debouncedSearch, setDebouncedSearch] = useState("");
 	const [deleteModalOpen, setDeleteModalOpen] = useState(false);
 	const [chatToDelete, setChatToDelete] = useState<string | null>(null);
 	const [hoveredChatId, setHoveredChatId] = useState<string | null>(null);
-	const [displayedChats, setDisplayedChats] = useState<Chat[]>([]);
-	const [isLoading, setIsLoading] = useState(false);
 
 	useEffect(() => {
 		const handler = setTimeout(() => {
@@ -42,59 +37,16 @@ export function AppSidebar() {
 		return () => clearTimeout(handler);
 	}, [search]);
 
-	const isSearching = !!search.trim();
-	const queryFn = isSearching ? api.chat.searchChats : api.chat.listChats;
-	const queryArgs = user
-		? isSearching
-			? { userId: user.id, query: debouncedSearch }
-			: { userId: user.id }
-		: "skip";
-
-	const chats = useQuery(queryFn, queryArgs);
-	const deleteChat = useMutation(api.chat.deleteChat);
-
-	// Sync Convex chats to Dexie on fetch
-	useEffect(() => {
-		if (chats && chats.length > 0) {
-			db.chats.bulkPut(chats);
+	// Filter chats based on search - now using cached data
+	const displayedChats = useMemo(() => {
+		if (!debouncedSearch.trim()) {
+			return cache.chats;
 		}
-	}, [chats]);
-
-	// biome-ignore lint/correctness/useExhaustiveDependencies: <explanation>
-	useEffect(() => {
-		let active = true;
-		let loadingTimeout: NodeJS.Timeout | null = null;
-
-		// Only show loading if search takes longer than 150ms
-		loadingTimeout = setTimeout(() => {
-			if (active) setIsLoading(true);
-		}, 150);
-
-		async function fetchLocalChats() {
-			let result: Chat[] = [];
-			if (user) {
-				if (debouncedSearch.trim()) {
-					result = await db.chats
-						.where("userId")
-						.equals(user.id)
-						.filter((chat) =>
-							chat.name.toLowerCase().includes(debouncedSearch.toLowerCase()),
-						)
-						.toArray();
-				} else {
-					result = await db.chats.where("userId").equals(user.id).toArray();
-				}
-			}
-			if (active) setDisplayedChats(result);
-			if (loadingTimeout) clearTimeout(loadingTimeout);
-			setIsLoading(false);
-		}
-		fetchLocalChats();
-		return () => {
-			active = false;
-			if (loadingTimeout) clearTimeout(loadingTimeout);
-		};
-	}, [user, debouncedSearch, chats]);
+		
+		return cache.chats.filter(chat =>
+			chat.name.toLowerCase().includes(debouncedSearch.toLowerCase())
+		);
+	}, [cache.chats, debouncedSearch]);
 
 	const handleProfileClick = (_e: React.MouseEvent | React.KeyboardEvent) => {
 		router.push("/settings/subscription");
@@ -111,16 +63,18 @@ export function AppSidebar() {
 
 	const handleConfirmDelete = async () => {
 		if (chatToDelete) {
-			await deleteChat({ chatId: chatToDelete as Id<"chats"> });
-			// Remove from Dexie (chat and its messages)
-			await db.chats.delete(chatToDelete);
-			await db.messages.where("chatId").equals(chatToDelete).delete();
-			setDisplayedChats((prev) =>
-				prev.filter((chat) => chat._id !== chatToDelete),
-			);
-			router.push("/");
+			// Close modal immediately for instant feedback
 			setDeleteModalOpen(false);
+			const chatIdToDelete = chatToDelete;
 			setChatToDelete(null);
+			
+			try {
+				await cache.deleteChat(chatIdToDelete);
+				router.push("/");
+			} catch (error) {
+				console.error("Failed to delete chat:", error);
+				// Modal is already closed, error handling is in cache provider
+			}
 		}
 	};
 
@@ -155,9 +109,13 @@ export function AppSidebar() {
 						Your Chats
 					</div>
 					<SidebarMenu>
-						{isLoading ? (
+						{cache.isLoading ? (
 							<div className="px-4 py-2 text-muted-foreground text-xs">
-								Searching...
+								Loading...
+							</div>
+						) : cache.isSyncing ? (
+							<div className="px-4 py-2 text-muted-foreground text-xs">
+								Syncing...
 							</div>
 						) : (
 							displayedChats?.map((chat) => (

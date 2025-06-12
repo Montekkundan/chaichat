@@ -139,6 +139,7 @@ export function MessageUser({
                 handleEditCancel()
               }
             }}
+            // biome-ignore lint/a11y/noAutofocus: <explanation>
             autoFocus
           />
           <div className="flex justify-end gap-2">

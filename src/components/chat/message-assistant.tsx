@@ -47,21 +47,21 @@ export const MessageAssistant = React.memo(function MessageAssistant({
 }: MessageAssistantProps) {
   // const { preferences } = useUserPreferences()
   const sources = useMemo(() => getSources(parts), [parts])
-  
-  const toolInvocationParts = useMemo(() => 
+
+  const toolInvocationParts = useMemo(() =>
     parts?.filter((part) => part.type === "tool-invocation"),
     [parts]
   )
-  
-  const reasoningParts = useMemo(() => 
+
+  const reasoningParts = useMemo(() =>
     parts?.find((part) => part.type === "reasoning"),
     [parts]
   )
-  
+
   const contentNullOrEmpty = children === null || children === ""
   const isLastStreaming = status === "streaming" && isLast
-  
-  const searchImageResults = useMemo(() => 
+
+  const searchImageResults = useMemo(() =>
     parts
       ?.filter(
         (part) =>
@@ -72,9 +72,9 @@ export const MessageAssistant = React.memo(function MessageAssistant({
       )
       .flatMap((part) =>
         part.type === "tool-invocation" &&
-        part.toolInvocation?.state === "result" &&
-        part.toolInvocation?.toolName === "imageSearch" &&
-        part.toolInvocation?.result?.content?.[0]?.type === "images"
+          part.toolInvocation?.state === "result" &&
+          part.toolInvocation?.toolName === "imageSearch" &&
+          part.toolInvocation?.result?.content?.[0]?.type === "images"
           ? (part.toolInvocation?.result?.content?.[0]?.results ?? [])
           : []
       ) ?? [],
@@ -107,8 +107,8 @@ export const MessageAssistant = React.memo(function MessageAssistant({
 
         {toolInvocationParts && toolInvocationParts.length > 0 && (
           // preferences.showToolInvocations && (
-            <ToolInvocation toolInvocations={toolInvocationParts} />
-          )}
+          <ToolInvocation toolInvocations={toolInvocationParts} />
+        )}
 
         {searchImageResults.length > 0 && (
           <SearchImages results={searchImageResults} />
@@ -157,21 +157,25 @@ export const MessageAssistant = React.memo(function MessageAssistant({
                     }
                   }}
                 >
-                  <button
-                    className="hover:bg-accent/60 text-muted-foreground hover:text-foreground flex size-7.5 items-center justify-center rounded-full bg-transparent transition"
-                    aria-label="Regenerate"
-                    type="button"
-                  >
-                    <ArrowClockwise className="size-4" />
-                  </button>
+                  <div className="flex items-center">
+                    <button
+                      className="hover:bg-accent/60 text-muted-foreground hover:text-foreground flex size-7.5 items-center justify-center rounded-full bg-transparent transition"
+                      aria-label="Regenerate"
+                      type="button"
+                    >
+                      <ArrowClockwise className="size-4" />
+                    </button>
+                    {model && (
+                      <span className="text-xs text-muted-foreground ml-2">
+                        {model}
+                      </span>
+                    )}
+                  </div>
+
                 </RegenerateDropdown>
               </MessageAction>
             </MessageActions>
-            {model && (
-              <span className="text-xs text-muted-foreground ml-2">
-                {model}
-              </span>
-            )}
+
           </div>
         )}
       </div>

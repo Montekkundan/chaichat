@@ -189,12 +189,23 @@ export const switchMessageVersion = mutation({
 export const getNextVersionNumber = query({
   args: { parentMessageId: v.id("messages") },
   handler: async (ctx, { parentMessageId }) => {
+    // Get all versions (children of the parent)
     const versions = await ctx.db
       .query("messages")
       .withIndex("by_parent", (q) => q.eq("parentMessageId", parentMessageId))
       .collect();
     
-    const maxVersion = Math.max(...versions.map(v => v.version || 1), 1);
+    // Also get the original message (the parent itself)
+    const originalMessage = await ctx.db.get(parentMessageId);
+    
+    // Collect all version numbers, including the original
+    const versionNumbers = versions.map(v => v.version || 1);
+    if (originalMessage) {
+      versionNumbers.push(originalMessage.version || 1);
+    }
+    
+    // Find the maximum version and add 1
+    const maxVersion = Math.max(...versionNumbers, 0);
     return maxVersion + 1;
   },
 });
