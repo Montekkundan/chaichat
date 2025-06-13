@@ -5,7 +5,7 @@ import { Unauthenticated } from "convex/react";
 import { Search, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { DeleteChatModal } from "~/components/modals/delete-chat-modal";
 import {
@@ -17,8 +17,8 @@ import {
 	SidebarMenuButton,
 	SidebarMenuItem,
 } from "~/components/ui/sidebar";
-import { Button } from "./ui/button";
 import { useCache } from "~/lib/providers/cache-provider";
+import { Button } from "./ui/button";
 
 export function AppSidebar() {
 	const { user } = useUser();
@@ -42,9 +42,9 @@ export function AppSidebar() {
 		if (!debouncedSearch.trim()) {
 			return cache.chats;
 		}
-		
-		return cache.chats.filter(chat =>
-			chat.name.toLowerCase().includes(debouncedSearch.toLowerCase())
+
+		return cache.chats.filter((chat) =>
+			chat.name.toLowerCase().includes(debouncedSearch.toLowerCase()),
 		);
 	}, [cache.chats, debouncedSearch]);
 
@@ -71,7 +71,7 @@ export function AppSidebar() {
 			setDeleteModalOpen(false);
 			const chatIdToDelete = chatToDelete;
 			setChatToDelete(null);
-			
+
 			try {
 				await cache.deleteChat(chatIdToDelete);
 				router.push("/");
@@ -116,9 +116,13 @@ export function AppSidebar() {
 							</div>
 							<SidebarMenu>
 								{cache.isLoading ? (
-									<div className="px-4 py-2 text-muted-foreground text-xs">Loading...</div>
+									<div className="px-4 py-2 text-muted-foreground text-xs">
+										Loading...
+									</div>
 								) : cache.isSyncing ? (
-									<div className="px-4 py-2 text-muted-foreground text-xs">Syncing...</div>
+									<div className="px-4 py-2 text-muted-foreground text-xs">
+										Syncing...
+									</div>
 								) : (
 									displayedChats?.map((chat) => (
 										<SidebarMenuItem
@@ -128,7 +132,9 @@ export function AppSidebar() {
 											onMouseLeave={() => setHoveredChatId(null)}
 										>
 											<SidebarMenuButton asChild>
-												<Link href={`/chat/${chat._id}`}><span>{chat.name}</span></Link>
+												<Link href={`/chat/${chat._id}`}>
+													<span>{chat.name}</span>
+												</Link>
 											</SidebarMenuButton>
 											{hoveredChatId === chat._id && (
 												<button
@@ -149,7 +155,7 @@ export function AppSidebar() {
 							</SidebarMenu>
 						</>
 					) : (
-						<div className="py-6 text-center text-xs text-muted-foreground">
+						<div className="py-6 text-center text-muted-foreground text-xs">
 							Sign in to start chatting.
 						</div>
 					)}

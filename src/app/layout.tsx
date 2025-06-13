@@ -5,10 +5,10 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import ConvexClientProvider from "~/components/providers/convex-client-provider";
 import { ThemeProvider } from "~/components/providers/theme-provider";
-import { ChatsProvider } from "~/lib/providers/chats-provider";
+import { Toaster } from "~/components/ui/sonner";
 import { CacheProvider } from "~/lib/providers/cache-provider";
+import { ChatsProvider } from "~/lib/providers/chats-provider";
 import { ModelsProvider } from "~/lib/providers/models-provider";
-import { Toaster } from "~/components/ui/sonner"
 
 const geistSans = Geist({
 	variable: "--font-geist-sans",
@@ -31,26 +31,30 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
 	return (
 		<ClerkProvider>
-			<html lang="en" className={`${geistSans.variable} ${geistMono.variable} antialiased`} suppressHydrationWarning>
+			<html
+				lang="en"
+				className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+				suppressHydrationWarning
+			>
 				<body className="bg-sidebar">
 					<ThemeProvider
-					attribute="class"
-					defaultTheme="system"
-					enableSystem
-					disableTransitionOnChange
+						attribute="class"
+						defaultTheme="system"
+						enableSystem
+						disableTransitionOnChange
 					>
-					<ConvexClientProvider>
-						<CacheProvider>
-							<ChatsProvider>
-								<ModelsProvider>
-									<main className="flex-1">
-									<Toaster position="top-center" />
-										{children}
+						<ConvexClientProvider>
+							<CacheProvider>
+								<ChatsProvider>
+									<ModelsProvider>
+										<main className="flex-1">
+											<Toaster position="top-center" />
+											{children}
 										</main>
-								</ModelsProvider>
-							</ChatsProvider>
-						</CacheProvider>
-					</ConvexClientProvider>
+									</ModelsProvider>
+								</ChatsProvider>
+							</CacheProvider>
+						</ConvexClientProvider>
 					</ThemeProvider>
 				</body>
 			</html>

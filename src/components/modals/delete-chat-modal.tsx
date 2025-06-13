@@ -1,7 +1,7 @@
+import { Loader2 } from "lucide-react";
 import React, { useState } from "react";
 import { Dialog, DialogContent, DialogTitle } from "~/components/ui/dialog";
 import { Button } from "../ui/button";
-import { Loader2 } from "lucide-react";
 
 interface DeleteChatModalProps {
 	open: boolean;
@@ -47,21 +47,21 @@ export function DeleteChatModal({
 						action cannot be undone.
 					</div>
 					<div className="flex justify-end gap-2">
-						<Button 
-							variant="ghost" 
+						<Button
+							variant="ghost"
 							onClick={handleCancel}
 							disabled={isDeleting}
 						>
 							Cancel
 						</Button>
-						<Button 
-							variant="destructive" 
+						<Button
+							variant="destructive"
 							onClick={handleConfirm}
 							disabled={isDeleting}
 						>
 							{isDeleting ? (
 								<>
-									<Loader2 className="w-4 h-4 mr-2 animate-spin" />
+									<Loader2 className="mr-2 h-4 w-4 animate-spin" />
 									Deleting...
 								</>
 							) : (

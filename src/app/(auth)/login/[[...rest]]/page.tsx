@@ -1,8 +1,16 @@
 "use client";
 
-// This catch-all route is required by Clerk so that any sub-path under /login
-// (e.g. /login/ˍˍclerk_callback) is handled without a 404.
-// It simply re-exports the existing LoginPage component.
+import { SignIn } from "@clerk/nextjs";
 
-import LoginPage from "../page";
-export default LoginPage; 
+export default function LoginPage() {
+  return (
+    <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4">
+      <div className="mb-4 text-center">
+        <h1 className="mb-2 text-2xl font-semibold tracking-tight">Welcome to ChaiChat</h1>
+        <p className="text-sm text-muted-foreground">Sign in to continue</p>
+      </div>
+
+      <SignIn appearance={{ variables: { colorPrimary: "#6366f1" } }} />
+    </div>
+  );
+}

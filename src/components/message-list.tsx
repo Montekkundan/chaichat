@@ -2,7 +2,6 @@
 
 import { Copy } from "lucide-react";
 import { useState } from "react";
-import { Button } from "~/components/ui/button";
 import {
 	Message,
 	MessageAction,
@@ -10,6 +9,7 @@ import {
 	MessageAvatar,
 	MessageContent,
 } from "~/components/prompt-kit/message";
+import { Button } from "~/components/ui/button";
 
 export type MessageListMessage = {
 	id: string;
@@ -18,10 +18,11 @@ export type MessageListMessage = {
 };
 
 import {
-	ChatContainerRoot, ChatContainerContent,
-	ChatContainerScrollAnchor
-} from "~/components/prompt-kit/chat-container"
-import { ScrollButton } from "~/components/prompt-kit/scroll-button"
+	ChatContainerContent,
+	ChatContainerRoot,
+	ChatContainerScrollAnchor,
+} from "~/components/prompt-kit/chat-container";
+import { ScrollButton } from "~/components/prompt-kit/scroll-button";
 
 type MessageListProps = {
 	messages: MessageListMessage[];
@@ -39,7 +40,9 @@ export function MessageList({
 					<div className="">
 						<div>Message 1</div>
 						{messages.map((msg) => {
-							const content = Array.isArray(msg.content) ? msg.content.join("") : msg.content;
+							const content = Array.isArray(msg.content)
+								? msg.content.join("")
+								: msg.content;
 							const isUser = msg.role === "user";
 							return (
 								<div
@@ -47,11 +50,11 @@ export function MessageList({
 									className={`flex gap-3 ${isUser ? "justify-end" : "justify-start"}`}
 								>
 									<div
-										className={`prose whitespace-normal break-words rounded-lg p-2
-											${isUser
+										className={`prose whitespace-normal break-words rounded-lg p-2${
+											isUser
 												? "bg-secondary text-foreground"
 												: "bg-secondary text-foreground"
-											}`}
+										}`}
 									>
 										{content}
 									</div>

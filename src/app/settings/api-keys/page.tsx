@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { useMutation, useQuery } from "convex/react";
 import { Loader2 } from "lucide-react";
+import { useEffect, useState } from "react";
 
 type UserKeys = {
 	openaiKey?: string;
@@ -53,17 +53,17 @@ export default function ApiKeysPage() {
 
 	return (
 		<div className="mx-auto max-w-md px-4 py-8">
-			<h1 className="mb-6 text-2xl font-semibold">API Keys</h1>
+			<h1 className="mb-6 font-semibold text-2xl">API Keys</h1>
 
 			{/* OpenAI key section */}
-			<div className="mb-8 border rounded-lg p-4">
-				<h2 className="font-medium mb-2">OpenAI</h2>
-				<p className="text-sm text-muted-foreground mb-4">
+			<div className="mb-8 rounded-lg border p-4">
+				<h2 className="mb-2 font-medium">OpenAI</h2>
+				<p className="mb-4 text-muted-foreground text-sm">
 					Enter your personal OpenAI API key if you want to use premium models.
 					It is stored encrypted and sent only when you make a request.
 				</p>
 
-				<label className="block text-sm font-medium mb-1" htmlFor="openai-key">
+				<label className="mb-1 block font-medium text-sm" htmlFor="openai-key">
 					Current key
 				</label>
 				<div className="mb-3 text-sm" id="openai-key">
@@ -72,7 +72,7 @@ export default function ApiKeysPage() {
 
 				<input
 					type="text"
-					className="w-full border rounded p-2 text-sm mb-3"
+					className="mb-3 w-full rounded border p-2 text-sm"
 					placeholder="sk-..."
 					value={openaiInput}
 					onChange={(e) => setOpenaiInput(e.target.value)}
@@ -81,7 +81,7 @@ export default function ApiKeysPage() {
 					type="button"
 					disabled={saving || !openaiInput.trim()}
 					onClick={handleSave}
-					className="px-4 py-2 rounded bg-black text-white disabled:opacity-50"
+					className="rounded bg-black px-4 py-2 text-white disabled:opacity-50"
 				>
 					{saving ? "Saving..." : "Save key"}
 				</button>

@@ -1,4 +1,5 @@
 "use client";
+import { ArrowUp, Stop, Warning } from "@phosphor-icons/react";
 import { useCallback, useState } from "react";
 import { CookiePreferencesModal } from "~/components/modals/cookie-preferences-modal";
 import { Button } from "~/components/ui/button";
@@ -9,28 +10,27 @@ import {
 	PromptInputTextarea,
 } from "~/components/ui/prompt-input";
 import { getModelInfo } from "~/lib/models";
-import { ArrowUp, Stop, Warning } from "@phosphor-icons/react"
 import { ModelSelector } from "./chat-input/model-selector";
 
 type ChatInputProps = {
-	value: string
-	onValueChange: (value: string) => void
-	onSend: () => void
-	isSubmitting?: boolean
-	hasMessages?: boolean
+	value: string;
+	onValueChange: (value: string) => void;
+	onSend: () => void;
+	isSubmitting?: boolean;
+	hasMessages?: boolean;
 	// files: File[]
 	// onFileUpload: (files: File[]) => void
 	// onFileRemove: (file: File) => void
 	// onSuggestion: (suggestion: string) => void
 	// hasSuggestions?: boolean
-	onSelectModel: (model: string) => void
-	selectedModel: string
-	isUserAuthenticated: boolean
-	stop: () => void
-	status?: "submitted" | "streaming" | "ready" | "error"
+	onSelectModel: (model: string) => void;
+	selectedModel: string;
+	isUserAuthenticated: boolean;
+	stop: () => void;
+	status?: "submitted" | "streaming" | "ready" | "error";
 	// onSearchToggle?: (enabled: boolean, agentId: string | null) => void
-	position?: "centered" | "bottom"
-}
+	position?: "centered" | "bottom";
+};
 
 export function ChatInput({
 	value,
@@ -50,9 +50,9 @@ export function ChatInput({
 	// onSearchToggle,
 	position = "centered",
 }: ChatInputProps) {
-	const selectModelConfig = getModelInfo(selectedModel)
-	const hasToolSupport = Boolean(selectModelConfig?.tools)
-	const isOnlyWhitespace = (text: string) => !/[^\s]/.test(text)
+	const selectModelConfig = getModelInfo(selectedModel);
+	const hasToolSupport = Boolean(selectModelConfig?.tools);
+	const isOnlyWhitespace = (text: string) => !/[^\s]/.test(text);
 
 	// Handle search toggle
 	// biome-ignore lint/correctness/useExhaustiveDependencies: <explanation>
@@ -80,16 +80,16 @@ export function ChatInput({
 
 	const handleSend = useCallback(() => {
 		if (isSubmitting) {
-			return
+			return;
 		}
 
 		if (status === "streaming") {
-			stop()
-			return
+			stop();
+			return;
 		}
 
-		onSend()
-	}, [isSubmitting, onSend, status, stop])
+		onSend();
+	}, [isSubmitting, onSend, status, stop]);
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: <explanation>
 	const handleKeyDown = useCallback(
@@ -98,13 +98,13 @@ export function ChatInput({
 			//   agentCommand.handleKeyDown(e)
 
 			if (isSubmitting) {
-				e.preventDefault()
-				return
+				e.preventDefault();
+				return;
 			}
 
 			if (e.key === "Enter" && status === "streaming") {
-				e.preventDefault()
-				return
+				e.preventDefault();
+				return;
 			}
 
 			//   if (e.key === "Enter" && !e.shiftKey && !agentCommand.showAgentCommand) {
@@ -116,37 +116,37 @@ export function ChatInput({
 			//     onSend()
 			//   }
 		},
-		[isSubmitting, onSend, status, value]
-	)
+		[isSubmitting, onSend, status, value],
+	);
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: <explanation>
 	const handlePaste = useCallback(
 		async (e: ClipboardEvent) => {
-			const items = e.clipboardData?.items
-			if (!items) return
+			const items = e.clipboardData?.items;
+			if (!items) return;
 
 			const hasImageContent = Array.from(items).some((item) =>
-				item.type.startsWith("image/")
-			)
+				item.type.startsWith("image/"),
+			);
 
 			if (!isUserAuthenticated && hasImageContent) {
-				e.preventDefault()
-				return
+				e.preventDefault();
+				return;
 			}
 
 			if (isUserAuthenticated && hasImageContent) {
-				const imageFiles: File[] = []
+				const imageFiles: File[] = [];
 
 				for (const item of Array.from(items)) {
 					if (item.type.startsWith("image/")) {
-						const file = item.getAsFile()
+						const file = item.getAsFile();
 						if (file) {
 							const newFile = new File(
 								[file],
 								`pasted-image-${Date.now()}.${file.type.split("/")[1]}`,
-								{ type: file.type }
-							)
-							imageFiles.push(newFile)
+								{ type: file.type },
+							);
+							imageFiles.push(newFile);
 						}
 					}
 				}
@@ -157,18 +157,17 @@ export function ChatInput({
 			}
 			// Text pasting will work by default for everyone
 		},
-		[isUserAuthenticated]
-	)
-
+		[isUserAuthenticated],
+	);
 
 	const [showCookieModal, setShowCookieModal] = useState(false);
 	const mainContent = (
 		<div className="w-full max-w-3xl">
 			<PromptInput
-				className="bg-popover relative z-10 p-0 pt-1 shadow-xs backdrop-blur-xl"
+				className="relative z-10 bg-popover p-0 pt-1 shadow-xs backdrop-blur-xl"
 				maxHeight={200}
 				value={value}
-			//   onValueChange={agentCommand.handleValueChange}
+				//   onValueChange={agentCommand.handleValueChange}
 			>
 				{/* {agentCommand.showAgentCommand && (
             <div className="absolute bottom-full left-0 w-full">
@@ -192,9 +191,9 @@ export function ChatInput({
 				<PromptInputTextarea
 					placeholder="Ask ChaiChat"
 					onKeyDown={handleKeyDown}
-					onChange={e => onValueChange(e.target.value)}
+					onChange={(e) => onValueChange(e.target.value)}
 					className="min-h-[44px] pt-3 pl-4 text-base leading-[1.3] sm:text-base md:text-base"
-				// ref={agentCommand.textareaRef}
+					// ref={agentCommand.textareaRef}
 				/>
 				<PromptInputActions className="mt-5 w-full justify-between px-3 pb-3">
 					<div className="flex gap-2">
@@ -224,9 +223,7 @@ export function ChatInput({
                 </div>
               )} */}
 					</div>
-					<PromptInputAction
-						tooltip={status === "streaming" ? "Stop" : "Send"}
-					>
+					<PromptInputAction tooltip={status === "streaming" ? "Stop" : "Send"}>
 						<Button
 							size="sm"
 							className="size-9 rounded-full transition-all duration-300 ease-out"

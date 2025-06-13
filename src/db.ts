@@ -38,22 +38,28 @@ export class ChaiChatDB extends Dexie {
 
 	constructor() {
 		super("ChaiChatDB");
-		this.version(2).stores({
-			chats: "_id, userId, name, createdAt, currentModel",
-			messages: "_id, chatId, userId, createdAt, parentMessageId, version, isActive, model",
-			users: "id, fullName",
-		}).upgrade(tx => {
-			// Migration for version 2
-			return tx.table("messages").toCollection().modify(message => {
-				if (message.isActive === undefined) {
-					message.isActive = true;
-				}
-				// Ensure model field exists for existing messages
-				if (!message.model) {
-					message.model = "gpt-4o"; // Default model for existing messages
-				}
+		this.version(2)
+			.stores({
+				chats: "_id, userId, name, createdAt, currentModel",
+				messages:
+					"_id, chatId, userId, createdAt, parentMessageId, version, isActive, model",
+				users: "id, fullName",
+			})
+			.upgrade((tx) => {
+				// Migration for version 2
+				return tx
+					.table("messages")
+					.toCollection()
+					.modify((message) => {
+						if (message.isActive === undefined) {
+							message.isActive = true;
+						}
+						// Ensure model field exists for existing messages
+						if (!message.model) {
+							message.model = "gpt-4o"; // Default model for existing messages
+						}
+					});
 			});
-		});
 	}
 }
 
