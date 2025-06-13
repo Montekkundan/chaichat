@@ -29,9 +29,14 @@ export function Conversation({
 }: ConversationProps) {
   const initialMessageCount = useRef(messages.length)
 
-  // Sort messages by timestamp as a safety measure to ensure correct order
-  const sortedMessages = messages.sort((a, b) => {
-    // Use createdAt if available, otherwise fall back to a timestamp from the id or current time
+  // Update the ref when messages change to track new messages properly
+  if (status === "ready" && messages.length > initialMessageCount.current) {
+    initialMessageCount.current = messages.length;
+  }
+
+  // Sort messages by timestamp to ensure chronological order (oldest first, newest last)
+  const sortedMessages = [...messages].sort((a, b) => {
+    // Use createdAt if available, otherwise fall back to _creationTime or current time
     const aTime = ('_creationTime' in a ? a._creationTime : ('createdAt' in a ? a.createdAt : Date.now())) as number;
     const bTime = ('_creationTime' in b ? b._creationTime : ('createdAt' in b ? b.createdAt : Date.now())) as number;
     return aTime - bTime;

@@ -77,11 +77,9 @@ export const getMessages = query({
   handler: async (ctx, { chatId, userId }) => {
     let query = ctx.db
       .query("messages")
-      .withIndex("by_chat", (q) => q.eq("chatId", chatId))
-      .filter((q) => q.or(
-        q.eq(q.field("isActive"), true),
-        q.eq(q.field("isActive"), undefined) // Handle existing messages without isActive field
-      ))
+      .withIndex("by_chat_active_time", (q) =>
+        q.eq("chatId", chatId).eq("isActive", true)
+      )
       .order("asc");
     if (userId) {
       query = query.filter((q) => q.eq(q.field("userId"), userId));
@@ -182,6 +180,16 @@ export const switchMessageVersion = mutation({
 
     // Activate the selected version
     await ctx.db.patch(messageId, { isActive: true });
+
+    // Return the new active list (sorted)
+    const chatId = message.chatId;
+    const active = await ctx.db
+      .query("messages")
+      .withIndex("by_chat_active_time", q => q.eq("chatId", chatId).eq("isActive", true))
+      .order("asc")
+      .collect();
+
+    return active;
   },
 });
 

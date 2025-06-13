@@ -1,6 +1,5 @@
 import { openproviders } from "~/lib/openproviders"
 import type { ModelConfig } from "../types"
-import { openai } from "@ai-sdk/openai"
 
 const openaiModels: ModelConfig[] = [
   {
@@ -177,7 +176,7 @@ const openaiModels: ModelConfig[] = [
     website: "https://openai.com",
     apiDocs: "https://platform.openai.com/docs/api-reference",
     modelPage: "https://platform.openai.com/docs/models/gpt-4o",
-    apiSdk: (apiKey?: string) => openai("gpt-4o"),
+    apiSdk: (apiKey?: string) => openproviders("gpt-4o", undefined, apiKey),
   },
   {
     id: "gpt-4o-mini",
@@ -359,7 +358,7 @@ const openaiModels: ModelConfig[] = [
     speed: "Medium",
     website: "https://openai.com",
     apiDocs: "https://platform.openai.com/docs/api-reference",
-    apiSdk: (apiKey?: string) => openproviders("gpt-4o-mini", undefined, apiKey),
+    apiSdk: (apiKey?: string) => openproviders("o4-mini", undefined, apiKey),
   },
 ]
 

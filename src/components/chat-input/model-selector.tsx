@@ -24,10 +24,10 @@ import {
   TooltipTrigger,
 } from "~/components/ui/tooltip"
 import { FREE_MODELS_IDS } from "~/lib/config"
-import { fetchClient } from "~/lib/fetch"
 import type { ModelConfig } from "~/lib/models/types"
 import { PROVIDERS } from "~/lib/providers"
 import { cn } from "~/lib/utils"
+import { useModels } from "~/lib/providers/models-provider"
 import { CaretDown, MagnifyingGlass, Star } from "@phosphor-icons/react"
 import { useEffect, useRef, useState } from "react"
 // import { ProModelDialog } from "./pro-dialog"
@@ -46,49 +46,16 @@ export function ModelSelector({
   className,
   isUserAuthenticated = true,
 }: ModelSelectorProps) {
-  const [models, setModels] = useState<ModelConfig[]>([])
-  const [isLoadingModels, setIsLoadingModels] = useState(true)
-
-  // Load models on component mount
-  useEffect(() => {
-    // Only run on client side
-    if (typeof window === "undefined") return
-
-    const loadModels = async () => {
-      try {
-        setIsLoadingModels(true)
-
-        // Use the API endpoint directly to avoid SSR issues
-        const response = await fetchClient("/api/models")
-        if (!response.ok) {
-          throw new Error("Failed to fetch models")
-        }
-
-        const data = await response.json()
-        setModels(data.models || [])
-      } catch (error) {
-        console.error("Failed to load models:", error)
-        // Fallback to empty array if loading fails
-        setModels([])
-      } finally {
-        setIsLoadingModels(false)
-      }
-    }
-
-    loadModels()
-  }, [])
+  const { models, isLoading: isLoadingModels } = useModels()
 
   const currentModel = models.find((model) => model.id === selectedModelId)
   const currentProvider = PROVIDERS.find(
     (provider) => provider.id === currentModel?.providerId
   )
 
-  // Treat all Ollama models as free models
-  const freeModels = models.filter(
-    (model) =>
-      FREE_MODELS_IDS.includes(model.id) || model.providerId === "ollama"
-  )
-  const proModels = models.filter((model) => !freeModels.includes(model))
+  // Categorize models based on FREE_MODELS_IDS
+  const freeModels = models.filter((model) => FREE_MODELS_IDS.includes(model.id))
+  const proModels = models.filter((model) => !FREE_MODELS_IDS.includes(model.id))
 
   const isMobile = useBreakpoint(768)
 
@@ -134,10 +101,29 @@ export function ModelSelector({
     }
   }, [isDropdownOpen, selectedModelId])
 
+  const handleModelSelect = (model: ModelConfig) => {
+    const isPro = !FREE_MODELS_IDS.includes(model.id);
+    
+    if (isPro && !isUserAuthenticated) {
+      // Show auth dialog for unauthenticated users trying to use pro models
+      setSelectedProModel(model.id)
+      setIsProDialogOpen(true)
+      return
+    }
+
+    // For authenticated users or free models, just select the model
+    setSelectedModelId(model.id)
+    if (isMobile) {
+      setIsDrawerOpen(false)
+    } else {
+      setIsDropdownOpen(false)
+    }
+  }
+
   const renderModelItem = (model: ModelConfig) => {
-    const isPro = proModels.some((proModel) => proModel.id === model.id)
+    const isPro = !FREE_MODELS_IDS.includes(model.id);
     const provider = PROVIDERS.find(
-      (provider) => provider.id === model.provider
+      (provider) => provider.id === model.providerId
     )
 
     return (
@@ -145,23 +131,10 @@ export function ModelSelector({
 <div
         key={model.id}
         className={cn(
-          "flex w-full items-center justify-between px-3 py-2",
+          "flex w-full items-center justify-between px-3 py-2 cursor-pointer hover:bg-accent",
           selectedModelId === model.id && "bg-accent"
         )}
-        onClick={() => {
-          if (isPro) {
-            setSelectedProModel(model.id)
-            setIsProDialogOpen(true)
-            return
-          }
-
-          setSelectedModelId(model.id)
-          if (isMobile) {
-            setIsDrawerOpen(false)
-          } else {
-            setIsDropdownOpen(false)
-          }
-        }}
+        onClick={() => handleModelSelect(model)}
       >
         <div className="flex items-center gap-3">
           {provider?.icon && <provider.icon className="size-5" />}
@@ -358,9 +331,7 @@ export function ModelSelector({
                 </div>
               ) : filteredModels.length > 0 ? (
                 filteredModels.map((model) => {
-                  const isPro = proModels.some(
-                    (proModel) => proModel.id === model.id
-                  )
+                  const isPro = !FREE_MODELS_IDS.includes(model.id);
                   const provider = PROVIDERS.find(
                     (provider) => provider.id === model.providerId
                   )
@@ -372,16 +343,7 @@ export function ModelSelector({
                         "flex w-full items-center justify-between px-3 py-2",
                         selectedModelId === model.id && "bg-accent"
                       )}
-                      onSelect={() => {
-                        if (isPro) {
-                          setSelectedProModel(model.id)
-                          setIsProDialogOpen(true)
-                          return
-                        }
-
-                        setSelectedModelId(model.id)
-                        setIsDropdownOpen(false)
-                      }}
+                      onSelect={() => handleModelSelect(model)}
                       onFocus={() => {
                         if (isDropdownOpen) {
                           setHoveredModel(model.id)

@@ -59,7 +59,7 @@ export default function Chat() {
             user: user as unknown as User | null,
         });
 
-    const handleReload = async () => {
+        const handleReload = async () => {
         // TODO: implement reload in provider if needed
     };
 
@@ -72,9 +72,7 @@ export default function Chat() {
             try {
                 const newChatId = await createNewChat(input, selectedModel);
                 // Navigate to the new chat and the message will be sent automatically
-                const url = new URL(`${window.location.origin}/chat/${newChatId}`);
-                url.searchParams.set('q', input);
-                router.push(url.pathname + url.search);
+                router.push(`/chat/${newChatId}?q=${encodeURIComponent(input)}`);
             } catch (error) {
                 console.error("Failed to create chat:", error);
             } finally {
@@ -98,7 +96,7 @@ export default function Chat() {
         >
             {showOnboarding ? (
                 <div className="flex flex-col items-center justify-center flex-1 w-full">
-                    <AnimatePresence initial={false} mode="popLayout">
+            <AnimatePresence initial={false} mode="popLayout">
                         <motion.div
                             key="onboarding"
                             className="mx-auto max-w-[50rem] mb-8"
@@ -137,7 +135,7 @@ export default function Chat() {
                         />
                     </motion.div>
                 </div>
-            ) : (
+                ) : (
                 <>
                     <AnimatePresence initial={false} mode="popLayout">
                         <motion.div
@@ -147,40 +145,40 @@ export default function Chat() {
                             transition={{ duration: 0.3 }}
                             className="flex-1 w-full overflow-auto"
                         >
-                            <Conversation
-                                messages={messages}
-                                status={status}
-                                onDelete={handleDelete}
-                                onEdit={handleEdit}
-                                onReload={handleReload}
+                      <Conversation
+                        messages={messages}
+                        status={status}
+                        onDelete={handleDelete}
+                        onEdit={handleEdit}
+                        onReload={handleReload}
                                 onRegenerate={regenerateMessage}
-                            />
+                      />
                         </motion.div>
-                    </AnimatePresence>
+            </AnimatePresence>
                     
-                    <motion.div
+            <motion.div
                         className="relative inset-x-0 bottom-0 z-50 mx-auto w-full max-w-3xl"
-                        layout="position"
-                        layoutId="chat-input-container"
-                        transition={{
-                            layout: {
+                layout="position"
+                layoutId="chat-input-container"
+                transition={{
+                    layout: {
                                 duration: shouldAnimateInput ? 0.4 : 0,
                                 ease: "easeInOut"
-                            },
-                        }}
-                    >
-                        <ChatInput
-                            value={input}
-                            onValueChange={handleInputChange}
+                    },
+                }}
+            >
+                <ChatInput
+                    value={input}
+                    onValueChange={handleInputChange}
                             onSend={handleSend}
                             isSubmitting={isLoading}
-                            onSelectModel={handleModelChange}
-                            selectedModel={selectedModel}
+                    onSelectModel={handleModelChange}
+                    selectedModel={selectedModel}
                             isUserAuthenticated={!!user?.id}
-                            stop={stop}
-                            status={status}
-                        />
-                    </motion.div>
+                    stop={stop}
+                    status={status}
+                />
+            </motion.div>
                 </>
             )}
         </div>

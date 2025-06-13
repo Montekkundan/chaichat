@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect, useRef } from "react"
 import { CaretLeft, CaretRight } from "@phosphor-icons/react"
 import { Button } from "~/components/ui/button"
 import { cn } from "~/lib/utils"
@@ -26,10 +26,25 @@ export function MessageVersions({
 }: MessageVersionsProps) {
   const [isLoadingVersion, setIsLoadingVersion] = useState(false)
   const cache = useCache()
+  const loggedIds = useRef(new Set<string>())
   
-  // Only use convexId if it exists - don't fallback to AI SDK messageId
+  // Only use convexId if it exists and is a valid Convex ID
   // AI SDK generates IDs like "msg-..." which are not valid Convex IDs
-  const actualConvexId = convexId
+  const actualConvexId = convexId && !convexId.startsWith('msg-') && !convexId.startsWith('temp-') ? convexId : undefined
+  
+  // Log if we're getting invalid IDs to help debug (only once per ID)
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'development') {
+      if (messageId?.startsWith('msg-') && !loggedIds.current.has(messageId)) {
+        console.warn('MessageVersions: Received AI SDK message ID, skipping version query:', messageId);
+        loggedIds.current.add(messageId);
+      }
+      if (convexId && (convexId.startsWith('msg-') || convexId.startsWith('temp-')) && !loggedIds.current.has(convexId)) {
+        console.warn('MessageVersions: Received invalid convexId, skipping version query:', convexId);
+        loggedIds.current.add(convexId);
+      }
+    }
+  }, [messageId, convexId])
   
   // Get all versions of this message using Convex query
   // Only run query if we have a valid Convex ID

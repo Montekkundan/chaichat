@@ -16,7 +16,6 @@ import type {
   XaiModel,
 } from "./types"
 
-
 type OpenAIChatSettings = Parameters<typeof openai>[1]
 type MistralProviderSettings = Parameters<typeof mistral>[1]
 type GoogleGenerativeAIProviderSettings = Parameters<typeof google>[1]
@@ -24,7 +23,17 @@ type AnthropicProviderSettings = Parameters<typeof anthropic>[1]
 type XaiProviderSettings = Parameters<typeof xai>[1]
 type OllamaProviderSettings = OpenAIChatSettings // Ollama uses OpenAI-compatible API
 
-type ModelSettings<T extends SupportedModel> = T extends OpenAIModel
+type CommonSamplingSettings = {
+  temperature?: number;
+  topP?: number;
+  topK?: number;
+  presencePenalty?: number;
+  frequencyPenalty?: number;
+  stopSequences?: string[];
+  seed?: number;
+};
+
+type ModelSettings<T extends SupportedModel> = (T extends OpenAIModel
   ? OpenAIChatSettings
   : T extends MistralModel
     ? MistralProviderSettings
@@ -36,7 +45,7 @@ type ModelSettings<T extends SupportedModel> = T extends OpenAIModel
           ? XaiProviderSettings
           : T extends OllamaModel
             ? OllamaProviderSettings
-            : never
+            : never) & CommonSamplingSettings
 
 export type OpenProvidersOptions<T extends SupportedModel> = ModelSettings<T>
 
@@ -48,7 +57,8 @@ const getOllamaBaseURL = () => {
   }
   
   // Server-side: check environment variables
-  return process.env.OLLAMA_BASE_URL?.replace(/\/+$/, '') + "/v1" || "http://localhost:11434/v1"
+  const base = process.env.OLLAMA_BASE_URL?.replace(/\/+$/, '') ?? 'http://localhost:11434';
+  return `${base}/v1`;
 }
 
 // Create Ollama provider instance with configurable baseURL
@@ -116,4 +126,14 @@ export function openproviders<T extends SupportedModel>(
   }
 
   throw new Error(`Unsupported model: ${modelId}`)
+}
+
+export function getModelWithUserKey<T extends SupportedModel>(
+  modelId: T,
+  settings: OpenProvidersOptions<T> | undefined,
+  userKeys: Record<string, string | undefined>
+) {
+  const provider = getProviderForModel(modelId);
+  const key = userKeys?.[`${provider}Key`];
+  return openproviders(modelId, settings, key);
 }

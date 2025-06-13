@@ -10,11 +10,11 @@ import {
 import { Input } from "~/components/ui/input"
 import { cn } from "~/lib/utils"
 import { MagnifyingGlass, ArrowClockwise } from "@phosphor-icons/react"
-import { useState, useEffect } from "react"
-import { fetchClient } from "~/lib/fetch"
+import { useState } from "react"
 import type { ModelConfig } from "~/lib/models/types"
 import { PROVIDERS } from "~/lib/providers"
 import { FREE_MODELS_IDS } from "~/lib/config"
+import { useModels } from "~/lib/providers/models-provider"
 
 type RegenerateDropdownProps = {
   currentModel: string
@@ -27,32 +27,9 @@ export function RegenerateDropdown({
   onRegenerate,
   children,
 }: RegenerateDropdownProps) {
-  const [models, setModels] = useState<ModelConfig[]>([])
-  const [isLoadingModels, setIsLoadingModels] = useState(true)
+  const { models, isLoading: isLoadingModels } = useModels()
   const [searchQuery, setSearchQuery] = useState("")
   const [isOpen, setIsOpen] = useState(false)
-
-  // Load models
-  useEffect(() => {
-    const loadModels = async () => {
-      try {
-        setIsLoadingModels(true)
-        const response = await fetchClient("/api/models")
-        if (!response.ok) {
-          throw new Error("Failed to fetch models")
-        }
-        const data = await response.json()
-        setModels(data.models || [])
-      } catch (error) {
-        console.error("Failed to load models:", error)
-        setModels([])
-      } finally {
-        setIsLoadingModels(false)
-      }
-    }
-
-    loadModels()
-  }, [])
 
   const filteredModels = models
     .filter((model) =>
@@ -129,7 +106,7 @@ export function RegenerateDropdown({
                 const provider = PROVIDERS.find(
                   (provider) => provider.id === model.providerId
                 )
-                const isPro = !FREE_MODELS_IDS.includes(model.id) && model.providerId !== "ollama"
+                const isPro = !FREE_MODELS_IDS.includes(model.id)
                 const isCurrentModel = model.id === currentModel
 
                 return (

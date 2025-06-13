@@ -59,6 +59,13 @@ export function CacheProvider({ children }: { children: React.ReactNode }) {
   
   // Message cache - keyed by chatId
   const messagesCache = useRef<Map<string, Message[]>>(new Map());
+  // In-flight promise map to de-duplicate concurrent Convex reads
+  const inflightRequests = useRef<Map<string, Promise<Message[]>>>(new Map());
+
+  // Small in-memory LRU so we don't even touch IndexedDB for very hot chats
+  const memLRU = useRef<Map<string, { ts: number; msgs: Message[] }>>(new Map());
+  const LRU_MAX = 5;
+  const LRU_TTL = 5 * 60_000; // 5 minutes
   
   // Version cache - keyed by parentMessageId
   const versionsCache = useRef<Map<string, Message[]>>(new Map());
@@ -254,59 +261,87 @@ export function CacheProvider({ children }: { children: React.ReactNode }) {
 
   // Message operations
   const getMessages = useCallback(async (chatId: string): Promise<Message[]> => {
-    // Return cached if available (already sorted and filtered)
-    const cached = messagesCache.current.get(chatId);
-    if (cached) {
-      // Filter to only active messages and sort
-      const activeMessages = cached.filter(msg => msg.isActive === true || msg.isActive === undefined);
-      return activeMessages.sort((a, b) => a._creationTime - b._creationTime);
+    // 0) in-memory LRU
+    const lruHit = memLRU.current.get(chatId);
+    if (lruHit && Date.now() - lruHit.ts < LRU_TTL) {
+      // bump recency
+      memLRU.current.delete(chatId);
+      memLRU.current.set(chatId, { ...lruHit, ts: Date.now() });
+      return lruHit.msgs;
     }
 
-    // Load from Dexie first
-    try {
-      const localMessages = await db.messages
-        .where("chatId")
-        .equals(chatId)
-        .and(msg => msg.isActive === true || msg.isActive === undefined) // Only truly active messages
-        .toArray();
-      
-      if (localMessages.length > 0) {
-        // Sort messages by creation time to ensure correct order
-        const sortedMessages = localMessages.sort((a, b) => a._creationTime - b._creationTime);
-        messagesCache.current.set(chatId, sortedMessages);
-        return sortedMessages;
+    // 1) de-duplicate concurrent fetches
+    if (inflightRequests.current.has(chatId)) {
+      const p = inflightRequests.current.get(chatId);
+      if (p) return p;
+    }
+
+    const fetchPromise = (async (): Promise<Message[]> => {
+      // Return cached if available (already sorted and filtered)
+      const cached = messagesCache.current.get(chatId);
+      if (cached) {
+        // Filter to only active messages and sort
+        const activeMessages = cached.filter(msg => msg.isActive === true || msg.isActive === undefined);
+        memLRU.current.set(chatId, { ts: Date.now(), msgs: activeMessages });
+        return activeMessages.sort((a, b) => a._creationTime - b._creationTime);
       }
-    } catch (error) {
-      console.error("Failed to load from Dexie:", error);
-    }
 
-    // If no local messages, try to load from Convex
-    try {
-      const convexMessages = await convex.query(api.chat.getMessages, { 
-        chatId: chatId as Id<"chats"> 
-      });
-      
-      if (convexMessages && convexMessages.length > 0) {
-        // Save to Dexie for future use
-        await db.messages.bulkPut(convexMessages.map((msg: Doc<"messages">) => ({
-          ...msg,
-          _id: msg._id,
-          chatId: chatId,
-          _creationTime: msg._creationTime || msg.createdAt,
-        })));
+      // Load from Dexie first
+      try {
+        const localMessages = await db.messages
+          .where("chatId")
+          .equals(chatId)
+          .and(msg => msg.isActive === true || msg.isActive === undefined) // Only truly active messages
+          .toArray();
         
-        // Filter only active messages and sort
-        const activeMessages = convexMessages.filter((msg: Doc<"messages">) => msg.isActive === true || msg.isActive === undefined);
-        const sortedMessages = activeMessages.sort((a: Doc<"messages">, b: Doc<"messages">) => (a._creationTime || a.createdAt) - (b._creationTime || b.createdAt));
-        
-        messagesCache.current.set(chatId, sortedMessages as Message[]);
-        return sortedMessages as Message[];
+        if (localMessages.length > 0) {
+          // Sort messages by creation time to ensure correct order
+          const sortedMessages = localMessages.sort((a, b) => a._creationTime - b._creationTime);
+          messagesCache.current.set(chatId, sortedMessages);
+          memLRU.current.set(chatId, { ts: Date.now(), msgs: sortedMessages });
+          return sortedMessages;
+        }
+      } catch (error) {
+        console.error("Failed to load from Dexie:", error);
       }
-    } catch (error) {
-      console.error("Failed to load from Convex:", error);
-    }
 
-    return [];
+      // If no local messages, try to load from Convex
+      try {
+        const convexMessages = await convex.query(api.chat.getMessages, { 
+          chatId: chatId as Id<"chats"> 
+        });
+        
+        if (convexMessages && convexMessages.length > 0) {
+          // Save to Dexie for future use
+          await db.messages.bulkPut(convexMessages.map((msg: Doc<"messages">) => ({
+            ...msg,
+            _id: msg._id,
+            chatId: chatId,
+            _creationTime: msg._creationTime || msg.createdAt,
+          })));
+          
+          // Filter only active messages and sort
+          const activeMessages = convexMessages.filter((msg: Doc<"messages">) => msg.isActive === true || msg.isActive === undefined);
+          const sortedMessages = activeMessages.sort((a: Doc<"messages">, b: Doc<"messages">) => (a._creationTime || a.createdAt) - (b._creationTime || b.createdAt));
+          
+          messagesCache.current.set(chatId, sortedMessages as Message[]);
+          memLRU.current.set(chatId, { ts: Date.now(), msgs: sortedMessages as Message[] });
+          return sortedMessages as Message[];
+        }
+      } catch (error) {
+        console.error("Failed to load from Convex:", error);
+      }
+
+      return [];
+    })();
+
+    inflightRequests.current.set(chatId, fetchPromise);
+    try {
+      const result = await fetchPromise;
+      return result;
+    } finally {
+      inflightRequests.current.delete(chatId);
+    }
   }, [convex]);
 
   const getMessageVersions = useCallback(async (messageId: string): Promise<Message[]> => {
@@ -337,15 +372,32 @@ export function CacheProvider({ children }: { children: React.ReactNode }) {
     const optimisticMessage: Message = {
       ...messageData,
       _id: optimisticId,
-      _creationTime: Date.now(),
+      _creationTime: messageData.createdAt, // Use the provided createdAt time
       isActive: messageData.isActive ?? true,
     };
 
     const currentMessages = messagesCache.current.get(messageData.chatId) || [];
+    // Add the new message at the end (it should have the latest timestamp)
     const newMessages = [...currentMessages, optimisticMessage];
-    // Keep messages sorted by creation time
+    // Sort to ensure proper order, but new messages should naturally be at the end
     const sortedMessages = newMessages.sort((a, b) => a._creationTime - b._creationTime);
     messagesCache.current.set(messageData.chatId, sortedMessages);
+    
+    // Update LRU cache immediately with the new message
+    memLRU.current.set(messageData.chatId, { ts: Date.now(), msgs: sortedMessages });
+    
+    // Evict oldest LRU entries if we exceed the limit
+    if (memLRU.current.size > LRU_MAX) {
+      const entries = Array.from(memLRU.current.entries());
+      entries.sort((a, b) => a[1].ts - b[1].ts); // Sort by timestamp
+      const toDelete = entries.slice(0, entries.length - LRU_MAX);
+      for (const [key] of toDelete) {
+        memLRU.current.delete(key);
+      }
+    }
+
+    // Notify the messages provider immediately about the optimistic update
+    onMessagesChangedCallback.current?.(messageData.chatId);
 
     try {
       const convexData = {
@@ -365,42 +417,61 @@ export function CacheProvider({ children }: { children: React.ReactNode }) {
       const realMessage = { ...optimisticMessage, _id: newMessageId };
       await db.messages.put(realMessage);
       
+      // Update the cache with the real message ID
       const messages = messagesCache.current.get(messageData.chatId) || [];
       const updatedMessages = messages.map(msg => msg._id === optimisticId ? realMessage : msg);
-      const sortedMessages = updatedMessages.sort((a, b) => a._creationTime - b._creationTime);
-      messagesCache.current.set(messageData.chatId, sortedMessages);
+      const sortedUpdatedMessages = updatedMessages.sort((a, b) => a._creationTime - b._creationTime);
+      messagesCache.current.set(messageData.chatId, sortedUpdatedMessages);
+      
+      // Update LRU cache with the real message
+      memLRU.current.set(messageData.chatId, { ts: Date.now(), msgs: sortedUpdatedMessages });
+
+      // Notify again after the real message is saved
+      onMessagesChangedCallback.current?.(messageData.chatId);
 
       return newMessageId;
     } catch (error) {
+      // Rollback: remove the optimistic message
       const messages = messagesCache.current.get(messageData.chatId) || [];
-      messagesCache.current.set(
-        messageData.chatId,
-        messages.filter(msg => msg._id !== optimisticId)
-      );
+      const rolledBackMessages = messages.filter(msg => msg._id !== optimisticId);
+      messagesCache.current.set(messageData.chatId, rolledBackMessages);
+      
+      // Update LRU cache after rollback
+      memLRU.current.set(messageData.chatId, { ts: Date.now(), msgs: rolledBackMessages });
+      
+      // Notify about the rollback
+      onMessagesChangedCallback.current?.(messageData.chatId);
+      
       throw error;
     }
   }, [addMessageMutation]);
 
   const switchMessageVersion = useCallback(async (messageId: string): Promise<void> => {
     try {
-      // Switch version in Convex
-      await switchMessageVersionMutation({ 
+      const updatedActive = await switchMessageVersionMutation({ 
         messageId: messageId as Id<"messages"> 
       });
-      
-      // Clear version cache to force refresh
+
+      // Clear version cache
       versionsCache.current.clear();
-      
-      // Get the chat ID for this message
-      const message = await db.messages.get(messageId);
-      if (message) {
-        // Clear the old cache to force reload
-        messagesCache.current.delete(message.chatId);
-        
-        // Trigger messages reload in the messages provider
-        if (onMessagesChangedCallback.current) {
-          onMessagesChangedCallback.current(message.chatId);
-        }
+
+      // If mutation returned list, update Dexie & caches in one go
+      if (Array.isArray(updatedActive) && updatedActive.length > 0) {
+        const first = updatedActive[0] as Message;
+        const chatId = first.chatId;
+        if (!chatId) return;
+
+        // Upsert into Dexie
+        await db.messages.bulkPut(updatedActive.map((m) => ({
+          ...(m as Message),
+          _creationTime: (m as unknown as { _creationTime?: number; createdAt: number })._creationTime ?? (m as Message).createdAt,
+        })));
+
+        messagesCache.current.set(chatId, updatedActive as Message[]);
+        memLRU.current.set(chatId, { ts: Date.now(), msgs: updatedActive as Message[] });
+
+        // Notify any listeners
+        onMessagesChangedCallback.current?.(chatId);
       }
     } catch (error) {
       console.error("Failed to switch version:", error);

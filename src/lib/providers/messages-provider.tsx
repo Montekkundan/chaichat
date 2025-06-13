@@ -2,7 +2,7 @@
 
 import { useChat, type Message as MessageAISDK } from "@ai-sdk/react";
 import { useUser } from "@clerk/nextjs";
-import { createContext, useContext, useEffect, useState, useRef, useCallback } from "react";
+import { createContext, useContext, useEffect, useState, useRef, useCallback, startTransition } from "react";
 import { toast } from "~/components/ui/toast";
 import { API_ROUTE_CHAT } from "~/lib/routes";
 import { SYSTEM_PROMPT_DEFAULT } from "~/lib/config";
@@ -28,12 +28,13 @@ interface MessagesContextType {
   reload: () => void;
 }
 
-const MessagesContext = createContext<MessagesContextType | null>(null);
+const MessagesContext = createContext<MessagesContextType | undefined>(undefined);
 
 export function useMessages() {
   const context = useContext(MessagesContext);
-  if (!context)
-    throw new Error("useMessages must be used within MessagesProvider");
+  if (!context) {
+    throw new Error("useMessages must be used within a MessagesProvider");
+  }
   return context;
 }
 
@@ -61,6 +62,17 @@ export function MessagesProvider({
     version: number;
   } | null>(null);
 
+  // Track the last user message that needs to be saved to cache
+  const pendingUserMessage = useRef<{
+    content: string;
+    messageId: string;
+  } | null>(null);
+
+  // Track pending message from URL query parameter
+  const hasSentPending = useRef(false);
+  const hasAppendedPending = useRef(false);
+  const [pendingInputToSend, setPendingInputToSend] = useState<string | null>(null);
+
   // Load messages from cache when chatId changes
   useEffect(() => {
     const loadMessages = async () => {
@@ -77,6 +89,8 @@ export function MessagesProvider({
           content: m.content,
           model: m.model,
           convexId: m._id,
+          _creationTime: m._creationTime,
+          createdAt: new Date(m.createdAt),
         })) as MessageAISDK[];
         
         setCachedMessages(aiSdkMessages);
@@ -101,10 +115,38 @@ export function MessagesProvider({
     append,
   } = useChat({
     api: API_ROUTE_CHAT,
-    initialMessages: [],
-    onFinish: async (message) => {
+    initialMessages: cachedMessages,
+    onFinish: async (message, { finishReason, usage }) => {
       if (!chatId || !user?.id) return;
 
+      // Save pending user message first if it exists
+      if (pendingUserMessage.current) {
+        try {
+          const convexMessageId = await cache.addMessage({
+            chatId,
+            userId: user.id,
+            role: "user",
+            content: pendingUserMessage.current.content,
+            model: selectedModel,
+            createdAt: Date.now(),
+          });
+
+          // Update the user message with convex ID
+          startTransition(() => setMessages(currentMessages => 
+            currentMessages.map(msg => 
+              msg.id === pendingUserMessage.current?.messageId 
+                ? { ...msg, convexId: convexMessageId }
+                : msg
+            )
+          ));
+
+          pendingUserMessage.current = null;
+        } catch (error) {
+          console.error("Failed to save user message:", error);
+        }
+      }
+
+      // Save assistant message to cache
       if (message.role === "assistant") {
         try {
           if (regenerationContext.current) {
@@ -122,13 +164,13 @@ export function MessagesProvider({
               createdAt: Date.now(),
             });
 
-            setMessages(currentMessages => 
+            startTransition(() => setMessages(currentMessages => 
               currentMessages.map(msg => 
                 msg.id === message.id 
-                  ? { ...msg, convexId: convexMessageId }
+                  ? { ...msg, convexId: convexMessageId, model: selectedModel }
                   : msg
               )
-            );
+            ));
 
             regenerationContext.current = null;
           } else {
@@ -142,13 +184,13 @@ export function MessagesProvider({
               createdAt: Date.now(),
             });
 
-            setMessages(currentMessages => 
+            startTransition(() => setMessages(currentMessages => 
               currentMessages.map(msg => 
                 msg.id === message.id 
-                  ? { ...msg, convexId: convexMessageId }
+                  ? { ...msg, convexId: convexMessageId, model: selectedModel }
                   : msg
               )
-            );
+            ));
           }
         } catch (error) {
           console.error("Failed to save assistant message:", error);
@@ -165,77 +207,72 @@ export function MessagesProvider({
     }
   });
 
+  // Handle query parameter for auto-sending messages (after useChat)
   useEffect(() => {
-    if (cachedMessages.length > 0 && status === "ready") {
-      setMessages(cachedMessages);
+    // Only run on client-side and if we haven't already processed the pending input
+    if (typeof window !== "undefined" && !hasAppendedPending.current) {
+      const url = new URL(window.location.href);
+      const pendingInput = url.searchParams.get("q");
+      
+      if (pendingInput) {
+        setPendingInputToSend(pendingInput);
+        hasAppendedPending.current = true;
+        
+        // Clean up URL
+        url.searchParams.delete("q");
+        window.history.replaceState({}, "", url.pathname + url.search);
+      }
     }
-  }, [cachedMessages, setMessages, status]);
+  }, []);
 
+  // Reset pending flags when chatId changes (after useChat)
   useEffect(() => {
     if (chatId === null) {
       setMessages([]);
       setCachedMessages([]);
     }
+    hasSentPending.current = false;
     hasAppendedPending.current = false;
   }, [chatId, setMessages]);
 
-  // Register callback for force reloading messages when versions change
+  // Sync cached messages with AI SDK when cache changes
   useEffect(() => {
-    const handleMessagesChanged = async (changedChatId: string) => {
-      if (changedChatId === chatId) {
-        // Force reload from Convex and update cache
-        try {
-          // Query Convex directly for fresh data
-          const convexMessages = await convex.query(api.chat.getMessages, { 
-            chatId: changedChatId as Id<"chats">
-          });
-          
-          // Convert to AI SDK format
-          const aiSdkMessages = convexMessages.map((m) => ({
-            id: m._id,
-            role: m.role,
-            content: m.content,
-            model: m.model,
-            convexId: m._id,
-          })) as MessageAISDK[];
-          
-          setCachedMessages(aiSdkMessages);
-          setMessages(aiSdkMessages);
-        } catch (error) {
-          console.error("Failed to reload messages from Convex:", error);
-        }
-      }
-    };
-
-    cache.setOnMessagesChanged(handleMessagesChanged);
-  }, [chatId, cache, convex, setMessages]);
-
-  const createNewChat = async (initialMessage: string, model: string): Promise<string> => {
-    if (!user?.id) throw new Error("User not authenticated");
-    
-    const chatName = initialMessage.slice(0, 50);
-    const newChatId = await cache.createChat(chatName, model);
-    
-    return newChatId;
-  };
-
-  const changeModel = useCallback(async (model: string): Promise<void> => {
-    setSelectedModel(model);
-    
-    // Update the chat's current model if we have a chatId
-    if (chatId) {
-      await cache.updateChatModel(chatId, model);
+    if (cachedMessages.length > 0 && messages.length === 0) {
+      startTransition(() => setMessages(cachedMessages));
     }
-  }, [chatId, cache]);
+  }, [cachedMessages, messages.length, setMessages]);
 
-  const sendMessage = useCallback(async (messageContent: string) => {
-    if (!messageContent.trim() || !user?.id || !chatId) return;
-    if (isSubmitting) return;
-    
-    setIsSubmitting(true);
-    
+  const createNewChat = useCallback(async (initialMessage: string, model: string): Promise<string> => {
+    if (!user?.id) throw new Error("User not authenticated");
+
     try {
-      const submitOptions = {
+      const chatName = initialMessage.slice(0, 50);
+      const newChatId = await cache.createChat(chatName, model);
+      return newChatId;
+    } catch (error) {
+      console.error("Failed to create chat:", error);
+      throw error;
+    }
+  }, [user?.id, cache]);
+
+  const sendMessage = useCallback(async (message: string) => {
+    if (!user?.id || !chatId) return;
+    if (isSubmitting) return;
+
+    setIsSubmitting(true);
+
+    try {
+      // Track this message to save it later
+      pendingUserMessage.current = {
+        content: message,
+        messageId: `temp-${Date.now()}`,
+      };
+
+      // Use append to add the user message and trigger AI response
+      await append({
+        role: "user",
+        content: message,
+      }, {
         body: {
           chatId: chatId as Id<"chats">,
           userId: user.id,
@@ -243,25 +280,7 @@ export function MessagesProvider({
           isAuthenticated: true,
           systemPrompt: SYSTEM_PROMPT_DEFAULT,
         },
-      };
-
-      await cache.addMessage({
-        chatId,
-        userId: user.id,
-        role: "user",
-        content: messageContent,
-        model: selectedModel,
-        createdAt: Date.now(),
       });
-
-      await append(
-        {
-          role: "user",
-          content: messageContent,
-        },
-        submitOptions
-      );
-      
     } catch (error) {
       console.error("Failed to send message:", error);
       toast({
@@ -271,27 +290,9 @@ export function MessagesProvider({
     } finally {
       setIsSubmitting(false);
     }
-  }, [user?.id, chatId, selectedModel, append, isSubmitting, cache]);
+  }, [user?.id, chatId, selectedModel, append, isSubmitting]);
 
-  const hasAppendedPending = useRef(false);
-  const hasSentPending = useRef(false);
-  const [pendingInputToSend, setPendingInputToSend] = useState<string | null>(null);
-  
-  useEffect(() => {
-    if (typeof window !== "undefined" && !hasAppendedPending.current) {
-      const url = new URL(window.location.href);
-      const pendingInput = url.searchParams.get("q");
-      
-      if (pendingInput) {
-        setPendingInputToSend(pendingInput);
-        hasAppendedPending.current = true;
-        
-        url.searchParams.delete("q");
-        window.history.replaceState({}, "", url.pathname + url.search);
-      }
-    }
-  }, []);
-  
+  // Send pending message when conditions are right (after sendMessage is defined)
   useEffect(() => {
     if (pendingInputToSend && chatId && user?.id && status === "ready" && messages.length === 0 && !hasSentPending.current) {
       hasSentPending.current = true;
@@ -303,9 +304,18 @@ export function MessagesProvider({
     }
   }, [pendingInputToSend, chatId, user?.id, status, messages.length, sendMessage]);
 
-  useEffect(() => {
-    hasSentPending.current = false;
-  }, []);
+  const changeModel = useCallback(async (newModel: string) => {
+    setSelectedModel(newModel);
+    
+    // If we have a chat, update it in the cache
+    if (chatId && user?.id) {
+      try {
+        await cache.updateChatModel(chatId, newModel);
+      } catch (error) {
+        console.error("Failed to update chat model:", error);
+      }
+    }
+  }, [chatId, user?.id, cache]);
 
   const regenerateMessage = useCallback(async (messageIndex: number, newModel?: string) => {
     if (!user?.id || !chatId || messageIndex < 0) return;
@@ -323,10 +333,9 @@ export function MessagesProvider({
 
       const convexId = (assistantMessage as MessageAISDK & { convexId?: string }).convexId;
       
-      const actualConvexId = convexId || assistantMessage.id;
-      
-      if (!actualConvexId) {
-        console.error("No ID found for message - cannot regenerate");
+      // Only proceed if we have a valid Convex ID (not an optimistic AI SDK ID)
+      if (!convexId || convexId.startsWith('msg-') || convexId.startsWith('temp-')) {
+        console.error("No valid Convex ID found for message - cannot regenerate");
         return;
       }
 
@@ -342,21 +351,24 @@ export function MessagesProvider({
       }
 
       // Get the root parent message ID (for version chaining)
-      // If the current message already has a parent, use that parent
-      // Otherwise, use the current message as the root parent
-      let rootParentId = actualConvexId;
+      let rootParentId = convexId;
       
       // Check if this message already has a parent (it's already a regenerated version)
-      const currentMessage = await convex.query(api.chat.getMessageVersions, {
-        messageId: actualConvexId as Id<"messages">
-      });
-      
-      if (currentMessage && currentMessage.length > 0) {
-        // Find the root parent (the one without a parentMessageId)
-        const rootMessage = currentMessage.find(msg => !msg.parentMessageId);
-        if (rootMessage) {
-          rootParentId = rootMessage._id;
+      try {
+        const currentMessage = await convex.query(api.chat.getMessageVersions, {
+          messageId: convexId as Id<"messages">
+        });
+        
+        if (currentMessage && currentMessage.length > 0) {
+          // Find the root parent (the one without a parentMessageId)
+          const rootMessage = currentMessage.find(msg => !msg.parentMessageId);
+          if (rootMessage) {
+            rootParentId = rootMessage._id;
+          }
         }
+      } catch (error) {
+        console.error("Failed to get message versions:", error);
+        // Continue with the current message as root parent
       }
 
       // Get the next version number from Convex using the root parent
@@ -372,16 +384,19 @@ export function MessagesProvider({
       }
 
       regenerationContext.current = {
-        parentMessageId: rootParentId, // Use root parent, not immediate parent
+        parentMessageId: rootParentId,
         version: nextVersion,
       };
 
-      // Remove assistant message and any messages after it from the UI temporarily
+      // Remove assistant message and any messages after it from UI
       const messagesToKeep = messages.slice(0, messageIndex);
-      setMessages(messagesToKeep);
+      startTransition(() => setMessages(messagesToKeep));
 
-      // regenerate the response
-      await reload({
+      // Use append to regenerate instead of reload to avoid duplication
+      await append({
+        role: "user",
+        content: userMessage.content,
+      }, {
         body: {
           chatId: chatId as Id<"chats">,
           userId: user.id,
@@ -401,7 +416,7 @@ export function MessagesProvider({
     } finally {
       setIsSubmitting(false);
     }
-  }, [user?.id, chatId, selectedModel, messages, setMessages, reload, changeModel, isSubmitting, convex]);
+  }, [user?.id, chatId, selectedModel, messages, setMessages, append, changeModel, isSubmitting, convex]);
 
   return (
     <MessagesContext.Provider

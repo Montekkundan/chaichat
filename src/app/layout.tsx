@@ -7,6 +7,7 @@ import ConvexClientProvider from "~/components/providers/convex-client-provider"
 import { ThemeProvider } from "~/components/providers/theme-provider";
 import { ChatsProvider } from "~/lib/providers/chats-provider";
 import { CacheProvider } from "~/lib/providers/cache-provider";
+import { ModelsProvider } from "~/lib/providers/models-provider";
 import { Toaster } from "~/components/ui/sonner"
 
 const geistSans = Geist({
@@ -41,10 +42,12 @@ export default function RootLayout({
 					<ConvexClientProvider>
 						<CacheProvider>
 							<ChatsProvider>
+								<ModelsProvider>
 									<main className="flex-1">
 									<Toaster position="top-center" />
 										{children}
 										</main>
+								</ModelsProvider>
 							</ChatsProvider>
 						</CacheProvider>
 					</ConvexClientProvider>

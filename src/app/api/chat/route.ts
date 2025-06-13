@@ -1,11 +1,14 @@
 // import { loadAgent } from "@/lib/agents/load-agent"
-import { SYSTEM_PROMPT_DEFAULT } from "~/lib/config"
+import { SYSTEM_PROMPT_DEFAULT, FREE_MODELS_IDS } from "~/lib/config"
 // import { loadMCPToolsFromURL } from "@/lib/mcp/load-mcp-from-url"
 import { getAllModels } from "~/lib/models"
 import { getProviderForModel } from "~/lib/openproviders/provider-map"
+import { openproviders } from "~/lib/openproviders"
 // import { Provider } from "@/lib/user-keys"
 import type { Attachment } from "@ai-sdk/ui-utils"
 import { type Message as MessageAISDK, streamText, type ToolSet } from "ai"
+import { ConvexHttpClient } from "convex/browser"
+import { api } from "@/convex/_generated/api"
 // import {
 //   logUserMessage,
 //   storeAssistantMessage,
@@ -27,6 +30,7 @@ type ChatRequest = {
   systemPrompt: string
   agentId?: string
   regenerateMessageId?: string 
+  temperature?: number
 }
 
 export async function POST(req: Request) {
@@ -42,6 +46,7 @@ export async function POST(req: Request) {
       systemPrompt,
       agentId,
       regenerateMessageId,
+      temperature,
     } = body as ChatRequest
 
     if (!messages || !chatId || !userId) {
@@ -49,6 +54,26 @@ export async function POST(req: Request) {
         JSON.stringify({ error: "Error, missing information" }),
         { status: 400 }
       )
+    }
+
+    // Initialize Convex client for server-side queries
+    const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL;
+    if (!convexUrl) {
+      throw new Error("NEXT_PUBLIC_CONVEX_URL is not configured");
+    }
+    const convex = new ConvexHttpClient(convexUrl);
+
+    // Check if this is a free model or requires user API key
+    const isFreeModel = FREE_MODELS_IDS.includes(model);
+    let userApiKeys: Record<string, string | undefined> = {};
+
+    if (!isFreeModel && isAuthenticated) {
+      // Get user's API keys for premium models
+      try {
+        userApiKeys = await convex.query(api.userKeys.getUserKeysForAPI, { userId });
+      } catch (error) {
+        console.error("Failed to fetch user API keys:", error);
+      }
     }
 
     // const supabase = await validateAndTrackUsage({
@@ -106,21 +131,42 @@ export async function POST(req: Request) {
 
     let streamError: Error | null = null
 
-    // let apiKey: string | undefined
-    // if (isAuthenticated && userId) {
-    //   const { getEffectiveApiKey } = await import("@/lib/user-keys")
-    //   const provider = getProviderForModel(model)
-    //   apiKey =
-    //     (await getEffectiveApiKey(userId, provider as Provider)) || undefined
-    // }
+    // Determine which API key to use
+    let apiKey: string | undefined;
+    
+    if (isFreeModel) {
+      // Use project API key for free models
+      apiKey = undefined; // This will use default project keys from openproviders
+    } else {
+      // Use user's API key for premium models
+      const provider = getProviderForModel(model);
+      const userKey = userApiKeys[`${provider}Key`];
+      
+      if (!userKey) {
+        return new Response(
+          JSON.stringify({ 
+            error: `This model requires your own ${provider.toUpperCase()} API key. Please add it in Settings.`,
+            code: "API_KEY_REQUIRED" 
+          }),
+          { status: 403 }
+        );
+      }
+      
+      apiKey = userKey;
+    }
+
+    // Get the model instance with the appropriate API key
+    const modelInstance = isFreeModel 
+      ? modelConfig.apiSdk(undefined)
+      : modelConfig.apiSdk(apiKey);
 
     const result = streamText({
-      // TODO: add api key
-      model: modelConfig.apiSdk(),
+      model: modelInstance,
       system: effectiveSystemPrompt,
       messages: messages,
       // tools: toolsToUse as ToolSet,
       maxSteps: 10,
+      temperature: temperature || 0.8,
       onError: (err: unknown) => {
         console.error("🛑 streamText error:", err)
         streamError = new Error(

@@ -4,24 +4,30 @@ import { getAllModels, refreshModelsCache } from "~/lib/models"
 export async function GET() {
   try {
     const models = await getAllModels()
-
-    return new Response(JSON.stringify({ models }), {
-      status: 200,
-      headers: {
-        "Content-Type": "application/json",
-      },
+    
+    return Response.json({
+      models: models.map(model => ({
+        id: model.id,
+        name: model.name,
+        provider: model.provider,
+        providerId: model.providerId,
+        modelFamily: model.modelFamily,
+        description: model.description,
+        tags: model.tags,
+        contextWindow: model.contextWindow,
+        inputCost: model.inputCost,
+        outputCost: model.outputCost,
+        priceUnit: model.priceUnit,
+        vision: model.vision,
+        tools: model.tools,
+        audio: model.audio,
+        openSource: model.openSource,
+        speed: model.speed,
+      }))
     })
   } catch (error) {
-    console.error("Error fetching models:", error)
-    return new Response(
-      JSON.stringify({ error: "Failed to fetch models" }),
-      {
-        status: 500,
-        headers: {
-          "Content-Type": "application/json",
-        },
-      }
-    )
+    console.error("Failed to load models:", error)
+    return Response.json({ error: "Failed to load models" }, { status: 500 })
   }
 }
 
