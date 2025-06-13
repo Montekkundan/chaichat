@@ -53,6 +53,10 @@ export function AppSidebar() {
 	};
 
 	const handleNewChat = async () => {
+		if (!user) {
+			router.push("/login");
+			return;
+		}
 		router.push("/");
 	};
 
@@ -105,48 +109,50 @@ export function AppSidebar() {
 			</SidebarHeader>
 			<SidebarContent>
 				<div className="px-2">
-					<div className="mb-2 font-semibold text-muted-foreground text-xs">
-						Your Chats
-					</div>
-					<SidebarMenu>
-						{cache.isLoading ? (
-							<div className="px-4 py-2 text-muted-foreground text-xs">
-								Loading...
+					{user ? (
+						<>
+							<div className="mb-2 font-semibold text-muted-foreground text-xs">
+								Your Chats
 							</div>
-						) : cache.isSyncing ? (
-							<div className="px-4 py-2 text-muted-foreground text-xs">
-								Syncing...
-							</div>
-						) : (
-							displayedChats?.map((chat) => (
-								<SidebarMenuItem
-									key={chat._id}
-									className="relative"
-									onMouseEnter={() => setHoveredChatId(chat._id)}
-									onMouseLeave={() => setHoveredChatId(null)}
-								>
-									<SidebarMenuButton asChild>
-										<Link href={`/chat/${chat._id}`}>
-											<span>{chat.name}</span>
-										</Link>
-									</SidebarMenuButton>
-									{hoveredChatId === chat._id && (
-										<button
-											type="button"
-											className="-translate-y-1/2 absolute top-1/2 right-2 rounded-full p-1 opacity-100 transition-opacity duration-200 hover:bg-destructive/10 hover:text-destructive"
-											onClick={(e) => {
-												e.preventDefault();
-												handleDeleteClick(chat._id);
-											}}
-											aria-label="Delete chat"
+							<SidebarMenu>
+								{cache.isLoading ? (
+									<div className="px-4 py-2 text-muted-foreground text-xs">Loading...</div>
+								) : cache.isSyncing ? (
+									<div className="px-4 py-2 text-muted-foreground text-xs">Syncing...</div>
+								) : (
+									displayedChats?.map((chat) => (
+										<SidebarMenuItem
+											key={chat._id}
+											className="relative"
+											onMouseEnter={() => setHoveredChatId(chat._id)}
+											onMouseLeave={() => setHoveredChatId(null)}
 										>
-											<X className="size-4" />
-										</button>
-									)}
-								</SidebarMenuItem>
-							))
-						)}
-					</SidebarMenu>
+											<SidebarMenuButton asChild>
+												<Link href={`/chat/${chat._id}`}><span>{chat.name}</span></Link>
+											</SidebarMenuButton>
+											{hoveredChatId === chat._id && (
+												<button
+													type="button"
+													className="-translate-y-1/2 absolute top-1/2 right-2 rounded-full p-1 opacity-100 transition-opacity duration-200 hover:bg-destructive/10 hover:text-destructive"
+													onClick={(e) => {
+														e.preventDefault();
+														handleDeleteClick(chat._id);
+													}}
+													aria-label="Delete chat"
+												>
+													<X className="size-4" />
+												</button>
+											)}
+										</SidebarMenuItem>
+									))
+								)}
+							</SidebarMenu>
+						</>
+					) : (
+						<div className="py-6 text-center text-xs text-muted-foreground">
+							Sign in to start chatting.
+						</div>
+					)}
 				</div>
 			</SidebarContent>
 			<SidebarFooter>
