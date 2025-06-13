@@ -6,3 +6,7 @@ export const FREE_MODELS_IDS = ["gpt-4o", "gpt-3.5-turbo"];
 export const MODEL_DEFAULT = "gpt-4o";
 
 export const MESSAGE_MAX_LENGTH = 4000;
+
+// Default theme applied to new users (must match one in themes.css)
+// default themes goes to globals.css
+export const DEFAULT_APP_THEME = "default";

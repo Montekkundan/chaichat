@@ -16,6 +16,7 @@ export default defineSchema({
     mistralKey: v.optional(v.string()),
     googleKey: v.optional(v.string()),
     anthropicKey: v.optional(v.string()),
+    theme: v.optional(v.string()),
   }),
   messages: defineTable({
     chatId: v.id("chats"),

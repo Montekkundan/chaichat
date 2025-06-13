@@ -5,10 +5,12 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import ConvexClientProvider from "~/components/providers/convex-client-provider";
 import { ThemeProvider } from "~/components/providers/theme-provider";
+import { ActiveThemeProvider } from "~/components/active-theme";
 import { Toaster } from "~/components/ui/sonner";
 import { CacheProvider } from "~/lib/providers/cache-provider";
 import { ChatsProvider } from "~/lib/providers/chats-provider";
 import { ModelsProvider } from "~/lib/providers/models-provider";
+import { cookies } from "next/headers";
 
 const geistSans = Geist({
 	variable: "--font-geist-sans",
@@ -26,9 +28,12 @@ export const metadata: Metadata = {
 	icons: [{ rel: "icon", url: "/favicon.ico" }],
 };
 
-export default function RootLayout({
+export default async function RootLayout({
 	children,
 }: Readonly<{ children: React.ReactNode }>) {
+	const cookieStore = await cookies();
+	const activeThemeValue = cookieStore.get("active_theme")?.value;
+
 	return (
 		<ClerkProvider>
 			<html
@@ -43,18 +48,20 @@ export default function RootLayout({
 						enableSystem
 						disableTransitionOnChange
 					>
-						<ConvexClientProvider>
-							<CacheProvider>
-								<ChatsProvider>
-									<ModelsProvider>
-										<main className="flex-1">
-											<Toaster position="top-center" />
-											{children}
-										</main>
-									</ModelsProvider>
-								</ChatsProvider>
-							</CacheProvider>
-						</ConvexClientProvider>
+						<ActiveThemeProvider initialTheme={activeThemeValue}>
+							<ConvexClientProvider>
+								<CacheProvider>
+									<ChatsProvider>
+										<ModelsProvider>
+											<main className="flex-1">
+												<Toaster position="top-center" />
+												{children}
+											</main>
+										</ModelsProvider>
+									</ChatsProvider>
+								</CacheProvider>
+							</ConvexClientProvider>
+						</ActiveThemeProvider>
 					</ThemeProvider>
 				</body>
 			</html>
