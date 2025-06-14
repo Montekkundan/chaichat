@@ -211,3 +211,12 @@ const geminiModels: ModelConfig[] = [
 ];
 
 export { geminiModels };
+
+const aliasSource = geminiModels.find((m) => m.id === "gemini-1.5-pro-002");
+if (aliasSource) {
+	geminiModels.push({
+		...aliasSource,
+		id: "gemini-1.5-pro-latest",
+		name: "Gemini 1.5 Pro (Latest)",
+	});
+}

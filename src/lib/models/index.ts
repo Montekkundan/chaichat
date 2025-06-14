@@ -4,6 +4,7 @@ import { grokModels } from "./data/grok";
 import { mistralModels } from "./data/mistral";
 import { getOllamaModels, ollamaModels } from "./data/ollama";
 import { openaiModels } from "./data/openai";
+import { geminiModels } from "./data/gemini";
 import type { ModelConfig } from "./types";
 
 // Static models (always available)
@@ -13,6 +14,7 @@ export const STATIC_MODELS: ModelConfig[] = [
 	...deepseekModels,
 	...claudeModels,
 	...grokModels,
+	...geminiModels,
 	...ollamaModels, // Static fallback Ollama models
 
 	// not ready

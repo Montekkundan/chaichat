@@ -1,6 +1,6 @@
 "use client";
 import { AnimatePresence, motion } from "framer-motion";
-import { Plus, Search } from "lucide-react";
+import { Plus, Search, Settings2, SunMoon } from "lucide-react";
 import type { ReactNode } from "react";
 import { AppSidebar } from "~/components/app-sidebar";
 import {
@@ -15,11 +15,14 @@ import {
 	TooltipProvider,
 	TooltipTrigger,
 } from "~/components/ui/tooltip";
+import Link from "next/link";
+import { useTheme } from "next-themes";
 
 export default function ChatLayout({ children }: { children: ReactNode }) {
 	return (
 		<SidebarProvider>
 			<TopLeftControls />
+			<TopRightControls />
 			<AppSidebar />
 			<MainContentWithInset>{children}</MainContentWithInset>
 		</SidebarProvider>
@@ -30,7 +33,47 @@ function MainContentWithInset({ children }: { children: ReactNode }) {
 	const { state } = useSidebar();
 	const collapsed = state === "collapsed";
 	return (
-		<div className="relative w-full flex-1 overflow-hidden bg-sidebar">
+		<main className="relative w-full flex-1 overflow-hidden bg-sidebar">
+			{/* Decorative top-right wave overlay */}
+			{typeof window !== "undefined" && (
+				<div
+					className={`fixed right-0 top-0 z-20 h-16 w-28 max-sm:hidden transition-all ease-snappy ${collapsed ? "!translate-y-0 !rounded-none border-none" : "sm:translate-y-3.5 sm:rounded-tl-xl"}`}
+					style={{ clipPath: "inset(0px 12px 0px 0px)" }}
+				>
+					<div
+						className="pointer-events-none group absolute top-3.5 z-10 -mb-8 h-32 w-full origin-top transition-all ease-snappy"
+						style={{ boxShadow: "10px -10px 8px 2px hsl(var(--gradient-noise-top))" }}
+					>
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							viewBox="0 0 128 32"
+							fill="hsl(var(--gradient-noise-top))"
+							className="absolute -right-8 h-9 origin-top-left skew-x-[30deg] overflow-visible"
+							aria-hidden="true"
+							role="presentation"
+						>
+							<line
+								x1="1"
+								y1="0"
+								x2="128"
+								y2="0"
+								stroke="hsl(var(--gradient-noise-top))"
+								strokeWidth="2"
+								strokeLinecap="round"
+								vectorEffect="non-scaling-stroke"
+							/>
+							<path
+								className="translate-y-[0.5px]"
+								stroke="hsl(var(--chat-border))"
+								strokeWidth="1"
+								strokeLinecap="round"
+								vectorEffect="non-scaling-stroke"
+								d="M0,0c5.9,0,10.7,4.8,10.7,10.7v10.7c0,5.9,4.8,10.7,10.7,10.7H128V0"
+							/>
+						</svg>
+					</div>
+				</div>
+			)}
 			<div
 				className={`absolute top-0 bottom-0 w-full overflow-hidden border-chat-border border-t border-l bg-secondary bg-fixed transition-all ease-snappy max-sm:border-none ${!collapsed ? "sm:translate-y-3.5 sm:rounded-tl-2xl" : ""}`}
 			>
@@ -43,7 +86,7 @@ function MainContentWithInset({ children }: { children: ReactNode }) {
 					<div>{children}</div>
 				</SidebarInset>
 			</div>
-		</div>
+		</main>
 	);
 }
 
@@ -118,6 +161,32 @@ function TopLeftControls() {
 					</AnimatePresence>
 				</motion.div>
 			</TooltipProvider>
+		</div>
+	);
+}
+
+function TopRightControls() {
+	const { resolvedTheme, setTheme } = useTheme();
+
+	return (
+		<div className="pointer-events-auto fixed top-2 right-2 z-50 flex flex-row items-center gap-0.5 rounded-md p-1 bg-gradient-noise-top text-muted-foreground">
+			<Link
+				aria-label="Go to settings"
+				href="/settings/customization"
+				className="size-8 inline-flex items-center justify-center rounded-md hover:bg-muted/40 hover:text-foreground rounded-bl-xl"
+				data-discover="true"
+			>
+				<Settings2 className="size-4" />
+			</Link>
+			<button
+				type="button"
+				aria-label="Toggle theme"
+				className="group relative size-8 inline-flex items-center justify-center rounded-md hover:bg-muted/40 hover:text-foreground"
+				onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
+			>
+				<SunMoon className="absolute size-4" />
+				<span className="sr-only">Toggle theme</span>
+			</button>
 		</div>
 	);
 }

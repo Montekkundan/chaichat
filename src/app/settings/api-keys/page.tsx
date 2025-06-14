@@ -10,7 +10,10 @@ type UserKeys = {
 	anthropicKey?: string;
 	googleKey?: string;
 	mistralKey?: string;
+	xaiKey?: string;
 };
+
+type ProviderId = "openai" | "anthropic" | "google" | "mistral";
 
 function maskKey(key: string | undefined) {
 	if (!key) return "—";
@@ -23,21 +26,26 @@ export default function ApiKeysPage() {
 	const saveKey = useMutation(api.userKeys.saveKey);
 
 	const [openaiInput, setOpenaiInput] = useState("");
+	const [anthropicInput, setAnthropicInput] = useState("");
+	const [googleInput, setGoogleInput] = useState("");
+	const [mistralInput, setMistralInput] = useState("");
 	const [saving, setSaving] = useState(false);
 
 	// initialise input with existing key (unmasked) when first loaded
 	useEffect(() => {
-		if (userKeys?.openaiKey) {
-			setOpenaiInput(userKeys.openaiKey);
-		}
+		if (!userKeys) return;
+		if (userKeys.openaiKey) setOpenaiInput(userKeys.openaiKey);
+		if (userKeys.anthropicKey) setAnthropicInput(userKeys.anthropicKey);
+		if (userKeys.googleKey) setGoogleInput(userKeys.googleKey);
+		if (userKeys.mistralKey) setMistralInput(userKeys.mistralKey);
 	}, [userKeys]);
 
-	const handleSave = async () => {
-		const trimmed = openaiInput.trim();
+	const handleSaveProvider = async (provider: ProviderId, value: string) => {
+		const trimmed = value.trim();
 		if (!trimmed) return;
 		setSaving(true);
 		try {
-			await saveKey({ provider: "openai", apiKey: trimmed });
+			await saveKey({ provider, apiKey: trimmed });
 		} finally {
 			setSaving(false);
 		}
@@ -55,37 +63,37 @@ export default function ApiKeysPage() {
 		<div className="mx-auto max-w-md px-4 py-8">
 			<h1 className="mb-6 font-semibold text-2xl">API Keys</h1>
 
-			{/* OpenAI key section */}
-			<div className="mb-8 rounded-lg border p-4">
-				<h2 className="mb-2 font-medium">OpenAI</h2>
-				<p className="mb-4 text-muted-foreground text-sm">
-					Enter your personal OpenAI API key if you want to use premium models.
-					It is stored encrypted and sent only when you make a request.
-				</p>
-
-				<label className="mb-1 block font-medium text-sm" htmlFor="openai-key">
-					Current key
-				</label>
-				<div className="mb-3 text-sm" id="openai-key">
-					{maskKey(userKeys.openaiKey)}
+			{/* Provider key sections */}
+			{([
+				{ label: "OpenAI", state: openaiInput, set: setOpenaiInput, key: userKeys.openaiKey, provider: "openai" as const },
+				{ label: "Anthropic", state: anthropicInput, set: setAnthropicInput, key: userKeys.anthropicKey, provider: "anthropic" as const },
+				{ label: "Google", state: googleInput, set: setGoogleInput, key: userKeys.googleKey, provider: "google" as const },
+				{ label: "Mistral", state: mistralInput, set: setMistralInput, key: userKeys.mistralKey, provider: "mistral" as const },
+			] as const).map((p) => (
+				<div key={p.provider} className="mb-8 rounded-lg border p-4">
+					<h2 className="mb-2 font-medium">{p.label}</h2>
+					<p className="mb-4 text-muted-foreground text-sm">
+						Provide your {p.label} API key if you plan to use premium models from {p.label}.
+					</p>
+					<p className="mb-1 block font-medium text-sm">Current key</p>
+					<div className="mb-3 text-sm">{maskKey(p.key)}</div>
+					<input
+						type="text"
+						className="mb-3 w-full rounded border p-2 text-sm"
+						placeholder="••••••"
+						value={p.state}
+						onChange={(e) => p.set(e.target.value)}
+					/>
+					<button
+						type="button"
+						disabled={saving || !p.state.trim()}
+						onClick={() => handleSaveProvider(p.provider, p.state)}
+						className="rounded bg-black px-4 py-2 text-white disabled:opacity-50"
+					>
+						{saving ? "Saving..." : "Save key"}
+					</button>
 				</div>
-
-				<input
-					type="text"
-					className="mb-3 w-full rounded border p-2 text-sm"
-					placeholder="sk-..."
-					value={openaiInput}
-					onChange={(e) => setOpenaiInput(e.target.value)}
-				/>
-				<button
-					type="button"
-					disabled={saving || !openaiInput.trim()}
-					onClick={handleSave}
-					className="rounded bg-black px-4 py-2 text-white disabled:opacity-50"
-				>
-					{saving ? "Saving..." : "Save key"}
-				</button>
-			</div>
+			))}
 		</div>
 	);
 }

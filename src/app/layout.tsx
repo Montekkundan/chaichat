@@ -53,10 +53,8 @@ export default async function RootLayout({
 								<CacheProvider>
 									<ChatsProvider>
 										<ModelsProvider>
-											<main className="flex-1">
-												<Toaster position="top-center" />
+												{/* <Toaster position="top-center" /> */}
 												{children}
-											</main>
 										</ModelsProvider>
 									</ChatsProvider>
 								</CacheProvider>

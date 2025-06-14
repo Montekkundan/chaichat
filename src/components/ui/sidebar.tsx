@@ -139,11 +139,22 @@ function SidebarProvider({
 						} as React.CSSProperties
 					}
 					className={cn(
-						"group/sidebar-wrapper flex min-h-svh w-full has-data-[variant=inset]:bg-sidebar",
+						"group/sidebar-wrapper flex min-h-svh w-full",
 						className,
 					)}
 					{...props}
 				>
+					<div className="!fixed inset-0 dark:bg-sidebar z-0">
+						<div
+							className="absolute inset-0 opacity-40"
+							style={{
+								backgroundImage:
+									"radial-gradient(closest-corner at 120px 36px, rgba(255,1,111,.19), rgba(255,1,111,.08)), linear-gradient(rgb(63,51,69) 15%, rgb(7,3,9))",
+							}}
+						/>
+						<div className="absolute inset-0 bg-black/40" />
+						<div className="pointer-events-none fixed inset-0 bg-noise" />
+					</div>
 					{children}
 				</div>
 			</TooltipProvider>
@@ -244,7 +255,7 @@ function Sidebar({
 				<div
 					data-sidebar="sidebar"
 					data-slot="sidebar-inner"
-					className="flex h-full w-full flex-col bg-sidebar group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:border group-data-[variant=floating]:border-sidebar-border group-data-[variant=floating]:shadow-sm"
+					className="flex h-full w-full flex-col group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:border group-data-[variant=floating]:border-sidebar-border group-data-[variant=floating]:shadow-sm"
 				>
 					{children}
 				</div>
@@ -569,7 +580,7 @@ function SidebarMenuAction({
 				"peer-data-[size=lg]/menu-button:top-2.5",
 				"group-data-[collapsible=icon]:hidden",
 				showOnHover &&
-					"group-focus-within/menu-item:opacity-100 group-hover/menu-item:opacity-100 data-[state=open]:opacity-100 peer-data-[active=true]/menu-button:text-sidebar-accent-foreground md:opacity-0",
+				"group-focus-within/menu-item:opacity-100 group-hover/menu-item:opacity-100 data-[state=open]:opacity-100 peer-data-[active=true]/menu-button:text-sidebar-accent-foreground md:opacity-0",
 				className,
 			)}
 			{...props}
