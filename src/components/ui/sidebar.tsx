@@ -147,7 +147,7 @@ function SidebarProvider({
 					)}
 					{...props}
 				>
-					<div className="!fixed inset-0 dark:bg-sidebar z-0">
+					<div className="!fixed inset-0 z-0 dark:bg-sidebar">
 						<div
 							className="absolute inset-0 opacity-40"
 							style={{ backgroundImage: "var(--sidebar-overlay)" }}
@@ -579,7 +579,7 @@ function SidebarMenuAction({
 				"peer-data-[size=lg]/menu-button:top-2.5",
 				"group-data-[collapsible=icon]:hidden",
 				showOnHover &&
-				"group-focus-within/menu-item:opacity-100 group-hover/menu-item:opacity-100 data-[state=open]:opacity-100 peer-data-[active=true]/menu-button:text-sidebar-accent-foreground md:opacity-0",
+					"group-focus-within/menu-item:opacity-100 group-hover/menu-item:opacity-100 data-[state=open]:opacity-100 peer-data-[active=true]/menu-button:text-sidebar-accent-foreground md:opacity-0",
 				className,
 			)}
 			{...props}

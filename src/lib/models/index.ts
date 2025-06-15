@@ -1,10 +1,10 @@
 import { claudeModels } from "./data/claude";
 import { deepseekModels } from "./data/deepseek";
+import { geminiModels } from "./data/gemini";
 import { grokModels } from "./data/grok";
 import { mistralModels } from "./data/mistral";
 import { getOllamaModels, ollamaModels } from "./data/ollama";
 import { openaiModels } from "./data/openai";
-import { geminiModels } from "./data/gemini";
 import type { ModelConfig } from "./types";
 
 // Static models (always available)

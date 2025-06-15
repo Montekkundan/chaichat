@@ -1,6 +1,8 @@
 "use client";
 
+import { api } from "@/convex/_generated/api";
 import { CaretDown, MagnifyingGlass, Star } from "@phosphor-icons/react";
+import { useQuery } from "convex/react";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "~/components/ui/button";
 import {
@@ -29,8 +31,6 @@ import { FREE_MODELS_IDS } from "~/lib/config";
 import type { ModelConfig } from "~/lib/models/types";
 import { PROVIDERS } from "~/lib/providers";
 import { useModels } from "~/lib/providers/models-provider";
-import { api } from "@/convex/_generated/api";
-import { useQuery } from "convex/react";
 import { cn } from "~/lib/utils";
 // import { ProModelDialog } from "./pro-dialog"
 // import { SubMenu } from "./sub-menu"
@@ -49,8 +49,14 @@ export function ModelSelector({
 	isUserAuthenticated = true,
 }: ModelSelectorProps) {
 	const { models: allModels, isLoading: isLoadingModels } = useModels();
-	const preferred = useQuery(api.userPreferences.getPreferredModels, {}) as string[] | null | undefined;
-	const models = preferred && preferred.length > 0 ? allModels.filter(m=>preferred.includes(m.id)) : allModels;
+	const preferred = useQuery(api.userPreferences.getPreferredModels, {}) as
+		| string[]
+		| null
+		| undefined;
+	const models =
+		preferred && preferred.length > 0
+			? allModels.filter((m) => preferred.includes(m.id))
+			: allModels;
 
 	const currentModel = models.find((model) => model.id === selectedModelId);
 	const currentProvider = PROVIDERS.find(

@@ -25,4 +25,4 @@ export const baseColors = [
 	},
 ] as const;
 
-export type BaseColor = (typeof baseColors)[number]; 
+export type BaseColor = (typeof baseColors)[number];

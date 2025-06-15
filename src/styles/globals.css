@@ -90,15 +90,23 @@
 	--blur-fallback: 1;
 	/* Chat specific */
 	--chat-background: 270 16.13% 12.16%;
-	--chat-input-background: oklch(0.99 0 0 / var(--blur-fallback,0.1));
+	--chat-input-background: oklch(0.99 0 0 / var(--blur-fallback, 0.1));
 	/* Gradient noise overlay (top) uses sidebar color */
 	--gradient-noise-top: var(--sidebar);
 	/* Border color inside chat area (for svg stroke etc.) */
 	--chat-border: 333.3 22% 16.1%;
 	/* Sidebar decorative background */
-	--sidebar-overlay: radial-gradient(closest-corner at 120px 36px, rgba(0,0,0,.07), rgba(0,0,0,0)), linear-gradient(rgb(254,254,254) 15%, rgb(240,240,240));
+	--sidebar-overlay: radial-gradient(
+			closest-corner at 120px 36px,
+			rgba(0, 0, 0, 0.07),
+			rgba(0, 0, 0, 0)
+		), linear-gradient(rgb(254, 254, 254) 15%, rgb(240, 240, 240));
 	/* Gradient used for chat-input reflective border */
-	--chat-input-gradient: linear-gradient(180deg, hsl(var(--chat-border) / 0.3), hsl(var(--chat-border) / 0.8));
+	--chat-input-gradient: linear-gradient(
+		180deg,
+		hsl(var(--chat-border) / 0.3),
+		hsl(var(--chat-border) / 0.8)
+	);
 }
 
 .dark {
@@ -143,7 +151,11 @@
 	/* Border color inside chat area (for svg stroke etc.) */
 	--chat-border: 333.3 22% 16.1%;
 	/* Sidebar decorative background */
-	--sidebar-overlay: radial-gradient(closest-corner at 120px 36px, rgba(255,255,255,.10), rgba(255,255,255,0)), linear-gradient(rgb(25,25,25) 15%, rgb(0,0,0));
+	--sidebar-overlay: radial-gradient(
+			closest-corner at 120px 36px,
+			rgba(255, 255, 255, 0.1),
+			rgba(255, 255, 255, 0)
+		), linear-gradient(rgb(25, 25, 25) 15%, rgb(0, 0, 0));
 }
 
 @layer base {
@@ -163,7 +175,9 @@
 }
 
 /* Override tailwind generated bg-black/40 so it uses simple rgba and affects all elements */
-.bg-black\/40 { background-color: rgba(0, 0, 0, 0.4) !important; }
+.bg-black\/40 {
+	background-color: rgba(0, 0, 0, 0.4) !important;
+}
 
 /* Chat helpers */
 .bg-chat-input {
@@ -196,10 +210,15 @@
 		background-color: var(--gradient-noise-top);
 	}
 	.bg-gradient-noise-top\/80 {
-		background-color: color-mix(in srgb, var(--gradient-noise-top) 80%, transparent);
+		background-color: color-mix(
+			in srgb,
+			var(--gradient-noise-top) 80%,
+			transparent
+		);
 	}
 	.from-gradient-noise-top {
-		--tw-gradient-from: var(--gradient-noise-top) var(--tw-gradient-from-position);
+		--tw-gradient-from: var(--gradient-noise-top)
+			var(--tw-gradient-from-position);
 		--tw-gradient-to: rgb(255 255 255 / 0) var(--tw-gradient-to-position);
 		--tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
 	}
@@ -222,9 +241,7 @@
 	border-radius: inherit;
 	background: var(--c, var(--chat-input-gradient));
 	/* Mask trick so only the border area is visible */
-	-webkit-mask:
-		linear-gradient(#000 0 0) content-box,
-		linear-gradient(#000 0 0);
+	-webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
 	-webkit-mask-composite: xor;
 	mask-composite: exclude;
 	pointer-events: none;

@@ -14,7 +14,11 @@ export default function ModelsPage() {
 		| undefined;
 	const savePref = useMutation(api.userPreferences.setPreferredModels);
 
-	const { models, isLoading: modelsLoading, refetch: refetchModels } = useModels();
+	const {
+		models,
+		isLoading: modelsLoading,
+		refetch: refetchModels,
+	} = useModels();
 
 	const [selected, setSelected] = useState<string[]>(RECOMMENDED_MODEL_IDS);
 	const [saving, setSaving] = useState(false);
@@ -57,7 +61,7 @@ export default function ModelsPage() {
 
 	return (
 		<div className="mx-auto max-w-3xl px-4 py-8">
-			<h1 className="mb-6 text-2xl font-semibold">Model Visibility</h1>
+			<h1 className="mb-6 font-semibold text-2xl">Model Visibility</h1>
 
 			<div className="mb-4 flex gap-3">
 				<button
@@ -76,7 +80,7 @@ export default function ModelsPage() {
 				</button>
 			</div>
 
-			<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+			<div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3">
 				{models.map((m) => (
 					<label
 						key={m.id}

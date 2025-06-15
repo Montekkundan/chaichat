@@ -20,7 +20,16 @@ import {
 import { useCache } from "~/lib/providers/cache-provider";
 import { Button } from "./ui/button";
 
-export function AppSidebar({ initialUser }: { initialUser?: { id: string; fullName?: string | null; firstName?: string | null; imageUrl?: string } } = {}) {
+export function AppSidebar({
+	initialUser,
+}: {
+	initialUser?: {
+		id: string;
+		fullName?: string | null;
+		firstName?: string | null;
+		imageUrl?: string;
+	};
+} = {}) {
 	const { user } = useUser();
 	const router = useRouter();
 	const cache = useCache();
@@ -178,7 +187,9 @@ export function AppSidebar({ initialUser }: { initialUser?: { id: string; fullNa
 							className="h-10 w-10 rounded-full"
 						/>
 						<div className="flex flex-col items-start">
-							<span className="font-semibold">{effectiveUser.fullName ?? effectiveUser.firstName}</span>
+							<span className="font-semibold">
+								{effectiveUser.fullName ?? effectiveUser.firstName}
+							</span>
 							<span className="text-muted-foreground text-xs">Free</span>
 						</div>
 					</button>

@@ -26,7 +26,9 @@ export function ActiveThemeProvider({
 	children: ReactNode;
 	initialTheme?: string;
 }) {
-	const [activeTheme, setActiveTheme] = useState(() => initialTheme || DEFAULT_THEME);
+	const [activeTheme, setActiveTheme] = useState(
+		() => initialTheme || DEFAULT_THEME,
+	);
 
 	useEffect(() => {
 		setThemeCookie(activeTheme);
@@ -54,6 +56,9 @@ export function ActiveThemeProvider({
 
 export function useThemeConfig() {
 	const ctx = useContext(ThemeContext);
-	if (!ctx) throw new Error("useThemeConfig must be used within an ActiveThemeProvider");
+	if (!ctx)
+		throw new Error(
+			"useThemeConfig must be used within an ActiveThemeProvider",
+		);
 	return ctx;
-} 
+}

@@ -7,14 +7,14 @@ export function LayoutChat({ children }: { children: React.ReactNode }) {
 	const collapsed = state === "collapsed";
 
 	return (
-		<div className="absolute bottom-0 top-0 w-full">
-			<div className="fixed right-0 top-0 max-sm:hidden">
+		<div className="absolute top-0 bottom-0 w-full">
+			<div className="fixed top-0 right-0 max-sm:hidden">
 				<div
-					className={`group pointer-events-none absolute top-3.5 z-10 -mb-8 h-32 w-full origin-top transition-all ease-snappy${collapsed ? ' -translate-y-3.5 scale-y-0' : ''}`}
+					className={`group -mb-8 pointer-events-none absolute top-3.5 z-10 h-32 w-full origin-top transition-all ease-snappy${collapsed ? " -translate-y-3.5 scale-y-0" : ""}`}
 					style={{ boxShadow: "10px -10px 8px 2px var(--gradient-noise-top)" }}
 				>
 					<svg
-						className="absolute -right-8 h-9 origin-top-left skew-x-[30deg] overflow-visible"
+						className="-right-8 absolute h-9 origin-top-left skew-x-[30deg] overflow-visible"
 						viewBox="0 0 128 32"
 						aria-hidden="true"
 						role="presentation"

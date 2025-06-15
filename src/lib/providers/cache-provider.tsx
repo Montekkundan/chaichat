@@ -57,7 +57,10 @@ export function useCache() {
 	return context;
 }
 
-export function CacheProvider({ children, initialChats = [] }: { children: React.ReactNode; initialChats?: Chat[] }) {
+export function CacheProvider({
+	children,
+	initialChats = [],
+}: { children: React.ReactNode; initialChats?: Chat[] }) {
 	const { user } = useUser();
 	const convex = useConvex();
 	const [chats, setChats] = useState<Chat[]>(initialChats);
@@ -170,7 +173,13 @@ export function CacheProvider({ children, initialChats = [] }: { children: React
 	useEffect(() => {
 		if (typeof document === "undefined") return;
 		try {
-			const minimal = chats.slice(0, 20).map((c) => ({ _id: c._id, name: c.name, currentModel: c.currentModel }));
+			const minimal = chats
+				.slice(0, 20)
+				.map((c) => ({
+					_id: c._id,
+					name: c.name,
+					currentModel: c.currentModel,
+				}));
 			const value = encodeURIComponent(JSON.stringify(minimal));
 			document.cookie = `cc_chats=${value}; path=/; max-age=604800; SameSite=Lax`;
 		} catch {

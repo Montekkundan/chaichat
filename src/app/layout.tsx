@@ -3,15 +3,15 @@ import "~/styles/globals.css";
 import { ClerkProvider } from "@clerk/nextjs";
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { cookies } from "next/headers";
+import { ActiveThemeProvider } from "~/components/active-theme";
 import ConvexClientProvider from "~/components/providers/convex-client-provider";
 import { ThemeProvider } from "~/components/providers/theme-provider";
-import { ActiveThemeProvider } from "~/components/active-theme";
 import { Toaster } from "~/components/ui/sonner";
+import { DEFAULT_APP_THEME } from "~/lib/config";
 import { CacheProvider } from "~/lib/providers/cache-provider";
 import { ChatsProvider } from "~/lib/providers/chats-provider";
 import { ModelsProvider } from "~/lib/providers/models-provider";
-import { cookies } from "next/headers";
-import { DEFAULT_APP_THEME } from "~/lib/config";
 
 const geistSans = Geist({
 	variable: "--font-geist-sans",
@@ -76,7 +76,9 @@ export default async function RootLayout({
 				className={`${geistSans.variable} ${geistMono.variable} antialiased`}
 				suppressHydrationWarning
 			>
-				<body className={`bg-sidebar theme-${activeThemeValue ?? DEFAULT_APP_THEME}`}>
+				<body
+					className={`bg-sidebar theme-${activeThemeValue ?? DEFAULT_APP_THEME}`}
+				>
 					<ThemeProvider
 						attribute="class"
 						defaultTheme="system"
@@ -88,8 +90,8 @@ export default async function RootLayout({
 								<CacheProvider initialChats={initialChats}>
 									<ChatsProvider>
 										<ModelsProvider>
-												{/* <Toaster position="top-center" /> */}
-												{children}
+											{/* <Toaster position="top-center" /> */}
+											{children}
 										</ModelsProvider>
 									</ChatsProvider>
 								</CacheProvider>

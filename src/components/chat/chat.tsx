@@ -18,193 +18,200 @@ import { useSidebar } from "../ui/sidebar";
 type ChatProps = { initialName?: string };
 
 export default function Chat({ initialName }: ChatProps = {}) {
-    const { chatId } = useParams();
-    const { user } = useUser();
-    const router = useRouter();
-    const [isCreatingChat, setIsCreatingChat] = useState(false);
-    const [hasNavigated, setHasNavigated] = useState(false);
+	const { chatId } = useParams();
+	const { user } = useUser();
+	const router = useRouter();
+	const [isCreatingChat, setIsCreatingChat] = useState(false);
+	const [hasNavigated, setHasNavigated] = useState(false);
 
-    const {
-        messages,
-        input,
-        setInput,
-        status,
-        isSubmitting,
-        selectedModel,
-        setSelectedModel,
-        sendMessage,
-        createNewChat,
-        changeModel,
-        regenerateMessage,
-        stop,
-    } = useMessages();
+	const {
+		messages,
+		input,
+		setInput,
+		status,
+		isSubmitting,
+		selectedModel,
+		setSelectedModel,
+		sendMessage,
+		createNewChat,
+		changeModel,
+		regenerateMessage,
+		stop,
+	} = useMessages();
 
-    const chatIdString = Array.isArray(chatId) ? chatId[0] : chatId;
+	const chatIdString = Array.isArray(chatId) ? chatId[0] : chatId;
 
-    useEffect(() => {
-        if (chatIdString && !hasNavigated) {
-            setHasNavigated(true);
-        }
-    }, [chatIdString, hasNavigated]);
+	useEffect(() => {
+		if (chatIdString && !hasNavigated) {
+			setHasNavigated(true);
+		}
+	}, [chatIdString, hasNavigated]);
 
-    // Determine if we should show onboarding (home page with no messages)
-    const showOnboarding = !chatIdString && messages.length === 0;
+	// Determine if we should show onboarding (home page with no messages)
+	const showOnboarding = !chatIdString && messages.length === 0;
 
-    // // Determine if we should animate the input position
-    // const shouldAnimateInput = hasNavigated || messages.length > 0;
+	// // Determine if we should animate the input position
+	// const shouldAnimateInput = hasNavigated || messages.length > 0;
 
-    const { handleInputChange, handleModelChange, handleDelete, handleEdit } =
-        useChatHandlers({
-            messages,
-            setMessages: () => { }, // Not needed with provider
-            setInput,
-            setSelectedModel: changeModel,
-            selectedModel,
-            chatId: chatIdString || null,
-            user: user as unknown as User | null,
-        });
+	const { handleInputChange, handleModelChange, handleDelete, handleEdit } =
+		useChatHandlers({
+			messages,
+			setMessages: () => {}, // Not needed with provider
+			setInput,
+			setSelectedModel: changeModel,
+			selectedModel,
+			chatId: chatIdString || null,
+			user: user as unknown as User | null,
+		});
 
-    const handleReload = async () => {
-        // TODO: implement reload in provider if needed
-    };
+	const handleReload = async () => {
+		// TODO: implement reload in provider if needed
+	};
 
-    const handleSend = async () => {
-        if (!input.trim() || !user?.id) return;
+	const handleSend = async () => {
+		if (!input.trim() || !user?.id) return;
 
-        // If no chatId, create a new chat first
-        if (!chatIdString) {
-            setIsCreatingChat(true);
-            try {
-                const newChatId = await createNewChat(input, selectedModel);
-                // Navigate to the new chat and the message will be sent automatically
-                router.push(`/chat/${newChatId}?q=${encodeURIComponent(input)}`);
-            } catch (error) {
-                console.error("Failed to create chat:", error);
-            } finally {
-                setIsCreatingChat(false);
-            }
-            return;
-        }
+		// If no chatId, create a new chat first
+		if (!chatIdString) {
+			setIsCreatingChat(true);
+			try {
+				const newChatId = await createNewChat(input, selectedModel);
+				// Navigate to the new chat and the message will be sent automatically
+				router.push(`/chat/${newChatId}?q=${encodeURIComponent(input)}`);
+			} catch (error) {
+				console.error("Failed to create chat:", error);
+			} finally {
+				setIsCreatingChat(false);
+			}
+			return;
+		}
 
-        // Send message in existing chat
-        await sendMessage(input);
-    };
+		// Send message in existing chat
+		await sendMessage(input);
+	};
 
-    const isLoading = isSubmitting || isCreatingChat || status === "streaming";
+	const isLoading = isSubmitting || isCreatingChat || status === "streaming";
 
-    const { resolvedTheme, setTheme } = useTheme();
+	const { resolvedTheme, setTheme } = useTheme();
 
-    const { state } = useSidebar();
-    const collapsed = state === "collapsed";
+	const { state } = useSidebar();
+	const collapsed = state === "collapsed";
 
-    return (
-        <>
-            <div className="pointer-events-none absolute bottom-0 z-10 w-full px-2">
-                <div className="relative mx-auto flex w-full max-w-3xl flex-col text-center">
-                    <div className="pointer-events-none">
-                        <div className="pointer-events-auto">
-                            <div className="rounded-t-3xl p-2 pb-0 backdrop-blur-lg ">
-                                <ChatInput
-                                    value={input}
-                                    onValueChange={handleInputChange}
-                                    onSend={handleSend}
-                                    isSubmitting={isLoading}
-                                    onSelectModel={handleModelChange}
-                                    selectedModel={selectedModel}
-                                    isUserAuthenticated={!!user?.id}
-                                    stop={stop}
-                                    status={status}
-                                />
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div className="absolute inset-0 overflow-y-scroll sm:pt-3.5" style={{ paddingBottom: '144px', scrollbarGutter: 'stable both-edges' }}>
-                <div
-                    className="fixed right-0 top-0 z-20 h-16 w-28 max-sm:hidden"
-                    style={{ clipPath: "inset(0px 12px 0px 0px)" }}
-                >
-                    <div
-                        className={`group pointer-events-none absolute top-3.5 z-10 -mb-8 h-32 w-full origin-top transition-all ease-snappy${collapsed ? " -translate-y-3.5 scale-y-0" : ""
-                            }`}
-                        style={{ boxShadow: "10px -10px 8px 2px var(--gradient-noise-top)" }}
-                    >
-                        <svg
-                            className="absolute -right-8 h-9 origin-top-left skew-x-[30deg] overflow-visible"
-                            viewBox="0 0 128 32"
-                            aria-hidden="true"
-                            role="presentation"
-                        >
-                            <line
-                                stroke="var(--gradient-noise-top)"
-                                strokeWidth="2px"
-                                shapeRendering="optimizeQuality"
-                                vectorEffect="non-scaling-stroke"
-                                strokeLinecap="round"
-                                strokeMiterlimit="10"
-                                x1="1"
-                                y1="0"
-                                x2="128"
-                                y2="0"
-                            />
-                            <path
-                                stroke="var(--chat-border)"
-                                className="translate-y-[0.5px]"
-                                fill="var(--gradient-noise-top)"
-                                shapeRendering="optimizeQuality"
-                                strokeWidth="1px"
-                                strokeLinecap="round"
-                                strokeMiterlimit="10"
-                                vectorEffect="non-scaling-stroke"
-                                d="M0,0c5.9,0,10.7,4.8,10.7,10.7v10.7c0,5.9,4.8,10.7,10.7,10.7H128V0"
-                            />
-                        </svg>
-                    </div>
-
-                </div>
-                <div className="fixed right-2 top-2 z-20 max-sm:hidden">
-                    <div className="flex flex-row items-center bg-gradient-noise-top text-muted-foreground gap-0.5 rounded-md p-1 transition-all rounded-bl-xl">
-                        <Link
-                            aria-label="Go to settings"
-                            href="/settings/customization"
-                            className="size-8 inline-flex items-center justify-center rounded-md hover:bg-muted/40 hover:text-foreground rounded-bl-xl"
-                            data-discover="true"
-                        >
-                            <Settings2 className="size-4" />
-                        </Link>
-                        <button
-                            type="button"
-                            aria-label="Toggle theme"
-                            className="group relative size-8 inline-flex items-center justify-center rounded-md hover:bg-muted/40 hover:text-foreground"
-                            onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
-                        >
-                            <SunMoon className="absolute size-4" />
-                            <span className="sr-only">Toggle theme</span>
-                        </button>
-                    </div>
-                </div>
-                <div className="mx-auto flex w-full max-w-3xl flex-col space-y-12 px-4 pb-10 pt-safe-offset-10">
-                    {showOnboarding ? (
-                        <div className="flex h-[calc(100vh-20rem)] items-start justify-center">
-                            <div className="w-full space-y-6 px-2 pt-[calc(max(15vh,2.5rem))] duration-300 animate-in fade-in-50 zoom-in-95 sm:px-8">
-                                <h2 className="text-3xl font-semibold">
-                                    How can I help you {user?.firstName ?? initialName ?? ''}?
-                                </h2>
-                            </div>
-                        </div>
-                    ) : (
-                        <Conversation
-                        messages={messages}
-                        status={status}
-                        onDelete={handleDelete}
-                        onEdit={handleEdit}
-                        onReload={handleReload}
-                        onRegenerate={regenerateMessage}
-                    />
-                    )}
-                </div>
-            </div>
-        </>
-    );
+	return (
+		<>
+			<div className="pointer-events-none absolute bottom-0 z-10 w-full px-2">
+				<div className="relative mx-auto flex w-full max-w-3xl flex-col text-center">
+					<div className="pointer-events-none">
+						<div className="pointer-events-auto">
+							<div className="rounded-t-3xl p-2 pb-0 backdrop-blur-lg ">
+								<ChatInput
+									value={input}
+									onValueChange={handleInputChange}
+									onSend={handleSend}
+									isSubmitting={isLoading}
+									onSelectModel={handleModelChange}
+									selectedModel={selectedModel}
+									isUserAuthenticated={!!user?.id}
+									stop={stop}
+									status={status}
+								/>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+			<div
+				className="absolute inset-0 overflow-y-scroll sm:pt-3.5"
+				style={{ paddingBottom: "144px", scrollbarGutter: "stable both-edges" }}
+			>
+				<div
+					className="fixed top-0 right-0 z-20 h-16 w-28 max-sm:hidden"
+					style={{ clipPath: "inset(0px 12px 0px 0px)" }}
+				>
+					<div
+						className={`group -mb-8 pointer-events-none absolute top-3.5 z-10 h-32 w-full origin-top transition-all ease-snappy${
+							collapsed ? " -translate-y-3.5 scale-y-0" : ""
+						}`}
+						style={{
+							boxShadow: "10px -10px 8px 2px var(--gradient-noise-top)",
+						}}
+					>
+						<svg
+							className="-right-8 absolute h-9 origin-top-left skew-x-[30deg] overflow-visible"
+							viewBox="0 0 128 32"
+							aria-hidden="true"
+							role="presentation"
+						>
+							<line
+								stroke="var(--gradient-noise-top)"
+								strokeWidth="2px"
+								shapeRendering="optimizeQuality"
+								vectorEffect="non-scaling-stroke"
+								strokeLinecap="round"
+								strokeMiterlimit="10"
+								x1="1"
+								y1="0"
+								x2="128"
+								y2="0"
+							/>
+							<path
+								stroke="var(--chat-border)"
+								className="translate-y-[0.5px]"
+								fill="var(--gradient-noise-top)"
+								shapeRendering="optimizeQuality"
+								strokeWidth="1px"
+								strokeLinecap="round"
+								strokeMiterlimit="10"
+								vectorEffect="non-scaling-stroke"
+								d="M0,0c5.9,0,10.7,4.8,10.7,10.7v10.7c0,5.9,4.8,10.7,10.7,10.7H128V0"
+							/>
+						</svg>
+					</div>
+				</div>
+				<div className="fixed top-2 right-2 z-20 max-sm:hidden">
+					<div className="flex flex-row items-center gap-0.5 rounded-md rounded-bl-xl bg-gradient-noise-top p-1 text-muted-foreground transition-all">
+						<Link
+							aria-label="Go to settings"
+							href="/settings/customization"
+							className="inline-flex size-8 items-center justify-center rounded-md rounded-bl-xl hover:bg-muted/40 hover:text-foreground"
+							data-discover="true"
+						>
+							<Settings2 className="size-4" />
+						</Link>
+						<button
+							type="button"
+							aria-label="Toggle theme"
+							className="group relative inline-flex size-8 items-center justify-center rounded-md hover:bg-muted/40 hover:text-foreground"
+							onClick={() =>
+								setTheme(resolvedTheme === "dark" ? "light" : "dark")
+							}
+						>
+							<SunMoon className="absolute size-4" />
+							<span className="sr-only">Toggle theme</span>
+						</button>
+					</div>
+				</div>
+				<div className="mx-auto flex w-full max-w-3xl flex-col space-y-12 px-4 pt-safe-offset-10 pb-10">
+					{showOnboarding ? (
+						<div className="flex h-[calc(100vh-20rem)] items-start justify-center">
+							<div className="fade-in-50 zoom-in-95 w-full animate-in space-y-6 px-2 pt-[calc(max(15vh,2.5rem))] duration-300 sm:px-8">
+								<h2 className="font-semibold text-3xl">
+									How can I help you {user?.firstName ?? initialName ?? ""}?
+								</h2>
+							</div>
+						</div>
+					) : (
+						<Conversation
+							messages={messages}
+							status={status}
+							onDelete={handleDelete}
+							onEdit={handleEdit}
+							onReload={handleReload}
+							onRegenerate={regenerateMessage}
+						/>
+					)}
+				</div>
+			</div>
+		</>
+	);
 }

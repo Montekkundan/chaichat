@@ -64,16 +64,43 @@ export default function ApiKeysPage() {
 			<h1 className="mb-6 font-semibold text-2xl">API Keys</h1>
 
 			{/* Provider key sections */}
-			{([
-				{ label: "OpenAI", state: openaiInput, set: setOpenaiInput, key: userKeys.openaiKey, provider: "openai" as const },
-				{ label: "Anthropic", state: anthropicInput, set: setAnthropicInput, key: userKeys.anthropicKey, provider: "anthropic" as const },
-				{ label: "Google", state: googleInput, set: setGoogleInput, key: userKeys.googleKey, provider: "google" as const },
-				{ label: "Mistral", state: mistralInput, set: setMistralInput, key: userKeys.mistralKey, provider: "mistral" as const },
-			] as const).map((p) => (
+			{(
+				[
+					{
+						label: "OpenAI",
+						state: openaiInput,
+						set: setOpenaiInput,
+						key: userKeys.openaiKey,
+						provider: "openai" as const,
+					},
+					{
+						label: "Anthropic",
+						state: anthropicInput,
+						set: setAnthropicInput,
+						key: userKeys.anthropicKey,
+						provider: "anthropic" as const,
+					},
+					{
+						label: "Google",
+						state: googleInput,
+						set: setGoogleInput,
+						key: userKeys.googleKey,
+						provider: "google" as const,
+					},
+					{
+						label: "Mistral",
+						state: mistralInput,
+						set: setMistralInput,
+						key: userKeys.mistralKey,
+						provider: "mistral" as const,
+					},
+				] as const
+			).map((p) => (
 				<div key={p.provider} className="mb-8 rounded-lg border p-4">
 					<h2 className="mb-2 font-medium">{p.label}</h2>
 					<p className="mb-4 text-muted-foreground text-sm">
-						Provide your {p.label} API key if you plan to use premium models from {p.label}.
+						Provide your {p.label} API key if you plan to use premium models
+						from {p.label}.
 					</p>
 					<p className="mb-1 block font-medium text-sm">Current key</p>
 					<div className="mb-3 text-sm">{maskKey(p.key)}</div>
