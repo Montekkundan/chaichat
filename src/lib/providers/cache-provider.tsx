@@ -18,7 +18,7 @@ import { type Chat, type Message, db } from "~/db";
 interface CacheContextType {
 	chats: Chat[];
 	getChat: (chatId: string) => Chat | undefined;
-	createChat: (name: string, model: string) => Promise<string>;
+	createChat: (name: string, model: string, userIdOverride?: string) => Promise<string>;
 	deleteChat: (chatId: string) => Promise<void>;
 	updateChatModel: (chatId: string, model: string) => Promise<void>;
 
@@ -28,7 +28,7 @@ interface CacheContextType {
 	addMessage: (message: {
 		chatId: string;
 		userId: string;
-		role: "user" | "assistant";
+		role: "user" | "assistant" | "system";
 		content: string;
 		model: string;
 		parentMessageId?: string;
@@ -194,14 +194,15 @@ export function CacheProvider({
 	);
 
 	const createChat = useCallback(
-		async (name: string, model: string): Promise<string> => {
-			if (!user?.id) throw new Error("User not authenticated");
+		async (name: string, model: string, userIdOverride?: string): Promise<string> => {
+			const uid = userIdOverride ?? user?.id;
+			if (!uid) throw new Error("User not authenticated");
 
 			const optimisticId = `optimistic-${Date.now()}`;
 			const optimisticChat: Chat = {
 				_id: optimisticId,
 				name,
-				userId: user.id,
+				userId: uid,
 				currentModel: model,
 				initialModel: model,
 				createdAt: Date.now(),
@@ -214,7 +215,7 @@ export function CacheProvider({
 			try {
 				const newChatId = await createChatMutation({
 					name,
-					userId: user.id,
+					userId: uid,
 					model,
 				});
 
@@ -443,7 +444,7 @@ export function CacheProvider({
 		async (messageData: {
 			chatId: string;
 			userId: string;
-			role: "user" | "assistant";
+			role: "user" | "assistant" | "system";
 			content: string;
 			model: string;
 			parentMessageId?: string;

@@ -2,9 +2,10 @@ import type { Message as MessageType } from "@ai-sdk/react";
 import React, { useState } from "react";
 import { MessageAssistant } from "./message-assistant";
 import { MessageUser } from "./message-user";
+import { MessageSystem } from "./message-system";
 
 type MessageProps = {
-	variant: MessageType["role"];
+	variant: MessageType["role"] | "system";
 	children: string;
 	id: string;
 	message?: MessageType;
@@ -82,6 +83,10 @@ export function Message({
 				{children}
 			</MessageAssistant>
 		);
+	}
+
+	if (variant === "system") {
+		return <MessageSystem>{children}</MessageSystem>;
 	}
 
 	return null;

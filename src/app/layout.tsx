@@ -12,6 +12,7 @@ import { DEFAULT_APP_THEME } from "~/lib/config";
 import { CacheProvider } from "~/lib/providers/cache-provider";
 import { ChatsProvider } from "~/lib/providers/chats-provider";
 import { ModelsProvider } from "~/lib/providers/models-provider";
+import { QuotaProvider } from "~/lib/providers/quota-provider";
 
 const geistSans = Geist({
 	variable: "--font-geist-sans",
@@ -90,8 +91,10 @@ export default async function RootLayout({
 								<CacheProvider initialChats={initialChats}>
 									<ChatsProvider>
 										<ModelsProvider>
-											{/* <Toaster position="top-center" /> */}
-											{children}
+											<QuotaProvider>
+												{/* <Toaster position="top-center" /> */}
+												{children}
+											</QuotaProvider>
 										</ModelsProvider>
 									</ChatsProvider>
 								</CacheProvider>

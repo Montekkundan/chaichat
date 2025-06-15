@@ -136,25 +136,27 @@ export function ModelSelector({
 
 	const renderModelItem = (model: ModelConfig) => {
 		const isPro = !FREE_MODELS_IDS.includes(model.id);
-		const provider = PROVIDERS.find(
-			(provider) => provider.id === model.providerId,
-		);
+		const provider = PROVIDERS.find((p) => p.id === model.providerId);
+
+		const locked = isPro && !isUserAuthenticated;
 
 		return (
-			// biome-ignore lint/a11y/useKeyWithClickEvents: <explanation>
+			// biome-ignore lint/a11y/useKeyWithClickEvents: interactive div for list item
 			<div
 				key={model.id}
 				className={cn(
-					"flex w-full cursor-pointer items-center justify-between px-3 py-2 hover:bg-accent",
+					"flex w-full items-center justify-between px-3 py-2 hover:bg-accent",
 					selectedModelId === model.id && "bg-accent",
+					locked && "cursor-not-allowed opacity-60",
 				)}
-				onClick={() => handleModelSelect(model)}
+				onClick={() => {
+					if (locked) return;
+					handleModelSelect(model);
+				}}
 			>
 				<div className="flex items-center gap-3">
 					{provider?.icon && <provider.icon className="size-5" />}
-					<div className="flex flex-col gap-0">
-						<span className="text-sm">{model.name}</span>
-					</div>
+					<span className="text-sm">{model.name}</span>
 				</div>
 				{isPro && (
 					<div className="flex items-center gap-0.5 rounded-full border border-input bg-accent px-1.5 py-0.5 font-medium text-[10px] text-muted-foreground">
@@ -202,37 +204,6 @@ export function ModelSelector({
 		e.stopPropagation();
 		setSearchQuery(e.target.value);
 	};
-
-	// If user is not authenticated, show the auth popover
-	if (!isUserAuthenticated) {
-		return (
-			<Popover>
-				<Tooltip>
-					<TooltipTrigger asChild>
-						<PopoverTrigger asChild>
-							<Button
-								size="sm"
-								variant="secondary"
-								className={cn(
-									"h-9 w-auto border border-border bg-transparent text-accent-foreground dark:bg-secondary",
-									className,
-								)}
-								type="button"
-							>
-								{currentProvider?.icon && (
-									<currentProvider.icon className="size-5" />
-								)}
-								{currentModel?.name}
-								<CaretDown className="size-4" />
-							</Button>
-						</PopoverTrigger>
-					</TooltipTrigger>
-					<TooltipContent>Select a model</TooltipContent>
-				</Tooltip>
-				{/* <PopoverContentAuth /> */}
-			</Popover>
-		);
-	}
 
 	if (isMobile) {
 		return (
@@ -344,45 +315,7 @@ export function ModelSelector({
 									</p>
 								</div>
 							) : filteredModels.length > 0 ? (
-								filteredModels.map((model) => {
-									const isPro = !FREE_MODELS_IDS.includes(model.id);
-									const provider = PROVIDERS.find(
-										(provider) => provider.id === model.providerId,
-									);
-
-									return (
-										<DropdownMenuItem
-											key={model.id}
-											className={cn(
-												"flex w-full items-center justify-between px-3 py-2",
-												selectedModelId === model.id && "bg-accent",
-											)}
-											onSelect={() => handleModelSelect(model)}
-											onFocus={() => {
-												if (isDropdownOpen) {
-													setHoveredModel(model.id);
-												}
-											}}
-											onMouseEnter={() => {
-												if (isDropdownOpen) {
-													setHoveredModel(model.id);
-												}
-											}}
-										>
-											<div className="flex items-center gap-3">
-												{provider?.icon && <provider.icon className="size-5" />}
-												<div className="flex flex-col gap-0">
-													<span className="text-sm">{model.name}</span>
-												</div>
-											</div>
-											{isPro && (
-												<div className="flex items-center gap-0.5 rounded-full border border-input bg-accent px-1.5 py-0.5 font-medium text-[10px] text-muted-foreground">
-													<span>Pro</span>
-												</div>
-											)}
-										</DropdownMenuItem>
-									);
-								})
+								filteredModels.map((model) => renderModelItem(model))
 							) : (
 								<div className="flex h-full flex-col items-center justify-center p-6 text-center">
 									<p className="mb-1 text-muted-foreground text-sm">

@@ -3,14 +3,12 @@ import React, { useEffect, useState } from "react";
 type TTheme = "system" | "light" | "dark";
 
 export const ThemeSwitcher = () => {
-	const getInitialTheme = (): TTheme => {
-		if (typeof window === "undefined") {
-			return "system";
-		}
-		return (localStorage.getItem("theme") as TTheme) || "system";
-	};
+	const [theme, setTheme] = useState<TTheme>("system");
 
-	const [theme, setTheme] = useState<TTheme>(getInitialTheme);
+	useEffect(() => {
+		const stored = (localStorage.getItem("theme") as TTheme) || "system";
+		setTheme(stored);
+	}, []);
 
 	useEffect(() => {
 		const root = document.documentElement;

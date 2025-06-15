@@ -10,10 +10,11 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useChatHandlers } from "~/components/chat-input/use-chat-handlers";
 import { Conversation } from "~/components/chat/conversation";
-import { ChatInput } from "~/components/prompt-input";
+import { ChatInput } from "~/components/chat-input/chat-input";
 import { useMessages } from "~/lib/providers/messages-provider";
 import { cn } from "~/lib/utils";
 import { useSidebar } from "../ui/sidebar";
+import { useQuota } from "~/lib/providers/quota-provider";
 
 type ChatProps = { initialName?: string };
 
@@ -37,6 +38,8 @@ export default function Chat({ initialName }: ChatProps = {}) {
 		changeModel,
 		regenerateMessage,
 		stop,
+		quotaExceeded,
+		rateLimited,
 	} = useMessages();
 
 	const chatIdString = Array.isArray(chatId) ? chatId[0] : chatId;
@@ -69,7 +72,7 @@ export default function Chat({ initialName }: ChatProps = {}) {
 	};
 
 	const handleSend = async () => {
-		if (!input.trim() || !user?.id) return;
+		if (!input.trim()) return;
 
 		// If no chatId, create a new chat first
 		if (!chatIdString) {
@@ -101,6 +104,10 @@ export default function Chat({ initialName }: ChatProps = {}) {
 		<>
 			<div className="pointer-events-none absolute bottom-0 z-10 w-full px-2">
 				<div className="relative mx-auto flex w-full max-w-3xl flex-col text-center">
+					{/* Anonymous quota banner */}
+					{!user?.id && (
+						<AnonQuotaBanner />
+					)}
 					<div className="pointer-events-none">
 						<div className="pointer-events-auto">
 							<div className="rounded-t-3xl p-2 pb-0 backdrop-blur-lg ">
@@ -109,6 +116,7 @@ export default function Chat({ initialName }: ChatProps = {}) {
 									onValueChange={handleInputChange}
 									onSend={handleSend}
 									isSubmitting={isLoading}
+									disabled={quotaExceeded || rateLimited}
 									onSelectModel={handleModelChange}
 									selectedModel={selectedModel}
 									isUserAuthenticated={!!user?.id}
@@ -213,5 +221,17 @@ export default function Chat({ initialName }: ChatProps = {}) {
 				</div>
 			</div>
 		</>
+	);
+}
+
+// Banner shown to anonymous visitors indicating remaining credits
+function AnonQuotaBanner() {
+	const quota = useQuota();
+	if (quota.plan !== "anonymous") return null;
+	const remaining = quota.stdCredits ?? 0;
+	return (
+		<div className="pointer-events-auto mb-2 rounded-md bg-muted/50 py-1 px-4 text-sm text-muted-foreground backdrop-blur-lg">
+			{remaining} free messages left. <Link href="/sign-in" className="underline">Sign in</Link> for more.
+		</div>
 	);
 }

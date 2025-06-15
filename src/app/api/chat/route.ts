@@ -9,6 +9,8 @@ import { FREE_MODELS_IDS, SYSTEM_PROMPT_DEFAULT } from "~/lib/config";
 import { getAllModels } from "~/lib/models";
 import { openproviders } from "~/lib/openproviders";
 import { getProviderForModel } from "~/lib/openproviders/provider-map";
+import { modelCost, shouldReset } from "~/lib/subscription";
+import { PLANS } from "~/lib/config";
 // import {
 //   logUserMessage,
 //   storeAssistantMessage,
@@ -161,6 +163,60 @@ export async function POST(req: Request) {
 		const modelInstance = isFreeModel
 			? modelConfig.apiSdk(undefined)
 			: modelConfig.apiSdk(apiKey);
+
+		// ----------------- Quota checks -----------------
+		// Ensure user exists and fetch quota
+		const quota = await convex.mutation(api.userQuota.initUser, {
+			userId,
+			plan: isAuthenticated ? "free" : "anonymous",
+		});
+		if (!quota) {
+			throw new Error("Failed to initialize user quota");
+		}
+
+		const now = Date.now();
+		let stdCredits = quota.stdCredits ?? 0;
+		let premiumCredits = quota.premiumCredits ?? 0;
+		let refillAt = quota.refillAt;
+		const planInfo = PLANS[quota.plan as keyof typeof PLANS] ?? PLANS.anonymous;
+		if (planInfo.periodMs && shouldReset(now, refillAt)) {
+			stdCredits = planInfo.total;
+			premiumCredits = planInfo.premium;
+			refillAt = now + planInfo.periodMs;
+			await convex.mutation(api.userQuota.updateQuota, {
+				userId,
+				std: stdCredits,
+				prem: premiumCredits,
+				refillAt,
+			});
+		}
+
+		// Determine cost for requested model
+		const cost = modelCost(model);
+		if (stdCredits < cost.standard || premiumCredits < cost.premium) {
+			return new Response(
+				JSON.stringify({
+					error: "Quota exceeded. Please upgrade your plan.",
+					code: "QUOTA_EXCEEDED",
+					remaining: {
+						standard: stdCredits,
+						premium: premiumCredits,
+					},
+				}),
+				{ status: 403 },
+			);
+		}
+
+		// Deduct credits
+		stdCredits -= cost.standard;
+		premiumCredits -= cost.premium;
+		await convex.mutation(api.userQuota.updateQuota, {
+			userId,
+			std: stdCredits,
+			prem: premiumCredits,
+			refillAt,
+		});
+		// ------------------------------------------------
 
 		const result = streamText({
 			model: modelInstance,

@@ -9,9 +9,26 @@ import {
 	TooltipProvider,
 	TooltipTrigger,
 } from "~/components/ui/tooltip";
+import { useQuota } from "~/lib/providers/quota-provider";
 
 export function TopLeftControls() {
 	const { state } = useSidebar();
+	const quota = useQuota();
+	const remaining = quota.plan === "pro" ? `${quota.stdCredits}/${quota.premiumCredits}` : quota.stdCredits.toString();
+
+	const badge = (
+		<Tooltip>
+			<TooltipTrigger asChild>
+				<span className="inline-flex items-center rounded-md bg-muted/40 px-2 text-[10px] font-medium text-muted-foreground">
+					{remaining}
+				</span>
+			</TooltipTrigger>
+			<TooltipContent side="top" className="px-2 py-1 text-xs">
+				{quota.plan === "pro" ? "Std / Premium credits" : "Remaining chats"}
+			</TooltipContent>
+		</Tooltip>
+	);
+
 	const collapsedBg = state === "collapsed" ? "bg-sidebar" : "";
 	return (
 		<div
@@ -37,6 +54,8 @@ export function TopLeftControls() {
 							</kbd>
 						</TooltipContent>
 					</Tooltip>
+
+					{badge}
 
 					<AnimatePresence>
 						{state === "collapsed" && (

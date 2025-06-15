@@ -163,7 +163,7 @@
 		@apply border-border outline-ring/50;
 	}
 	body {
-		@apply bg-background text-foreground overflow-hidden font-sans antialiased proportional-nums selection:bg-primary selection:text-white [font-feature-settings:'ss05'_on];
+		@apply bg-background text-foreground font-sans antialiased proportional-nums selection:bg-primary selection:text-white [font-feature-settings:'ss05'_on];
 	}
 }
 

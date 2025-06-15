@@ -32,7 +32,7 @@ export const addMessage = mutation({
   args: {
     chatId: v.id("chats"),
     userId: v.string(),
-    role: v.union(v.literal("user"), v.literal("assistant")),
+    role: v.union(v.literal("user"), v.literal("assistant"), v.literal("system")),
     content: v.string(),
     model: v.string(),
     parentMessageId: v.optional(v.id("messages")),

@@ -18,6 +18,7 @@ import { toast } from "~/components/ui/toast";
 import { SYSTEM_PROMPT_DEFAULT } from "~/lib/config";
 import { API_ROUTE_CHAT } from "~/lib/routes";
 import { useCache } from "./cache-provider";
+import { getAnonId } from "~/lib/anon-id";
 
 interface MessagesContextType {
 	messages: MessageAISDK[];
@@ -34,6 +35,8 @@ interface MessagesContextType {
 	regenerateMessage: (messageIndex: number, newModel?: string) => Promise<void>;
 	stop: () => void;
 	reload: () => void;
+	quotaExceeded: boolean;
+	rateLimited: boolean;
 }
 
 const MessagesContext = createContext<MessagesContextType | undefined>(
@@ -65,6 +68,9 @@ export function MessagesProvider({
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const [selectedModel, setSelectedModel] = useState(initialModel);
 	const [cachedMessages, setCachedMessages] = useState<MessageAISDK[]>([]);
+	const [quotaExceeded, setQuotaExceeded] = useState(false);
+	const [rateLimited, setRateLimited] = useState(false);
+	const currentUserId = user?.id ?? (typeof window !== "undefined" ? getAnonId() : "");
 
 	// Track regeneration context - use useRef to persist across re-renders
 	const regenerationContext = useRef<{
@@ -129,14 +135,14 @@ export function MessagesProvider({
 		api: API_ROUTE_CHAT,
 		initialMessages: cachedMessages,
 		onFinish: async (message, { finishReason, usage }) => {
-			if (!chatId || !user?.id) return;
+			if (!chatId || !currentUserId) return;
 
 			// Save pending user message first if it exists
 			if (pendingUserMessage.current) {
 				try {
 					const convexMessageId = await cache.addMessage({
 						chatId,
-						userId: user.id,
+						userId: currentUserId,
 						role: "user",
 						content: pendingUserMessage.current.content,
 						model: selectedModel,
@@ -171,7 +177,7 @@ export function MessagesProvider({
 
 						const convexMessageId = await cache.addMessage({
 							chatId,
-							userId: user.id,
+							userId: currentUserId,
 							role: "assistant",
 							content: message.content,
 							model: selectedModel,
@@ -199,7 +205,7 @@ export function MessagesProvider({
 						// For regular messages (not regenerated)
 						const convexMessageId = await cache.addMessage({
 							chatId,
-							userId: user.id,
+							userId: currentUserId,
 							role: "assistant",
 							content: message.content,
 							model: selectedModel,
@@ -228,6 +234,61 @@ export function MessagesProvider({
 		},
 		onError: (error) => {
 			console.error("AI Chat error:", error);
+			try {
+				const errObj = JSON.parse((error as Error).message);
+				if (errObj?.code === "QUOTA_EXCEEDED") {
+					setQuotaExceeded(true);
+					const sysMsg = {
+						id: `system-${Date.now()}`,
+						role: "system" as const,
+						content: errObj.error ?? "Quota exceeded.",
+						createdAt: Date.now(),
+					} as unknown as MessageAISDK;
+					setMessages((prev) => [...prev, sysMsg]);
+
+					if (chatId) {
+						cache.addMessage({
+							chatId,
+							userId: currentUserId ?? "system",
+							role: "system",
+							content: sysMsg.content,
+							model: selectedModel,
+							createdAt: Date.now(),
+						});
+					}
+					return;
+				}
+				if (errObj?.code === "RATE_LIMITED" || errObj?.status === 429) {
+					setRateLimited(true);
+					const sysMsg = {
+						id: `system-${Date.now()}`,
+						role: "system" as const,
+						content:
+							errObj.error ??
+							"Rate limit exceeded. Please wait a moment and try again.",
+						createdAt: Date.now(),
+					} as unknown as MessageAISDK;
+					setMessages((prev) => [...prev, sysMsg]);
+
+					if (chatId) {
+						cache.addMessage({
+							chatId,
+							userId: currentUserId ?? "system",
+							role: "system",
+							content: sysMsg.content,
+							model: selectedModel,
+							createdAt: Date.now(),
+						});
+					}
+					return;
+				}
+			} catch {}
+
+			// fallback string detection
+			if ((error as Error).message?.includes("429")) {
+				return;
+			}
+
 			toast({
 				title: "Failed to get AI response",
 				status: "error",
@@ -272,23 +333,23 @@ export function MessagesProvider({
 
 	const createNewChat = useCallback(
 		async (initialMessage: string, model: string): Promise<string> => {
-			if (!user?.id) throw new Error("User not authenticated");
+			if (!currentUserId) throw new Error("User not authenticated");
 
 			try {
 				const chatName = initialMessage.slice(0, 50);
-				const newChatId = await cache.createChat(chatName, model);
+				const newChatId = await cache.createChat(chatName, model, currentUserId);
 				return newChatId;
 			} catch (error) {
 				console.error("Failed to create chat:", error);
 				throw error;
 			}
 		},
-		[user?.id, cache],
+		[currentUserId, cache],
 	);
 
 	const sendMessage = useCallback(
 		async (message: string) => {
-			if (!user?.id || !chatId) return;
+			if (!currentUserId || !chatId) return;
 			if (isSubmitting) return;
 
 			setIsSubmitting(true);
@@ -309,14 +370,21 @@ export function MessagesProvider({
 					{
 						body: {
 							chatId: chatId as Id<"chats">,
-							userId: user.id,
+							userId: currentUserId,
 							model: selectedModel,
-							isAuthenticated: true,
+							isAuthenticated: !!user?.id,
 							systemPrompt: SYSTEM_PROMPT_DEFAULT,
 						},
 					},
 				);
 			} catch (error) {
+				try {
+					const errObj = JSON.parse((error as Error).message);
+					if (errObj?.code === "QUOTA_EXCEEDED") {
+						// already handled elsewhere; do not log
+						return;
+					}
+				} catch {}
 				console.error("Failed to send message:", error);
 				toast({
 					title: "Failed to send message",
@@ -326,7 +394,7 @@ export function MessagesProvider({
 				setIsSubmitting(false);
 			}
 		},
-		[user?.id, chatId, selectedModel, append, isSubmitting],
+		[currentUserId, chatId, selectedModel, append, isSubmitting, user?.id],
 	);
 
 	// Send pending message when conditions are right (after sendMessage is defined)
@@ -334,7 +402,7 @@ export function MessagesProvider({
 		if (
 			pendingInputToSend &&
 			chatId &&
-			user?.id &&
+			currentUserId &&
 			status === "ready" &&
 			messages.length === 0 &&
 			!hasSentPending.current
@@ -349,7 +417,7 @@ export function MessagesProvider({
 	}, [
 		pendingInputToSend,
 		chatId,
-		user?.id,
+		currentUserId,
 		status,
 		messages.length,
 		sendMessage,
@@ -360,7 +428,7 @@ export function MessagesProvider({
 			setSelectedModel(newModel);
 
 			// If we have a chat, update it in the cache
-			if (chatId && user?.id) {
+			if (chatId && currentUserId) {
 				try {
 					await cache.updateChatModel(chatId, newModel);
 				} catch (error) {
@@ -368,12 +436,12 @@ export function MessagesProvider({
 				}
 			}
 		},
-		[chatId, user?.id, cache],
+		[chatId, currentUserId, cache],
 	);
 
 	const regenerateMessage = useCallback(
 		async (messageIndex: number, newModel?: string) => {
-			if (!user?.id || !chatId || messageIndex < 0) return;
+			if (!currentUserId || !chatId || messageIndex < 0) return;
 			if (isSubmitting) return;
 
 			setIsSubmitting(true);
@@ -469,9 +537,9 @@ export function MessagesProvider({
 					{
 						body: {
 							chatId: chatId as Id<"chats">,
-							userId: user.id,
+							userId: currentUserId,
 							model: modelToUse,
-							isAuthenticated: true,
+							isAuthenticated: !!user?.id,
 							systemPrompt: SYSTEM_PROMPT_DEFAULT,
 						},
 					},
@@ -488,7 +556,7 @@ export function MessagesProvider({
 			}
 		},
 		[
-			user?.id,
+			currentUserId,
 			chatId,
 			selectedModel,
 			messages,
@@ -497,6 +565,7 @@ export function MessagesProvider({
 			changeModel,
 			isSubmitting,
 			convex,
+			user?.id,
 		],
 	);
 
@@ -517,6 +586,8 @@ export function MessagesProvider({
 				regenerateMessage,
 				stop,
 				reload,
+				quotaExceeded,
+				rateLimited,
 			}}
 		>
 			{children}

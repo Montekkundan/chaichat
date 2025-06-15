@@ -1,7 +1,6 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 
-// Protect settings pages and any /chat/** routes
-const isProtectedRoute = createRouteMatcher(["/settings(.*)", "/chat(.*)"]);
+const isProtectedRoute = createRouteMatcher(["/settings(.*)"]);
 
 export default clerkMiddleware(async (auth, req) => {
 	if (isProtectedRoute(req)) {

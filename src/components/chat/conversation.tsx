@@ -6,7 +6,10 @@ import {
 import { Loader } from "~/components/prompt-kit/loader";
 import { ScrollButton } from "~/components/prompt-kit/scroll-button";
 
-type MessageWithModel = MessageType & { model?: string };
+type MessageWithModel = Omit<MessageType, "role"> & {
+	role: "user" | "assistant" | "system" | "data";
+	model?: string;
+};
 import { useRef } from "react";
 import { Message } from "./message";
 

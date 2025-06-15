@@ -19,3 +19,15 @@ export const RECOMMENDED_MODEL_IDS = [
 	"mistral-large-latest",
 	"grok-2",
 ];
+
+// Subscription plan definitions
+export const PLANS = {
+	anonymous: { total: 10, premium: 0, periodMs: undefined }, // no refill
+	free: { total: 20, premium: 0, periodMs: 24 * 60 * 60 * 1000 }, // 24h
+	pro: { total: 1500, premium: 100, periodMs: 30 * 24 * 60 * 60 * 1000 }, // 30d
+} as const;
+
+export const PREMIUM_MODEL_IDS = [
+	"claude-3-5-sonnet-latest",
+	"grok-2",
+];

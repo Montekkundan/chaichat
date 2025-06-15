@@ -39,11 +39,8 @@ export function useChatHandlers({
 
 	const handleModelChange = useCallback(
 		async (model: string) => {
-			if (!user?.id) {
-				return;
-			}
-
-			if (!chatId && user?.id) {
+			// If chat not yet created just update local state
+			if (!chatId) {
 				setSelectedModel(model);
 				return;
 			}
@@ -51,19 +48,8 @@ export function useChatHandlers({
 			const oldModel = selectedModel;
 
 			setSelectedModel(model);
-
-			// try {
-			//   await updateChatModel(chatId!, model)
-			// } catch (err) {
-			//   console.error("Failed to update chat model:", err)
-			//   setSelectedModel(oldModel)
-			//   toast({
-			//     title: "Failed to update chat model",
-			//     status: "error",
-			//   })
-			// }
 		},
-		[chatId, selectedModel, setSelectedModel, user?.id],
+		[chatId, selectedModel, setSelectedModel],
 	);
 
 	const handleDelete = useCallback(

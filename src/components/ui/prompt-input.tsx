@@ -45,6 +45,7 @@ type PromptInputProps = {
 	onSubmit?: () => void;
 	children: React.ReactNode;
 	className?: string;
+	disabled?: boolean;
 };
 
 function PromptInput({
@@ -55,6 +56,7 @@ function PromptInput({
 	onValueChange,
 	onSubmit,
 	children,
+	disabled = false,
 }: PromptInputProps) {
 	const [internalValue, setInternalValue] = useState(value || "");
 
@@ -72,6 +74,7 @@ function PromptInput({
 					setValue: onValueChange ?? handleChange,
 					maxHeight,
 					onSubmit,
+					disabled,
 				}}
 			>
 				<div

@@ -10,7 +10,7 @@ import {
 	PromptInputTextarea,
 } from "~/components/ui/prompt-input";
 import { getModelInfo } from "~/lib/models";
-import { ModelSelector } from "./chat-input/model-selector";
+import { ModelSelector } from "./model-selector";
 
 type ChatInputProps = {
 	value: string;
@@ -28,6 +28,7 @@ type ChatInputProps = {
 	isUserAuthenticated: boolean;
 	stop: () => void;
 	status?: "submitted" | "streaming" | "ready" | "error";
+	disabled?: boolean;
 	// onSearchToggle?: (enabled: boolean, agentId: string | null) => void
 	position?: "centered" | "bottom";
 };
@@ -49,6 +50,7 @@ export function ChatInput({
 	status,
 	// onSearchToggle,
 	position = "centered",
+	disabled = false,
 }: ChatInputProps) {
 	const selectModelConfig = getModelInfo(selectedModel);
 	const hasToolSupport = Boolean(selectModelConfig?.tools);
@@ -79,7 +81,7 @@ export function ChatInput({
 	//   }, [isSubmitting, onSend, status, stop])
 
 	const handleSend = useCallback(() => {
-		if (isSubmitting) {
+		if (isSubmitting || disabled) {
 			return;
 		}
 
@@ -89,7 +91,7 @@ export function ChatInput({
 		}
 
 		onSend();
-	}, [isSubmitting, onSend, status, stop]);
+	}, [isSubmitting, onSend, status, stop, disabled]);
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: <explanation>
 	const handleKeyDown = useCallback(
@@ -168,6 +170,7 @@ export function ChatInput({
 				maxHeight={200}
 				value={value}
 				//   onValueChange={agentCommand.handleValueChange}
+				disabled={disabled}
 			>
 				{/* {agentCommand.showAgentCommand && (
             <div className="absolute bottom-full left-0 w-full">
@@ -193,6 +196,7 @@ export function ChatInput({
 					onKeyDown={handleKeyDown}
 					onChange={(e) => onValueChange(e.target.value)}
 					className="min-h-[44px] pt-3 pl-4 text-base leading-[1.3] sm:text-base md:text-base"
+					disabled={disabled || isSubmitting}
 					// ref={agentCommand.textareaRef}
 				/>
 				<PromptInputActions className="mt-5 w-full justify-between px-3 pb-3">
@@ -227,7 +231,7 @@ export function ChatInput({
 						<Button
 							size="sm"
 							className="size-9 rounded-full transition-all duration-300 ease-out"
-							disabled={!value || isSubmitting || isOnlyWhitespace(value)}
+							disabled={disabled || !value || isSubmitting || isOnlyWhitespace(value)}
 							type="button"
 							onClick={handleSend}
 							aria-label={status === "streaming" ? "Stop" : "Send message"}

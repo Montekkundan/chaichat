@@ -14,7 +14,7 @@ export interface Message {
 	_id: string;
 	chatId: string;
 	userId: string;
-	role: "user" | "assistant";
+	role: "user" | "assistant" | "system";
 	content: string;
 	model: string;
 	createdAt: number;
