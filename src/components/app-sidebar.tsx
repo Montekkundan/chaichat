@@ -20,7 +20,7 @@ import {
 import { useCache } from "~/lib/providers/cache-provider";
 import { Button } from "./ui/button";
 
-export function AppSidebar() {
+export function AppSidebar({ initialUser }: { initialUser?: { id: string; fullName?: string | null; firstName?: string | null; imageUrl?: string } } = {}) {
 	const { user } = useUser();
 	const router = useRouter();
 	const cache = useCache();
@@ -29,6 +29,8 @@ export function AppSidebar() {
 	const [deleteModalOpen, setDeleteModalOpen] = useState(false);
 	const [chatToDelete, setChatToDelete] = useState<string | null>(null);
 	const [hoveredChatId, setHoveredChatId] = useState<string | null>(null);
+
+	const effectiveUser = user ?? initialUser;
 
 	useEffect(() => {
 		const handler = setTimeout(() => {
@@ -53,7 +55,7 @@ export function AppSidebar() {
 	};
 
 	const handleNewChat = async () => {
-		if (!user) {
+		if (!effectiveUser) {
 			router.push("/login");
 			return;
 		}
@@ -67,7 +69,6 @@ export function AppSidebar() {
 
 	const handleConfirmDelete = async () => {
 		if (chatToDelete) {
-			// Close modal immediately for instant feedback
 			setDeleteModalOpen(false);
 			const chatIdToDelete = chatToDelete;
 			setChatToDelete(null);
@@ -77,7 +78,6 @@ export function AppSidebar() {
 				router.push("/");
 			} catch (error) {
 				console.error("Failed to delete chat:", error);
-				// Modal is already closed, error handling is in cache provider
 			}
 		}
 	};
@@ -109,7 +109,7 @@ export function AppSidebar() {
 			</SidebarHeader>
 			<SidebarContent>
 				<div className="px-2">
-					{user ? (
+					{effectiveUser ? (
 						<>
 							<div className="mb-2 font-semibold text-muted-foreground text-xs">
 								Your Chats
@@ -162,7 +162,7 @@ export function AppSidebar() {
 				</div>
 			</SidebarContent>
 			<SidebarFooter>
-				{user ? (
+				{effectiveUser ? (
 					<button
 						type="button"
 						className="flex w-full cursor-pointer items-center gap-3 px-4 py-4"
@@ -173,12 +173,12 @@ export function AppSidebar() {
 						tabIndex={0}
 					>
 						<img
-							src={user.imageUrl}
-							alt={user.fullName || "User"}
+							src={effectiveUser.imageUrl ?? ""}
+							alt={effectiveUser.fullName || "User"}
 							className="h-10 w-10 rounded-full"
 						/>
 						<div className="flex flex-col items-start">
-							<span className="font-semibold">{user.fullName}</span>
+							<span className="font-semibold">{effectiveUser.fullName ?? effectiveUser.firstName}</span>
 							<span className="text-muted-foreground text-xs">Free</span>
 						</div>
 					</button>

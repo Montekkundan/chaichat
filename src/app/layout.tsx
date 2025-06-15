@@ -11,6 +11,7 @@ import { CacheProvider } from "~/lib/providers/cache-provider";
 import { ChatsProvider } from "~/lib/providers/chats-provider";
 import { ModelsProvider } from "~/lib/providers/models-provider";
 import { cookies } from "next/headers";
+import { DEFAULT_APP_THEME } from "~/lib/config";
 
 const geistSans = Geist({
 	variable: "--font-geist-sans",
@@ -34,6 +35,40 @@ export default async function RootLayout({
 	const cookieStore = await cookies();
 	const activeThemeValue = cookieStore.get("active_theme")?.value;
 
+	type BasicChat = {
+		_id: string;
+		name: string;
+		userId: string;
+		currentModel: string;
+		initialModel: string;
+		createdAt: number;
+		_creationTime: number;
+	};
+
+	let initialChats: BasicChat[] = [];
+	const chatsCookie = cookieStore.get("cc_chats")?.value;
+	if (chatsCookie) {
+		try {
+			const parsed = JSON.parse(decodeURIComponent(chatsCookie));
+			if (Array.isArray(parsed)) {
+				initialChats = parsed.map((c): BasicChat => {
+					const obj = c as { _id: string; name: string; currentModel?: string };
+					return {
+						_id: obj._id,
+						name: obj.name,
+						userId: "",
+						currentModel: obj.currentModel ?? "",
+						initialModel: obj.currentModel ?? "",
+						createdAt: 0,
+						_creationTime: 0,
+					};
+				});
+			}
+		} catch {
+			// ignore parse errors
+		}
+	}
+
 	return (
 		<ClerkProvider>
 			<html
@@ -41,7 +76,7 @@ export default async function RootLayout({
 				className={`${geistSans.variable} ${geistMono.variable} antialiased`}
 				suppressHydrationWarning
 			>
-				<body className="bg-sidebar">
+				<body className={`bg-sidebar theme-${activeThemeValue ?? DEFAULT_APP_THEME}`}>
 					<ThemeProvider
 						attribute="class"
 						defaultTheme="system"
@@ -50,7 +85,7 @@ export default async function RootLayout({
 					>
 						<ActiveThemeProvider initialTheme={activeThemeValue}>
 							<ConvexClientProvider>
-								<CacheProvider>
+								<CacheProvider initialChats={initialChats}>
 									<ChatsProvider>
 										<ModelsProvider>
 												{/* <Toaster position="top-center" /> */}

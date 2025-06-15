@@ -57,11 +57,11 @@ export function useCache() {
 	return context;
 }
 
-export function CacheProvider({ children }: { children: React.ReactNode }) {
+export function CacheProvider({ children, initialChats = [] }: { children: React.ReactNode; initialChats?: Chat[] }) {
 	const { user } = useUser();
 	const convex = useConvex();
-	const [chats, setChats] = useState<Chat[]>([]);
-	const [isLoading, setIsLoading] = useState(true);
+	const [chats, setChats] = useState<Chat[]>(initialChats);
+	const [isLoading, setIsLoading] = useState(initialChats.length === 0);
 	const [isSyncing, setIsSyncing] = useState(false);
 
 	// Message cache - keyed by chatId
@@ -137,8 +137,10 @@ export function CacheProvider({ children }: { children: React.ReactNode }) {
 			}
 		};
 
-		initializeCache();
-	}, [user?.id]);
+		if (isLoading) {
+			initializeCache();
+		}
+	}, [user?.id, isLoading]);
 
 	// Sync Convex data with Dexie cache
 	useEffect(() => {
@@ -163,6 +165,18 @@ export function CacheProvider({ children }: { children: React.ReactNode }) {
 			syncWithConvex();
 		}
 	}, [convexChats, user?.id]);
+
+	// Persist minimal chat list (id + name) to cookie for fast SSR
+	useEffect(() => {
+		if (typeof document === "undefined") return;
+		try {
+			const minimal = chats.slice(0, 20).map((c) => ({ _id: c._id, name: c.name, currentModel: c.currentModel }));
+			const value = encodeURIComponent(JSON.stringify(minimal));
+			document.cookie = `cc_chats=${value}; path=/; max-age=604800; SameSite=Lax`;
+		} catch {
+			// ignore
+		}
+	}, [chats]);
 
 	// Chat operations
 	const getChat = useCallback(
@@ -298,7 +312,7 @@ export function CacheProvider({ children }: { children: React.ReactNode }) {
 	// Message operations
 	const getMessages = useCallback(
 		async (chatId: string): Promise<Message[]> => {
-			// 0) in-memory LRU
+			// in-memory LRU
 			const lruHit = memLRU.current.get(chatId);
 			if (lruHit && Date.now() - lruHit.ts < LRU_TTL) {
 				// bump recency
@@ -307,7 +321,7 @@ export function CacheProvider({ children }: { children: React.ReactNode }) {
 				return lruHit.msgs;
 			}
 
-			// 1) de-duplicate concurrent fetches
+			// de-duplicate concurrent fetches
 			if (inflightRequests.current.has(chatId)) {
 				const p = inflightRequests.current.get(chatId);
 				if (p) return p;
@@ -412,7 +426,7 @@ export function CacheProvider({ children }: { children: React.ReactNode }) {
 				return cached;
 			}
 
-			// This method is mainly for future expansion - the component uses direct Convex queries
+			// future expansion
 			return [];
 		},
 		[],

@@ -15,7 +15,9 @@ import { useMessages } from "~/lib/providers/messages-provider";
 import { cn } from "~/lib/utils";
 import { useSidebar } from "../ui/sidebar";
 
-export default function Chat() {
+type ChatProps = { initialName?: string };
+
+export default function Chat({ initialName }: ChatProps = {}) {
     const { chatId } = useParams();
     const { user } = useUser();
     const router = useRouter();
@@ -39,7 +41,6 @@ export default function Chat() {
 
     const chatIdString = Array.isArray(chatId) ? chatId[0] : chatId;
 
-    // Track navigation for animation purposes
     useEffect(() => {
         if (chatIdString && !hasNavigated) {
             setHasNavigated(true);
@@ -49,8 +50,8 @@ export default function Chat() {
     // Determine if we should show onboarding (home page with no messages)
     const showOnboarding = !chatIdString && messages.length === 0;
 
-    // Determine if we should animate the input position
-    const shouldAnimateInput = hasNavigated || messages.length > 0;
+    // // Determine if we should animate the input position
+    // const shouldAnimateInput = hasNavigated || messages.length > 0;
 
     const { handleInputChange, handleModelChange, handleDelete, handleEdit } =
         useChatHandlers({
@@ -188,7 +189,7 @@ export default function Chat() {
                         <div className="flex h-[calc(100vh-20rem)] items-start justify-center">
                             <div className="w-full space-y-6 px-2 pt-[calc(max(15vh,2.5rem))] duration-300 animate-in fade-in-50 zoom-in-95 sm:px-8">
                                 <h2 className="text-3xl font-semibold">
-                                    How can I help you {user?.firstName}?
+                                    How can I help you {user?.firstName ?? initialName ?? ''}?
                                 </h2>
                             </div>
                         </div>
@@ -205,98 +206,5 @@ export default function Chat() {
                 </div>
             </div>
         </>
-        // 	className={cn(
-        // 		"@container/main relative flex h-full flex-col",
-        // 		showOnboarding ? "items-center justify-center" : "",
-        // 	)}
-        // >
-        // 	{showOnboarding ? (
-        // 		<div className="flex w-full flex-1 flex-col items-center justify-center">
-        // 			<AnimatePresence initial={false} mode="popLayout">
-        // 				<motion.div
-        // 					key="onboarding"
-        // 					className="mx-auto mb-8 max-w-[50rem]"
-        // 					initial={{ opacity: 0, y: 20 }}
-        // 					animate={{ opacity: 1, y: 0 }}
-        // 					exit={{ opacity: 0, y: -20 }}
-        // 					transition={{ duration: 0.3, ease: "easeOut" }}
-        // 				>
-        // 					<h1 className="mb-6 font-medium text-3xl tracking-tight">
-        // 						What&apos;s on your mind?
-        // 					</h1>
-        // 				</motion.div>
-        // 			</AnimatePresence>
-
-        // 			<motion.div
-        // 				className="mx-auto w-full max-w-3xl"
-        // 				layout="position"
-        // 				layoutId="chat-input-container"
-        // 				transition={{
-        // 					layout: {
-        // 						duration: shouldAnimateInput ? 0.4 : 0,
-        // 						ease: "easeInOut",
-        // 					},
-        // 				}}
-        // 			>
-        // 				<ChatInput
-        // 					value={input}
-        // 					onValueChange={handleInputChange}
-        // 					onSend={handleSend}
-        // 					isSubmitting={isLoading}
-        // 					onSelectModel={handleModelChange}
-        // 					selectedModel={selectedModel}
-        // 					isUserAuthenticated={!!user?.id}
-        // 					stop={stop}
-        // 					status={status}
-        // 				/>
-        // 			</motion.div>
-        // 		</div>
-        // 	) : (
-        // 		<>
-        // 			<AnimatePresence initial={false} mode="popLayout">
-        // 				<motion.div
-        // 					key="conversation"
-        // 					initial={{ opacity: 0 }}
-        // 					animate={{ opacity: 1 }}
-        // 					transition={{ duration: 0.3 }}
-        // 					className="w-full flex-1 overflow-auto"
-        // 				>
-        // 					<Conversation
-        // 						messages={messages}
-        // 						status={status}
-        // 						onDelete={handleDelete}
-        // 						onEdit={handleEdit}
-        // 						onReload={handleReload}
-        // 						onRegenerate={regenerateMessage}
-        // 					/>
-        // 				</motion.div>
-        // 			</AnimatePresence>
-
-        // 			<motion.div
-        // 				className="relative inset-x-0 bottom-0 z-50 mx-auto w-full max-w-3xl"
-        // 				layout="position"
-        // 				layoutId="chat-input-container"
-        // 				transition={{
-        // 					layout: {
-        // 						duration: shouldAnimateInput ? 0.4 : 0,
-        // 						ease: "easeInOut",
-        // 					},
-        // 				}}
-        // 			>
-        // 				<ChatInput
-        // 					value={input}
-        // 					onValueChange={handleInputChange}
-        // 					onSend={handleSend}
-        // 					isSubmitting={isLoading}
-        // 					onSelectModel={handleModelChange}
-        // 					selectedModel={selectedModel}
-        // 					isUserAuthenticated={!!user?.id}
-        // 					stop={stop}
-        // 					status={status}
-        // 				/>
-        // 			</motion.div>
-        // 		</>
-        // 	)}
-        // </div>
     );
 }
