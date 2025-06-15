@@ -164,7 +164,7 @@ export function ChatInput({
 	const mainContent = (
 		<div className="w-full max-w-3xl">
 			<PromptInput
-				className="relative z-10 bg-popover p-0 pt-1 shadow-xs backdrop-blur-xl"
+				className="relative z-10 bg-chat-background p-0 pt-1 shadow-xs backdrop-blur-xl"
 				maxHeight={200}
 				value={value}
 				//   onValueChange={agentCommand.handleValueChange}

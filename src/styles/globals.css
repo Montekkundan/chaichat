@@ -86,6 +86,19 @@
 	--ds-gray-700: hsla(0, 0%, 56%, 1);
 	--ds-gray-1000: hsla(0, 0%, 9%, 1);
 	--ds-shadow: rgba(0, 0, 0, 0.08);
+	/* Used as alpha channel when backdrop-blur not supported */
+	--blur-fallback: 1;
+	/* Chat specific */
+	--chat-background: 270 16.13% 12.16%;
+	--chat-input-background: oklch(0.99 0 0 / var(--blur-fallback,0.1));
+	/* Gradient noise overlay (top) uses sidebar color */
+	--gradient-noise-top: var(--sidebar);
+	/* Border color inside chat area (for svg stroke etc.) */
+	--chat-border: 333.3 22% 16.1%;
+	/* Sidebar decorative background */
+	--sidebar-overlay: radial-gradient(closest-corner at 120px 36px, rgba(0,0,0,.07), rgba(0,0,0,0)), linear-gradient(rgb(254,254,254) 15%, rgb(240,240,240));
+	/* Gradient used for chat-input reflective border */
+	--chat-input-gradient: linear-gradient(180deg, hsl(var(--chat-border) / 0.3), hsl(var(--chat-border) / 0.8));
 }
 
 .dark {
@@ -123,6 +136,14 @@
 	--ds-gray-700: hsla(0, 0%, 56%, 1);
 	--ds-gray-1000: hsla(0, 0%, 93%, 1);
 	--ds-shadow: rgba(255, 255, 255, 0.145);
+	/* Chat specific */
+	--chat-background: 270 16.13% 12.16%;
+	/* Gradient noise overlay (top) uses sidebar color */
+	--gradient-noise-top: var(--sidebar);
+	/* Border color inside chat area (for svg stroke etc.) */
+	--chat-border: 333.3 22% 16.1%;
+	/* Sidebar decorative background */
+	--sidebar-overlay: radial-gradient(closest-corner at 120px 36px, rgba(255,255,255,.10), rgba(255,255,255,0)), linear-gradient(rgb(25,25,25) 15%, rgb(0,0,0));
 }
 
 @layer base {
@@ -130,7 +151,7 @@
 		@apply border-border outline-ring/50;
 	}
 	body {
-		@apply bg-background text-foreground;
+		@apply bg-background text-foreground overflow-hidden font-sans antialiased proportional-nums selection:bg-primary selection:text-white [font-feature-settings:'ss05'_on];
 	}
 }
 
@@ -143,3 +164,100 @@
 
 /* Override tailwind generated bg-black/40 so it uses simple rgba and affects all elements */
 .bg-black\/40 { background-color: rgba(0, 0, 0, 0.4) !important; }
+
+/* Chat helpers */
+.bg-chat-input {
+	background-color: var(--chat-input-background);
+}
+
+.chat-input-surface {
+	background-color: var(--chat-input-background);
+	backdrop-filter: blur(12px);
+	-webkit-backdrop-filter: blur(12px);
+	/* Ensures content appears above pseudo border */
+}
+
+.min-h-pwa {
+	min-height: calc(100svh + env(safe-area-inset-top));
+}
+
+.firefox-scrollbar-margin-fix {
+	/* Stable gutter for Firefox */
+	scrollbar-gutter: stable both-edges;
+}
+
+.bg-chat-background {
+	background-color: hsl(var(--chat-background));
+}
+
+/* Gradient noise top helpers */
+@layer utilities {
+	.bg-gradient-noise-top {
+		background-color: var(--gradient-noise-top);
+	}
+	.bg-gradient-noise-top\/80 {
+		background-color: color-mix(in srgb, var(--gradient-noise-top) 80%, transparent);
+	}
+	.from-gradient-noise-top {
+		--tw-gradient-from: var(--gradient-noise-top) var(--tw-gradient-from-position);
+		--tw-gradient-to: rgb(255 255 255 / 0) var(--tw-gradient-to-position);
+		--tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
+	}
+	.to-gradient-noise-top {
+		--tw-gradient-to: var(--gradient-noise-top) var(--tw-gradient-to-position);
+	}
+}
+
+/* Creates a fancy reflective gradient border that adapts to the current theme via the
+   --chat-input-gradient variable (or custom --c override). */
+.border-reflect {
+	position: relative;
+}
+
+.border-reflect::before {
+	content: "";
+	position: absolute;
+	inset: 0;
+	padding: 1px; /* border thickness */
+	border-radius: inherit;
+	background: var(--c, var(--chat-input-gradient));
+	/* Mask trick so only the border area is visible */
+	-webkit-mask:
+		linear-gradient(#000 0 0) content-box,
+		linear-gradient(#000 0 0);
+	-webkit-mask-composite: xor;
+	mask-composite: exclude;
+	pointer-events: none;
+}
+
+/* Utility: translucent sidebar background with blur-friendly alpha */
+.bg-sidebar-alpha {
+	background-color: color-mix(in srgb, var(--sidebar) 80%, transparent);
+}
+
+/* -------------------------
+   Custom thin scrollbar
+   ------------------------- */
+
+/* Firefox */
+* {
+	scrollbar-width: thin;
+	scrollbar-color: var(--sidebar) transparent;
+}
+
+/* WebKit (Chrome, Safari, Edge) */
+*::-webkit-scrollbar {
+	width: 8px;
+	height: 8px;
+}
+
+*::-webkit-scrollbar-thumb {
+	background-color: var(--sidebar);
+	border-radius: 4px;
+	background-clip: padding-box;
+	border: 2px solid transparent; /* gives the thumb some breathing room */
+}
+
+*::-webkit-scrollbar-track {
+	background: transparent;
+}

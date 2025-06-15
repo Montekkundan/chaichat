@@ -22,7 +22,7 @@ export default function ChatLayout({ children }: { children: ReactNode }) {
 	return (
 		<SidebarProvider>
 			<TopLeftControls />
-			<TopRightControls />
+			{/* <TopRightControls /> */}
 			<AppSidebar />
 			<MainContentWithInset>{children}</MainContentWithInset>
 		</SidebarProvider>
@@ -33,59 +33,17 @@ function MainContentWithInset({ children }: { children: ReactNode }) {
 	const { state } = useSidebar();
 	const collapsed = state === "collapsed";
 	return (
-		<main className="relative w-full flex-1 overflow-hidden bg-sidebar">
-			{/* Decorative top-right wave overlay */}
-			{typeof window !== "undefined" && (
-				<div
-					className={`fixed right-0 top-0 z-20 h-16 w-28 max-sm:hidden transition-all ease-snappy ${collapsed ? "!translate-y-0 !rounded-none border-none" : "sm:translate-y-3.5 sm:rounded-tl-xl"}`}
-					style={{ clipPath: "inset(0px 12px 0px 0px)" }}
-				>
-					<div
-						className="pointer-events-none group absolute top-3.5 z-10 -mb-8 h-32 w-full origin-top transition-all ease-snappy"
-						style={{ boxShadow: "10px -10px 8px 2px hsl(var(--gradient-noise-top))" }}
-					>
-						<svg
-							xmlns="http://www.w3.org/2000/svg"
-							viewBox="0 0 128 32"
-							fill="hsl(var(--gradient-noise-top))"
-							className="absolute -right-8 h-9 origin-top-left skew-x-[30deg] overflow-visible"
-							aria-hidden="true"
-							role="presentation"
-						>
-							<line
-								x1="1"
-								y1="0"
-								x2="128"
-								y2="0"
-								stroke="hsl(var(--gradient-noise-top))"
-								strokeWidth="2"
-								strokeLinecap="round"
-								vectorEffect="non-scaling-stroke"
-							/>
-							<path
-								className="translate-y-[0.5px]"
-								stroke="hsl(var(--chat-border))"
-								strokeWidth="1"
-								strokeLinecap="round"
-								vectorEffect="non-scaling-stroke"
-								d="M0,0c5.9,0,10.7,4.8,10.7,10.7v10.7c0,5.9,4.8,10.7,10.7,10.7H128V0"
-							/>
-						</svg>
-					</div>
-				</div>
-			)}
-			<div
-				className={`absolute top-0 bottom-0 w-full overflow-hidden border-chat-border border-t border-l bg-secondary bg-fixed transition-all ease-snappy max-sm:border-none ${!collapsed ? "sm:translate-y-3.5 sm:rounded-tl-2xl" : ""}`}
-			>
-				<SidebarInset>
-					<div className="absolute inset-x-3 top-0 z-10 box-content overflow-hidden border-chat-border bg-gradient-noise-top/80 blur-fallback:bg-gradient-noise-top transition-[transform,border] ease-snappy max-sm:hidden sm:h-3.5">
-						<div className="absolute top-0 left-0 blur-fallback:hidden h-full w-8 bg-gradient-to-r from-gradient-noise-top to-transparent" />
-						<div className="absolute top-0 right-24 blur-fallback:hidden h-full w-8 bg-gradient-to-l from-gradient-noise-top to-transparent" />
-						<div className="absolute top-0 right-0 blur-fallback:hidden h-full w-24 bg-gradient-noise-top" />
-					</div>
-					<div>{children}</div>
-				</SidebarInset>
+		<main className="firefox-scrollbar-margin-fix relative flex min-h-pwa w-full flex-1 flex-col overflow-hidden transition-[width,height]">
+			<div className={`absolute top-0 bottom-0 w-full overflow-hidden border-chat-border border-t border-l-[0.5px] border-t-[0.5px] bg-chat-background bg-fixed pb-[140px] transition-all ease-snappy max-sm:border-none sm:translate-y-3.5 sm:rounded-tl-xl ${collapsed ? ' !translate-y-0 !rounded-none border-none' : ''}`}>
+				<div className={`-top-3.5 absolute inset-0 bg-noise bg-fixed transition-transform ease-snappy [background-position:right_bottom] ${collapsed ? 'translate-y-3.5' : ''}`} />
 			</div>
+			{/* Decorative top-right wave overlay */}
+			<div className={`absolute inset-x-3 top-0 z-10 box-content overflow-hidden border-b border-b-[0.5px] bg-gradient-noise-top/80 backdrop-blur-md transition-[transform,border] ease-snappy blur-fallback:bg-gradient-noise-top max-sm:hidden sm:h-3.5 ${collapsed ? '-translate-y-[15px] border-transparent' : 'border-chat-border'}`}>
+				<div className="absolute left-0 top-0 h-full w-8 bg-gradient-to-r from-gradient-noise-top to-transparent blur-fallback:hidden" />
+				<div className="absolute right-24 top-0 h-full w-8 bg-gradient-to-l from-gradient-noise-top to-transparent blur-fallback:hidden" />
+				<div className="absolute right-0 top-0 h-full w-24 bg-gradient-noise-top blur-fallback:hidden" />
+			</div>
+			{children}
 		</main>
 	);
 }
@@ -165,30 +123,30 @@ function TopLeftControls() {
 	);
 }
 
-function TopRightControls() {
-	const { resolvedTheme, setTheme } = useTheme();
+// function TopRightControls() {
+// 	const { resolvedTheme, setTheme } = useTheme();
 
-	return (
-		<div className="pointer-events-auto fixed top-2 right-2 z-50 flex flex-row items-center gap-0.5 rounded-md p-1 bg-gradient-noise-top text-muted-foreground">
-			<Link
-				aria-label="Go to settings"
-				href="/settings/customization"
-				className="size-8 inline-flex items-center justify-center rounded-md hover:bg-muted/40 hover:text-foreground rounded-bl-xl"
-				data-discover="true"
-			>
-				<Settings2 className="size-4" />
-			</Link>
-			<button
-				type="button"
-				aria-label="Toggle theme"
-				className="group relative size-8 inline-flex items-center justify-center rounded-md hover:bg-muted/40 hover:text-foreground"
-				onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
-			>
-				<SunMoon className="absolute size-4" />
-				<span className="sr-only">Toggle theme</span>
-			</button>
-		</div>
-	);
-}
+// 	return (
+// 		<div className="pointer-events-auto fixed top-2 right-2 z-50 flex flex-row items-center gap-0.5 rounded-md p-1 bg-gradient-noise-top text-muted-foreground">
+// 			<Link
+// 				aria-label="Go to settings"
+// 				href="/settings/customization"
+// 				className="size-8 inline-flex items-center justify-center rounded-md hover:bg-muted/40 hover:text-foreground rounded-bl-xl"
+// 				data-discover="true"
+// 			>
+// 				<Settings2 className="size-4" />
+// 			</Link>
+// 			<button
+// 				type="button"
+// 				aria-label="Toggle theme"
+// 				className="group relative size-8 inline-flex items-center justify-center rounded-md hover:bg-muted/40 hover:text-foreground"
+// 				onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
+// 			>
+// 				<SunMoon className="absolute size-4" />
+// 				<span className="sr-only">Toggle theme</span>
+// 			</button>
+// 		</div>
+// 	);
+// }
 
-export { TopLeftControls };
+// export { TopLeftControls };

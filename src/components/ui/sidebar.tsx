@@ -3,6 +3,7 @@
 import { Slot } from "@radix-ui/react-slot";
 import { type VariantProps, cva } from "class-variance-authority";
 import { PanelLeftIcon } from "lucide-react";
+import { useTheme } from "next-themes";
 import * as React from "react";
 
 import { Button } from "~/components/ui/button";
@@ -113,6 +114,8 @@ function SidebarProvider({
 	// This makes it easier to style the sidebar with Tailwind classes.
 	const state = open ? "expanded" : "collapsed";
 
+	const { resolvedTheme } = useTheme();
+
 	const contextValue = React.useMemo<SidebarContextProps>(
 		() => ({
 			state,
@@ -147,12 +150,9 @@ function SidebarProvider({
 					<div className="!fixed inset-0 dark:bg-sidebar z-0">
 						<div
 							className="absolute inset-0 opacity-40"
-							style={{
-								backgroundImage:
-									"radial-gradient(closest-corner at 120px 36px, rgba(255,1,111,.19), rgba(255,1,111,.08)), linear-gradient(rgb(63,51,69) 15%, rgb(7,3,9))",
-							}}
+							style={{ backgroundImage: "var(--sidebar-overlay)" }}
 						/>
-						<div className="absolute inset-0 bg-black/40" />
+						<div className="absolute inset-0 bg-transparent dark:bg-black/40" />
 						<div className="pointer-events-none fixed inset-0 bg-noise" />
 					</div>
 					{children}
@@ -303,8 +303,7 @@ function SidebarRail({ className, ...props }: React.ComponentProps<"button">) {
 			title="Toggle Sidebar"
 			className={cn(
 				"-translate-x-1/2 group-data-[side=left]:-right-4 absolute inset-y-0 z-20 hidden w-4 transition-all ease-linear after:absolute after:inset-y-0 after:left-1/2 after:w-[2px] hover:after:bg-sidebar-border group-data-[side=right]:left-0 sm:flex",
-				"in-data-[side=left]:cursor-w-resize in-data-[side=right]:cursor-e-resize",
-				"[[data-side=left][data-state=collapsed]_&]:cursor-e-resize [[data-side=right][data-state=collapsed]_&]:cursor-w-resize",
+				"in-data-[side=left][data-state=collapsed]_&]:cursor-e-resize in-data-[side=right][data-state=collapsed]_&]:cursor-w-resize",
 				"group-data-[collapsible=offcanvas]:translate-x-0 hover:group-data-[collapsible=offcanvas]:bg-sidebar group-data-[collapsible=offcanvas]:after:left-full",
 				"[[data-side=left][data-collapsible=offcanvas]_&]:-right-2",
 				"[[data-side=right][data-collapsible=offcanvas]_&]:-left-2",

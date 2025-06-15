@@ -31,6 +31,11 @@
   --sidebar-accent-foreground: oklch(0.3963 0.0251 285.1962);
   --sidebar-border: oklch(0.9383 0.0026 48.7178);
   --sidebar-ring: oklch(0.5916 0.218 0.5844);
+  --sidebar-overlay: radial-gradient(closest-corner at 120px 36px, rgba(255,1,111,.19), rgba(255,1,111,0)), linear-gradient(rgb(255,247,255) 15%, rgb(244,214,250));
+  --chat-background: 300 56% 98%;
+  --gradient-noise-top: var(--sidebar);
+  --chat-border: 304.8 61% 83.9%;
+  --chat-input-background: oklch(0.99 0 0 / var(--blur-fallback,0.1));
 }
 
 .dark .theme-t3chat {
@@ -66,6 +71,11 @@
   --sidebar-accent-foreground: oklch(0.9674 0.0013 286.3752);
   --sidebar-border: oklch(0 0 0);
   --sidebar-ring: oklch(0.5916 0.218 0.5844);
+  --sidebar-overlay: radial-gradient(closest-corner at 120px 36px, rgba(255,1,111,.19), rgba(255,1,111,0)), linear-gradient(rgb(63,51,69) 15%, rgb(7,3,9));
+  --chat-background: 270 16.13% 12.16%;
+  --gradient-noise-top: var(--sidebar);
+  --chat-border: 333.3 22% 16.1%;
+  --chat-input-background: oklch(31.1%, 4.75%, 307.787%)
 }
 
 .theme-vercel {
@@ -101,6 +111,11 @@
   --sidebar-accent-foreground: oklch(0 0 0);
   --sidebar-border: oklch(0.94 0 0);
   --sidebar-ring: oklch(0 0 0);
+  --sidebar-overlay: radial-gradient(closest-corner at 120px 36px, rgba(0,0,0,.07), rgba(0,0,0,0)), linear-gradient(rgb(254,254,254) 15%, rgb(242,242,242));
+  --chat-background: var(--background);
+  --gradient-noise-top: var(--sidebar);
+  --chat-border: 0 0% 12%;
+  --chat-input-background: oklch(0.99 0 0 / var(--blur-fallback,0.1));
 }
 
 .dark .theme-vercel {
@@ -136,4 +151,9 @@
   --sidebar-accent-foreground: oklch(1 0 0);
   --sidebar-border: oklch(0.32 0 0);
   --sidebar-ring: oklch(0.72 0 0);
+  --sidebar-overlay: radial-gradient(closest-corner at 120px 36px, rgba(255,255,255,.10), rgba(255,255,255,0)), linear-gradient(rgb(25,25,25) 15%, rgb(0,0,0));
+  --chat-background: var(--background);
+  --gradient-noise-top: var(--sidebar);
+  --chat-border: 0 0% 30%;
+  --chat-input-background: oklch(0.18 0 0 / var(--blur-fallback,0.4));
 }
