@@ -37,7 +37,6 @@ export function AppSidebar({
 	const [debouncedSearch, setDebouncedSearch] = useState("");
 	const [deleteModalOpen, setDeleteModalOpen] = useState(false);
 	const [chatToDelete, setChatToDelete] = useState<string | null>(null);
-	const [hoveredChatId, setHoveredChatId] = useState<string | null>(null);
 
 	const effectiveUser = user ?? initialUser;
 
@@ -136,28 +135,24 @@ export function AppSidebar({
 									displayedChats?.map((chat) => (
 										<SidebarMenuItem
 											key={chat._id}
-											className="relative"
-											onMouseEnter={() => setHoveredChatId(chat._id)}
-											onMouseLeave={() => setHoveredChatId(null)}
+											className="relative group/chat"
 										>
-											<SidebarMenuButton asChild>
-												<Link href={`/chat/${chat._id}`}>
-													<span>{chat.name}</span>
-												</Link>
+											<SidebarMenuButton asChild className="w-full pr-8">
+												<Link href={`/chat/${chat._id}`}>{chat.name}</Link>
 											</SidebarMenuButton>
-											{hoveredChatId === chat._id && (
-												<button
-													type="button"
-													className="-translate-y-1/2 absolute top-1/2 right-2 rounded-full p-1 opacity-100 transition-opacity duration-200 hover:bg-destructive/10 hover:text-destructive"
-													onClick={(e) => {
-														e.preventDefault();
-														handleDeleteClick(chat._id);
-													}}
-													aria-label="Delete chat"
-												>
-													<X className="size-4" />
-												</button>
-											)}
+
+											{/* Delete button shows on row hover */}
+											<button
+												type="button"
+												className="absolute top-1/2 right-2 -translate-y-1/2 hidden group-hover/chat:inline-flex items-center justify-center rounded-full p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive focus:outline-none"
+												onClick={(e) => {
+													e.preventDefault();
+													handleDeleteClick(chat._id);
+												}}
+												aria-label="Delete chat"
+											>
+												<X className="size-4" />
+											</button>
 										</SidebarMenuItem>
 									))
 								)}

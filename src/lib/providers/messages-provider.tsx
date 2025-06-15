@@ -233,7 +233,6 @@ export function MessagesProvider({
 			}
 		},
 		onError: (error) => {
-			console.error("AI Chat error:", error);
 			try {
 				const errObj = JSON.parse((error as Error).message);
 				if (errObj?.code === "QUOTA_EXCEEDED") {
@@ -289,10 +288,8 @@ export function MessagesProvider({
 				return;
 			}
 
-			toast({
-				title: "Failed to get AI response",
-				status: "error",
-			});
+			// handled expected errors; do not log
+			return;
 		},
 	});
 
