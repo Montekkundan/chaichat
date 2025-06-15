@@ -15,7 +15,7 @@ function CodeBlock({ children, className, ...props }: CodeBlockProps) {
 		<div
 			className={cn(
 				"not-prose flex w-full flex-col overflow-clip border",
-				"rounded-xl border-border bg-card text-card-foreground",
+				"rounded-xl border border-border/60 bg-secondary/20 text-foreground dark:bg-secondary/10",
 				className,
 			)}
 			{...props}

@@ -1,6 +1,6 @@
 import type { Message as MessageAISDK } from "@ai-sdk/react";
 import { ArrowClockwise, Check, Copy } from "@phosphor-icons/react";
-import React, { useState, useMemo } from "react";
+import React, { useMemo } from "react";
 import {
 	Message,
 	MessageAction,
