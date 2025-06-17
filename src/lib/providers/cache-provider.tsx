@@ -18,7 +18,11 @@ import { type Chat, type Message, db } from "~/db";
 interface CacheContextType {
 	chats: Chat[];
 	getChat: (chatId: string) => Chat | undefined;
-	createChat: (name: string, model: string, userIdOverride?: string) => Promise<string>;
+	createChat: (
+		name: string,
+		model: string,
+		userIdOverride?: string,
+	) => Promise<string>;
 	deleteChat: (chatId: string) => Promise<void>;
 	updateChatModel: (chatId: string, model: string) => Promise<void>;
 
@@ -200,7 +204,11 @@ export function CacheProvider({
 	);
 
 	const createChat = useCallback(
-		async (name: string, model: string, userIdOverride?: string): Promise<string> => {
+		async (
+			name: string,
+			model: string,
+			userIdOverride?: string,
+		): Promise<string> => {
 			const uid = userIdOverride ?? user?.id;
 			if (!uid) throw new Error("User not authenticated");
 

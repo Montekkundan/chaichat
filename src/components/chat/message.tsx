@@ -1,8 +1,8 @@
 import type { Message as MessageType } from "@ai-sdk/react";
 import React, { useState } from "react";
 import { MessageAssistant } from "./message-assistant";
-import { MessageUser } from "./message-user";
 import { MessageSystem } from "./message-system";
+import { MessageUser } from "./message-user";
 
 type MessageProps = {
 	variant: MessageType["role"] | "system";

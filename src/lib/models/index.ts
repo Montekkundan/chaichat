@@ -15,7 +15,7 @@ export const STATIC_MODELS: ModelConfig[] = [
 	...claudeModels,
 	...grokModels,
 	...geminiModels,
-	// ...ollamaModels, 
+	// ...ollamaModels,
 
 	// not ready
 	// ...llamaModels,

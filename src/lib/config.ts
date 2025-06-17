@@ -10,10 +10,7 @@ export const MESSAGE_MAX_LENGTH = 4000;
 export const DEFAULT_APP_THEME = "t3chat";
 
 // Recommended models to show user
-export const RECOMMENDED_MODEL_IDS = [
-	"gpt-4o",
-	"gemini-2.0-flash-001",
-];
+export const RECOMMENDED_MODEL_IDS = ["gpt-4o", "gemini-2.0-flash-001"];
 
 // Subscription plan definitions
 export const PLANS = {

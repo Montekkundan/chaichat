@@ -8,14 +8,14 @@ import { useTheme } from "next-themes";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { ChatInput } from "~/components/chat-input/chat-input";
+import type { UploadedFile } from "~/components/chat-input/file-items";
 import { useChatHandlers } from "~/components/chat-input/use-chat-handlers";
 import { Conversation } from "~/components/chat/conversation";
-import { ChatInput } from "~/components/chat-input/chat-input";
 import { useMessages } from "~/lib/providers/messages-provider";
+import { useQuota } from "~/lib/providers/quota-provider";
 import { cn } from "~/lib/utils";
 import { useSidebar } from "../ui/sidebar";
-import { useQuota } from "~/lib/providers/quota-provider";
-import type { UploadedFile } from "~/components/chat-input/file-items";
 
 type ChatProps = { initialName?: string };
 
@@ -98,7 +98,9 @@ export default function Chat({ initialName }: ChatProps = {}) {
 			try {
 				const newChatId = await createNewChat(messageToSend, selectedModel);
 				// Navigate to the new chat; provider will send message automatically from query param
-				router.push(`/chat/${newChatId}?q=${encodeURIComponent(messageToSend)}`);
+				router.push(
+					`/chat/${newChatId}?q=${encodeURIComponent(messageToSend)}`,
+				);
 			} catch (error) {
 				console.error("Failed to create chat:", error);
 				// Revert UI on error
@@ -133,9 +135,7 @@ export default function Chat({ initialName }: ChatProps = {}) {
 			<div className="pointer-events-none absolute bottom-0 z-10 w-full px-2">
 				<div className="relative mx-auto flex w-full max-w-3xl flex-col text-center">
 					{/* Anonymous quota banner */}
-					{!user?.id && (
-						<AnonQuotaBanner />
-					)}
+					{!user?.id && <AnonQuotaBanner />}
 					<div className="pointer-events-none">
 						<div className="pointer-events-auto">
 							<div className="rounded-t-3xl p-2 pb-0 backdrop-blur-lg ">
@@ -261,8 +261,12 @@ function AnonQuotaBanner() {
 	if (quota.plan !== "anonymous") return null;
 	const remaining = quota.stdCredits ?? 0;
 	return (
-		<div className="pointer-events-auto mb-2 rounded-md bg-muted/50 py-1 px-4 text-sm text-muted-foreground backdrop-blur-lg">
-			{remaining} free messages left. <Link href="/sign-in" className="underline">Sign in</Link> for more.
+		<div className="pointer-events-auto mb-2 rounded-md bg-muted/50 px-4 py-1 text-muted-foreground text-sm backdrop-blur-lg">
+			{remaining} free messages left.{" "}
+			<Link href="/sign-in" className="underline">
+				Sign in
+			</Link>{" "}
+			for more.
 		</div>
 	);
 }

@@ -3,11 +3,11 @@ import type { Attachment } from "@ai-sdk/ui-utils";
 import { type Message as MessageAISDK, type ToolSet, streamText } from "ai";
 import { ConvexHttpClient } from "convex/browser";
 import { FREE_MODELS_IDS, SYSTEM_PROMPT_DEFAULT } from "~/lib/config";
+import { PLANS } from "~/lib/config";
 import { getAllModels } from "~/lib/models";
 import { openproviders } from "~/lib/openproviders";
 import { getProviderForModel } from "~/lib/openproviders/provider-map";
 import { modelCost, shouldReset } from "~/lib/subscription";
-import { PLANS } from "~/lib/config";
 import { cleanMessagesForTools } from "./utils";
 
 export const maxDuration = 60;
@@ -106,13 +106,20 @@ export async function POST(req: Request) {
 
 		// Validate attachment support
 		const hasAttachmentsInMessages = messages.some((m) => {
-			const attachments = (m as unknown as { experimental_attachments?: Attachment[] }).experimental_attachments;
+			const attachments = (
+				m as unknown as { experimental_attachments?: Attachment[] }
+			).experimental_attachments;
 			return Array.isArray(attachments) && attachments.length > 0;
 		});
-		if (hasAttachmentsInMessages && !modelConfig?.attachments && !modelConfig?.vision) {
+		if (
+			hasAttachmentsInMessages &&
+			!modelConfig?.attachments &&
+			!modelConfig?.vision
+		) {
 			return new Response(
 				JSON.stringify({
-					error: "The selected model does not support file or image attachments.",
+					error:
+						"The selected model does not support file or image attachments.",
 					code: "ATTACHMENT_NOT_SUPPORTED",
 				}),
 				{ status: 400 },

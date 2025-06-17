@@ -1,6 +1,9 @@
 "use client";
-import { ArrowUp, Stop, Globe } from "@phosphor-icons/react";
-import { useCallback, useState, useRef } from "react";
+import { ArrowUp, Globe, Stop } from "@phosphor-icons/react";
+import { generateReactHelpers } from "@uploadthing/react";
+import { Paperclip } from "lucide-react";
+import { useCallback, useRef, useState } from "react";
+import type { UploadRouter } from "~/app/api/uploadthing/core";
 import { CookiePreferencesModal } from "~/components/modals/cookie-preferences-modal";
 import { Button } from "~/components/ui/button";
 import {
@@ -9,15 +12,12 @@ import {
 	PromptInputActions,
 	PromptInputTextarea,
 } from "~/components/ui/prompt-input";
-import { getModelInfo } from "~/lib/models";
-import { ModelSelector } from "./model-selector";
-import { generateReactHelpers } from "@uploadthing/react";
-import type { UploadRouter } from "~/app/api/uploadthing/core";
-import { Paperclip } from "lucide-react";
-import { useQuota } from "~/lib/providers/quota-provider";
-import { FileList } from "./file-list";
 import { toast } from "~/components/ui/toast";
 import { filterValidFiles } from "~/lib/file-upload/validation";
+import { getModelInfo } from "~/lib/models";
+import { useQuota } from "~/lib/providers/quota-provider";
+import { FileList } from "./file-list";
+import { ModelSelector } from "./model-selector";
 
 type ChatInputProps = {
 	value: string;
@@ -61,7 +61,8 @@ export function ChatInput({
 }: ChatInputProps) {
 	const selectModelConfig = getModelInfo(selectedModel);
 	const hasToolSupport = Boolean(selectModelConfig?.tools);
-	const allowWebSearch = hasToolSupport || selectModelConfig?.tags?.includes("search");
+	const allowWebSearch =
+		hasToolSupport || selectModelConfig?.tags?.includes("search");
 
 	// Helper to check if a string is only whitespace characters
 	const isOnlyWhitespace = (text: string) => !/[^\s]/.test(text);
@@ -101,7 +102,11 @@ export function ChatInput({
 					if (item.type.startsWith("image/")) {
 						const file = item.getAsFile();
 						if (file) {
-							const newFile = new File([file], `pasted-image-${Date.now()}.${file.type.split("/")[1]}`, { type: file.type });
+							const newFile = new File(
+								[file],
+								`pasted-image-${Date.now()}.${file.type.split("/")[1]}`,
+								{ type: file.type },
+							);
 							imageFiles.push(newFile);
 						}
 					}
@@ -155,12 +160,14 @@ export function ChatInput({
 			try {
 				const uploadRes = await startUpload(pendingFilesRef.current);
 				if (!uploadRes) throw new Error("Upload failed");
-				const uploaded = uploadRes.map((r: { name: string; url: string }, idx: number) => ({
-					name: r.name,
-					url: r.url,
-					contentType: pendingFilesRef.current[idx]?.type ?? "",
-					size: pendingFilesRef.current[idx]?.size ?? 0,
-				})) as import("./file-items").UploadedFile[];
+				const uploaded = uploadRes.map(
+					(r: { name: string; url: string }, idx: number) => ({
+						name: r.name,
+						url: r.url,
+						contentType: pendingFilesRef.current[idx]?.type ?? "",
+						size: pendingFilesRef.current[idx]?.size ?? 0,
+					}),
+				) as import("./file-items").UploadedFile[];
 
 				const newList = files.filter((f) => !f.local).concat(uploaded);
 				// Update Chat state so previews convert to real files
@@ -178,7 +185,16 @@ export function ChatInput({
 
 		// Finally invoke parent onSend with the final confirmed list
 		onSend(attachmentsToSend);
-	}, [isSubmitting, disabled, status, stop, onSend, startUpload, files, onFileUpload]);
+	}, [
+		isSubmitting,
+		disabled,
+		status,
+		stop,
+		onSend,
+		startUpload,
+		files,
+		onFileUpload,
+	]);
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: <explanation>
 	const handleKeyDown = useCallback(
@@ -196,7 +212,10 @@ export function ChatInput({
 				return;
 			}
 
-			if (e.key === "Enter" && !e.shiftKey /* && !agentCommand.showAgentCommand */) {
+			if (
+				e.key === "Enter" &&
+				!e.shiftKey /* && !agentCommand.showAgentCommand */
+			) {
 				if (isOnlyWhitespace(value) && files.length === 0) {
 					return;
 				}
@@ -213,11 +232,12 @@ export function ChatInput({
 	const quota = useQuota();
 
 	// Uploads are disabled either when the user is out of quota or when the selected model doesn't support attachments
-	const fileQuotaExceeded =
-		quota.stdCredits <= 0 && quota.premiumCredits <= 0;
+	const fileQuotaExceeded = quota.stdCredits <= 0 && quota.premiumCredits <= 0;
 	const uploadDisabled = fileQuotaExceeded || !modelAllowsAttachments;
 
-	const handleLocalFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+	const handleLocalFileChange = async (
+		e: React.ChangeEvent<HTMLInputElement>,
+	) => {
 		if (uploadDisabled) return;
 		if (!e.target.files) return;
 		const rawFiles = Array.from(e.target.files);
@@ -253,7 +273,9 @@ export function ChatInput({
 	const handleFileRemove = (file: import("./file-items").UploadedFile) => {
 		onFileRemove(file);
 		if (file.local) {
-			pendingFilesRef.current = pendingFilesRef.current.filter((f) => f.name !== file.name || f.size !== file.size);
+			pendingFilesRef.current = pendingFilesRef.current.filter(
+				(f) => f.name !== file.name || f.size !== file.size,
+			);
 		}
 	};
 
@@ -302,11 +324,13 @@ export function ChatInput({
 					// ref={agentCommand.textareaRef}
 				/>
 				<PromptInputActions className="mt-5 w-full justify-between px-3 pb-3">
-					<div className="flex gap-2 items-center">
+					<div className="flex items-center gap-2">
 						{/* Upload files */}
 						{modelAllowsAttachments && (
 							<PromptInputAction tooltip="Attach files">
-								<label className={`flex h-8 w-8 items-center justify-center rounded-2xl ${uploadDisabled ? "cursor-not-allowed opacity-40" : "cursor-pointer hover:bg-muted/40"}`}>
+								<label
+									className={`flex h-8 w-8 items-center justify-center rounded-2xl ${uploadDisabled ? "cursor-not-allowed opacity-40" : "cursor-pointer hover:bg-muted/40"}`}
+								>
 									<input
 										ref={fileInputRef}
 										type="file"
@@ -315,8 +339,19 @@ export function ChatInput({
 										className="hidden"
 									/>
 									{isUploading ? (
-										<svg className="size-5 animate-spin text-primary" viewBox="0 0 24 24" aria-hidden="true">
-											<circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+										<svg
+											className="size-5 animate-spin text-primary"
+											viewBox="0 0 24 24"
+											aria-hidden="true"
+										>
+											<circle
+												cx="12"
+												cy="12"
+												r="10"
+												stroke="currentColor"
+												strokeWidth="4"
+												fill="none"
+											/>
 										</svg>
 									) : (
 										<Paperclip className="size-5 text-primary" />
@@ -331,7 +366,9 @@ export function ChatInput({
 							className="rounded-full"
 						/>
 						{allowWebSearch && (
-							<PromptInputAction tooltip={isSearchEnabled ? "Disable search" : "Search"}>
+							<PromptInputAction
+								tooltip={isSearchEnabled ? "Disable search" : "Search"}
+							>
 								<Button
 									variant="outline"
 									size="icon"
@@ -348,7 +385,12 @@ export function ChatInput({
 						<Button
 							size="sm"
 							className="size-9 rounded-full transition-all duration-300 ease-out"
-							disabled={disabled || isUploading || (isOnlyWhitespace(value) && files.length === 0) || isSubmitting}
+							disabled={
+								disabled ||
+								isUploading ||
+								(isOnlyWhitespace(value) && files.length === 0) ||
+								isSubmitting
+							}
 							type="button"
 							onClick={handleSend}
 							aria-label={status === "streaming" ? "Stop" : "Send message"}

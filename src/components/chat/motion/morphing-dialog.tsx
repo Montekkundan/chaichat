@@ -81,7 +81,7 @@ function MorphingDialogProvider({
 
 	// eslint-disable-next-line react-hooks/exhaustive-deps
 	// biome-ignore lint/correctness/useExhaustiveDependencies: <explanation>
-		const contextValue = useMemo(
+	const contextValue = useMemo(
 		() => ({
 			isOpen,
 			setIsOpen,
@@ -110,9 +110,18 @@ export type MorphingDialogProps = {
 	initialIndex?: number;
 };
 
-export function MorphingDialog({ children, transition, images, initialIndex }: MorphingDialogProps) {
+export function MorphingDialog({
+	children,
+	transition,
+	images,
+	initialIndex,
+}: MorphingDialogProps) {
 	return (
-		<MorphingDialogProvider transition={transition} images={images} initialIndex={initialIndex}>
+		<MorphingDialogProvider
+			transition={transition}
+			images={images}
+			initialIndex={initialIndex}
+		>
 			<MotionConfig transition={transition}>{children}</MotionConfig>
 		</MorphingDialogProvider>
 	);
@@ -182,7 +191,16 @@ export function MorphingDialogContent({
 	className,
 	style,
 }: MorphingDialogContentProps) {
-	const { setIsOpen, isOpen, uniqueId, triggerRef, images, current, next, prev } = useMorphingDialog();
+	const {
+		setIsOpen,
+		isOpen,
+		uniqueId,
+		triggerRef,
+		images,
+		current,
+		next,
+		prev,
+	} = useMorphingDialog();
 	// biome-ignore lint/style/noNonNullAssertion: <explanation>
 	const containerRef = useRef<HTMLDivElement>(null!);
 	const [firstFocusableElement, setFirstFocusableElement] =
@@ -262,16 +280,22 @@ export function MorphingDialogContent({
 					<button
 						type="button"
 						aria-label="Previous image"
-						onClick={(e)=>{e.stopPropagation(); prev();}}
-						className="absolute left-4 top-1/2 -translate-y-1/2 -mt-4 size-10 flex items-center justify-center rounded-full bg-background/80 backdrop-blur-sm text-2xl z-[60] hover:bg-background"
+						onClick={(e) => {
+							e.stopPropagation();
+							prev();
+						}}
+						className="-translate-y-1/2 -mt-4 absolute top-1/2 left-4 z-[60] flex size-10 items-center justify-center rounded-full bg-background/80 text-2xl backdrop-blur-sm hover:bg-background"
 					>
 						‹
 					</button>
 					<button
 						type="button"
 						aria-label="Next image"
-						onClick={(e)=>{e.stopPropagation(); next();}}
-						className="absolute right-4 top-1/2 -translate-y-1/2 -mt-4 size-10 flex items-center justify-center rounded-full bg-background/80 backdrop-blur-sm text-2xl z-[60] hover:bg-background"
+						onClick={(e) => {
+							e.stopPropagation();
+							next();
+						}}
+						className="-translate-y-1/2 -mt-4 absolute top-1/2 right-4 z-[60] flex size-10 items-center justify-center rounded-full bg-background/80 text-2xl backdrop-blur-sm hover:bg-background"
 					>
 						›
 					</button>
@@ -281,7 +305,9 @@ export function MorphingDialogContent({
 	);
 }
 
-export function MorphingDialogContainer({ children }: { children: React.ReactNode }) {
+export function MorphingDialogContainer({
+	children,
+}: { children: React.ReactNode }) {
 	const { isOpen, uniqueId, images, next, prev } = useMorphingDialog();
 	const [mounted, setMounted] = useState(false);
 	useEffect(() => {
@@ -310,11 +336,15 @@ export function MorphingDialogContainer({ children }: { children: React.ReactNod
 	);
 }
 
-export function MorphingDialogImage({ src, alt = "", className }: { src?: string; alt?: string; className?: string }) {
+export function MorphingDialogImage({
+	src,
+	alt = "",
+	className,
+}: { src?: string; alt?: string; className?: string }) {
 	const { images, current } = useMorphingDialog();
 	const active = images && images.length > 0 ? images[current] : undefined;
-	const finalSrc = active ? active.url : src ?? "";
-	const finalAlt = active ? active.alt ?? "" : alt ?? "";
+	const finalSrc = active ? active.url : (src ?? "");
+	const finalAlt = active ? (active.alt ?? "") : (alt ?? "");
 	return <img src={finalSrc} alt={finalAlt} className={className} />;
 }
 
@@ -332,6 +362,12 @@ export function MorphingDialogClose({ className }: { className?: string }) {
 	);
 }
 
-export const MorphingDialogTitle = ({ children }: { children: React.ReactNode }) => <div>{children}</div>;
-export const MorphingDialogSubtitle = ({ children }: { children: React.ReactNode }) => <div>{children}</div>;
-export const MorphingDialogDescription = ({ children }: { children: React.ReactNode }) => <div>{children}</div>;
+export const MorphingDialogTitle = ({
+	children,
+}: { children: React.ReactNode }) => <div>{children}</div>;
+export const MorphingDialogSubtitle = ({
+	children,
+}: { children: React.ReactNode }) => <div>{children}</div>;
+export const MorphingDialogDescription = ({
+	children,
+}: { children: React.ReactNode }) => <div>{children}</div>;

@@ -82,8 +82,12 @@ export function MessageUser({
 				if (!attachments || attachments.length === 0) return null;
 
 				// Separate image attachments for special stacking
-				const imageAttachments = attachments.filter((a) => a.contentType?.startsWith("image"));
-				const otherAttachments = attachments.filter((a) => !a.contentType?.startsWith("image"));
+				const imageAttachments = attachments.filter((a) =>
+					a.contentType?.startsWith("image"),
+				);
+				const otherAttachments = attachments.filter(
+					(a) => !a.contentType?.startsWith("image"),
+				);
 
 				const rotationPalette = [-6, -2, 2, 6];
 
@@ -91,14 +95,20 @@ export function MessageUser({
 					<>
 						{/* Stacked images */}
 						{imageAttachments.length > 0 && (
-							<div className="relative mb-2 w-40 h-28">
+							<div className="relative mb-2 h-28 w-40">
 								{imageAttachments.map((attachment, idx) => {
-									const rotation = rotationPalette[idx % rotationPalette.length];
+									const rotation =
+										rotationPalette[idx % rotationPalette.length];
 									const offset = idx * 6; // px shift
 									return (
 										<MorphingDialog
 											key={`${attachment.name}-${idx}`}
-											transition={{ type: "spring", stiffness: 280, damping: 18, mass: 0.3 }}
+											transition={{
+												type: "spring",
+												stiffness: 280,
+												damping: 18,
+												mass: 0.3,
+											}}
 											images={imageAttachments}
 											initialIndex={idx}
 										>
@@ -107,11 +117,14 @@ export function MessageUser({
 												imageIndex={idx}
 											>
 												<div
-													style={{ transform: `rotate(${rotation}deg) translate(${offset}px, ${-offset}px)`, zIndex: idx }}
+													style={{
+														transform: `rotate(${rotation}deg) translate(${offset}px, ${-offset}px)`,
+														zIndex: idx,
+													}}
 													className="origin-center"
 												>
 													<Image
-														className="w-40 h-28 rounded-md object-cover shadow-md"
+														className="h-28 w-40 rounded-md object-cover shadow-md"
 														src={attachment.url}
 														alt={attachment.name || "Attachment"}
 														width={160}
@@ -137,7 +150,10 @@ export function MessageUser({
 
 						{/* Non-image attachments or single images listed vertically as before */}
 						{otherAttachments.map((attachment, index) => (
-							<div className="flex flex-row gap-2" key={`${attachment.name}-other-${index}`}>
+							<div
+								className="flex flex-row gap-2"
+								key={`${attachment.name}-other-${index}`}
+							>
 								{attachment.contentType?.startsWith("text") ? (
 									<div className="mb-3 h-24 w-40 overflow-hidden rounded-md border p-2 text-primary text-xs">
 										{getTextFromDataUrl(attachment.url)}

@@ -14,12 +14,12 @@ import {
 	useRef,
 	useState,
 } from "react";
+import type { UploadedFile } from "~/components/chat-input/file-items";
 import { toast } from "~/components/ui/toast";
+import { getAnonId } from "~/lib/anon-id";
 import { SYSTEM_PROMPT_DEFAULT } from "~/lib/config";
 import { API_ROUTE_CHAT } from "~/lib/routes";
 import { useCache } from "./cache-provider";
-import { getAnonId } from "~/lib/anon-id";
-import type { UploadedFile } from "~/components/chat-input/file-items";
 
 interface MessagesContextType {
 	messages: MessageAISDK[];
@@ -71,7 +71,8 @@ export function MessagesProvider({
 	const [cachedMessages, setCachedMessages] = useState<MessageAISDK[]>([]);
 	const [quotaExceeded, setQuotaExceeded] = useState(false);
 	const [rateLimited, setRateLimited] = useState(false);
-	const currentUserId = user?.id ?? (typeof window !== "undefined" ? getAnonId() : "");
+	const currentUserId =
+		user?.id ?? (typeof window !== "undefined" ? getAnonId() : "");
 
 	// Track regeneration context - use useRef to persist across re-renders
 	const regenerationContext = useRef<{
@@ -338,7 +339,11 @@ export function MessagesProvider({
 
 			try {
 				const chatName = initialMessage.slice(0, 50);
-				const newChatId = await cache.createChat(chatName, model, currentUserId);
+				const newChatId = await cache.createChat(
+					chatName,
+					model,
+					currentUserId,
+				);
 				return newChatId;
 			} catch (error) {
 				console.error("Failed to create chat:", error);

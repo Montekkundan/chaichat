@@ -17,17 +17,19 @@ export default function SubscriptionPage() {
 	};
 
 	return (
-		<div className="mx-auto max-w-4xl px-4 py-8 space-y-10">
+		<div className="mx-auto max-w-4xl space-y-10 px-4 py-8">
 			<div>
-				<h1 className="text-2xl font-semibold mb-2">Your Plan</h1>
-				<p className="text-muted-foreground mb-4">
+				<h1 className="mb-2 font-semibold text-2xl">Your Plan</h1>
+				<p className="mb-4 text-muted-foreground">
 					Current plan: <strong>{quota.plan}</strong>
 				</p>
 				<div className="rounded-md border p-4">
 					<p className="mb-1 text-sm">Standard credits: {quota.stdCredits}</p>
-					<p className="mb-1 text-sm">Premium credits: {quota.premiumCredits}</p>
+					<p className="mb-1 text-sm">
+						Premium credits: {quota.premiumCredits}
+					</p>
 					{quota.refillAt && (
-						<p className="text-xs text-muted-foreground">
+						<p className="text-muted-foreground text-xs">
 							Refill {new Date(quota.refillAt).toLocaleString()}
 						</p>
 					)}
@@ -35,22 +37,23 @@ export default function SubscriptionPage() {
 			</div>
 
 			<div>
-				<h2 className="text-xl font-semibold mb-4">Manage Subscription</h2>
+				<h2 className="mb-4 font-semibold text-xl">Manage Subscription</h2>
 				<PricingTable />
 			</div>
 
 			<section>
-				<h2 className="text-xl font-semibold mb-2">Security</h2>
+				<h2 className="mb-2 font-semibold text-xl">Security</h2>
 				<Button variant="destructive" onClick={handleDeleteAccount}>
 					Delete Account
 				</Button>
-				<h3 className="mt-6 text-lg font-medium">Active Device</h3>
+				<h3 className="mt-6 font-medium text-lg">Active Device</h3>
 				<ul className="list-disc pl-5">
 					{session && (
 						<li key={session.id}>
 							{session.lastActiveAt
 								? `Last active: ${new Date(session.lastActiveAt).toLocaleString()}`
-								: "Active"} (Current)
+								: "Active"}{" "}
+							(Current)
 						</li>
 					)}
 				</ul>

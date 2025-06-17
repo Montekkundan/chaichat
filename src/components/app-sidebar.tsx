@@ -135,7 +135,7 @@ export function AppSidebar({
 									displayedChats?.map((chat) => (
 										<SidebarMenuItem
 											key={chat._id}
-											className="relative group/chat"
+											className="group/chat relative"
 										>
 											<SidebarMenuButton asChild className="w-full pr-8">
 												<Link href={`/chat/${chat._id}`}>{chat.name}</Link>
@@ -144,7 +144,7 @@ export function AppSidebar({
 											{/* Delete button shows on row hover */}
 											<button
 												type="button"
-												className="absolute top-1/2 right-2 -translate-y-1/2 hidden group-hover/chat:inline-flex items-center justify-center rounded-full p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive focus:outline-none"
+												className="-translate-y-1/2 absolute top-1/2 right-2 hidden items-center justify-center rounded-full p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive focus:outline-none group-hover/chat:inline-flex"
 												onClick={(e) => {
 													e.preventDefault();
 													handleDeleteClick(chat._id);
