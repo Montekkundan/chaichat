@@ -1,6 +1,7 @@
 "use client";
 
 import { api } from "@/convex/_generated/api";
+import { OPTIMISTIC_PREFIX } from "~/lib/providers/cache-provider";
 import type { Id } from "@/convex/_generated/dataModel";
 import { CaretLeft, CaretRight } from "@phosphor-icons/react";
 import { useMutation, useQuery } from "convex/react";
@@ -31,7 +32,10 @@ export function MessageVersions({
 	// Only use convexId if it exists and is a valid Convex ID
 	// AI SDK generates IDs like "msg-..." which are not valid Convex IDs
 	const actualConvexId =
-		convexId && !convexId.startsWith("msg-") && !convexId.startsWith("temp-")
+		convexId &&
+		!convexId.startsWith("msg-") &&
+		!convexId.startsWith("temp-") &&
+		!convexId.startsWith(OPTIMISTIC_PREFIX)
 			? convexId
 			: undefined;
 
@@ -47,7 +51,7 @@ export function MessageVersions({
 			}
 			if (
 				convexId &&
-				(convexId.startsWith("msg-") || convexId.startsWith("temp-")) &&
+				(convexId.startsWith("msg-") || convexId.startsWith("temp-") || convexId.startsWith(OPTIMISTIC_PREFIX)) &&
 				!loggedIds.current.has(convexId)
 			) {
 				console.warn(

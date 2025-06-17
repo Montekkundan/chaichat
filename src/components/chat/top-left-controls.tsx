@@ -147,7 +147,7 @@ export function TopLeftControls() {
 						{recentChats.map((chat) => (
 							<CommandItem
 								key={chat._id}
-								value={chat._id}
+								value={`${chat.name} ${chat._id}`}
 								onSelect={() => handleSearchSelect(chat._id)}
 							>
 								{chat.name}

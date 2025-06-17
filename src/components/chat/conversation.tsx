@@ -20,6 +20,7 @@ type ConversationProps = {
 	onEdit: (id: string, newText: string) => void;
 	onReload: () => void;
 	onRegenerate?: (messageIndex: number, model: string) => void;
+	onBranch?: (messageIndex: number) => void;
 };
 
 export function Conversation({
@@ -29,6 +30,7 @@ export function Conversation({
 	onEdit,
 	onReload,
 	onRegenerate,
+	onBranch,
 }: ConversationProps) {
 	const initialMessageCount = useRef(messages.length);
 
@@ -96,6 +98,7 @@ export function Conversation({
 										? (model: string) => onRegenerate(index, model)
 										: undefined
 								}
+								onBranch={onBranch ? () => onBranch(index) : undefined}
 								hasScrollAnchor={hasScrollAnchor}
 								parts={message.parts}
 								status={status}

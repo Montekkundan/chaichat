@@ -2,8 +2,8 @@ import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 
 export const createChat = mutation({
-  args: { name: v.string(), userId: v.string(), model: v.string() },
-  handler: async (ctx, { name, userId, model }) => {
+  args: { name: v.string(), userId: v.string(), model: v.string(), parentChatId: v.optional(v.id("chats")) },
+  handler: async (ctx, { name, userId, model, parentChatId }) => {
     const identity = await ctx.auth.getUserIdentity();
     const actualUserId = identity?.subject || userId;
     const chatId = await ctx.db.insert("chats", {
@@ -12,7 +12,8 @@ export const createChat = mutation({
       initialModel: model,
       currentModel: model,
       createdAt: Date.now(),
-    });
+      parentChatId,
+    } as any);
     return chatId;
   },
 });
@@ -113,6 +114,16 @@ export const deleteChat = mutation({
     }
     // Now delete the chat itself
     await ctx.db.delete(chatId);
+
+    // Orphan any children that pointed to this chat
+    const children = await (ctx.db as any)
+      .query("chats")
+      .filter((q: any) => q.eq(q.field("parentChatId"), chatId))
+      .collect();
+
+    for (const child of children) {
+      await (ctx.db as any).patch(child._id, { parentChatId: undefined });
+    }
   },
 });
 

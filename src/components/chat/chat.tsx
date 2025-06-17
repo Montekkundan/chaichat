@@ -42,6 +42,7 @@ export default function Chat({ initialName }: ChatProps = {}) {
 		stop,
 		quotaExceeded,
 		rateLimited,
+		branchChat,
 	} = useMessages();
 
 	const chatIdString = Array.isArray(chatId) ? chatId[0] : chatId;
@@ -120,6 +121,13 @@ export default function Chat({ initialName }: ChatProps = {}) {
 			// On failure restore content so user can retry
 			setInput(messageToSend);
 			setAttachments(attToSend);
+		}
+	};
+
+	const handleBranch = async (idx: number) => {
+		const newId = await branchChat(idx);
+		if (newId) {
+			router.push(`/chat/${newId}`);
 		}
 	};
 
@@ -247,6 +255,7 @@ export default function Chat({ initialName }: ChatProps = {}) {
 							onEdit={handleEdit}
 							onReload={handleReload}
 							onRegenerate={regenerateMessage}
+							onBranch={handleBranch}
 						/>
 					)}
 				</div>

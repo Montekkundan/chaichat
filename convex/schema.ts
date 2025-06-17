@@ -8,6 +8,7 @@ export default defineSchema({
     initialModel: v.string(), // Model used when chat was created
     currentModel: v.string(),  // Current model being used
     createdAt: v.number(),
+    parentChatId: v.optional(v.id("chats")), // branch parent
   }),
   users: defineTable({
     userId: v.string(),            // Clerk userId

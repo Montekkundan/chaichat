@@ -7,6 +7,7 @@ export interface Chat {
 	createdAt: number;
 	currentModel: string;
 	initialModel: string;
+	parentChatId?: string;
 	_creationTime: number;
 }
 
@@ -44,29 +45,28 @@ export class ChaiChatDB extends Dexie {
 
 	constructor() {
 		super("ChaiChatDB");
-		this.version(3)
+		this.version(4)
 			.stores({
-				chats: "_id, userId, name, createdAt, currentModel",
+				chats: "_id, userId, name, createdAt, currentModel, parentChatId",
 				messages:
 					"_id, chatId, userId, createdAt, parentMessageId, version, isActive, model, attachments",
 				users: "id, fullName",
 			})
 			.upgrade((tx) => {
-				// Migration for version 3 - ensure fields exist
-				return tx
-					.table("messages")
+				// Ensure message fields exist
+				tx.table("messages")
 					.toCollection()
 					.modify((message) => {
-						if (message.isActive === undefined) {
-							message.isActive = true;
-						}
-						// Ensure model field exists for existing messages
-						if (!message.model) {
-							message.model = "gpt-4o"; // Default model for existing messages
-						}
-						if (message.attachments === undefined) {
-							message.attachments = [];
-						}
+						if (message.isActive === undefined) message.isActive = true;
+						if (!message.model) message.model = "gpt-4o";
+						if (message.attachments === undefined) message.attachments = [];
+					});
+
+				// Ensure new parentChatId field exists on chats
+				tx.table("chats")
+					.toCollection()
+					.modify((chat) => {
+						if (chat.parentChatId === undefined) chat.parentChatId = undefined;
 					});
 			});
 	}

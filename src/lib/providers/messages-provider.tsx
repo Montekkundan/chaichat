@@ -20,6 +20,7 @@ import { getAnonId } from "~/lib/anon-id";
 import { SYSTEM_PROMPT_DEFAULT } from "~/lib/config";
 import { API_ROUTE_CHAT } from "~/lib/routes";
 import { useCache } from "./cache-provider";
+import { OPTIMISTIC_PREFIX } from "./cache-provider";
 
 interface MessagesContextType {
 	messages: MessageAISDK[];
@@ -38,6 +39,7 @@ interface MessagesContextType {
 	reload: () => void;
 	quotaExceeded: boolean;
 	rateLimited: boolean;
+	branchChat: (index: number) => Promise<string | null>;
 }
 
 const MessagesContext = createContext<MessagesContextType | undefined>(
@@ -478,7 +480,8 @@ export function MessagesProvider({
 				if (
 					!convexId ||
 					convexId.startsWith("msg-") ||
-					convexId.startsWith("temp-")
+					convexId.startsWith("temp-") ||
+					convexId.startsWith(OPTIMISTIC_PREFIX)
 				) {
 					console.error(
 						"No valid Convex ID found for message - cannot regenerate",
@@ -584,6 +587,41 @@ export function MessagesProvider({
 		],
 	);
 
+	const branchChat = useCallback(
+		async (uptoIndex: number): Promise<string | null> => {
+			if (!currentUserId) return null;
+			const name = messages.find((m) => m.role === "user")?.content.slice(0, 30) || "Branched chat";
+			try {
+				const newChatId = await cache.createChat(name, selectedModelRef.current, currentUserId, chatId);
+
+				// excluding system and inactive versions
+				const msgsToCopy = messages
+					.slice(0, uptoIndex + 1)
+					.filter((m) =>
+						m.role === "user" ||
+						// biome-ignore lint/suspicious/noExplicitAny: messages typed loosely from AI SDK
+						(m.role === "assistant" && ((m as any).isActive ?? true)),
+					);
+				for (const msg of msgsToCopy) {
+					await cache.addMessage({
+						chatId: newChatId,
+						userId: msg.role === "user" ? currentUserId : "system", // keep same
+						role: msg.role as "user" | "assistant" | "system",
+						content: msg.content,
+						// biome-ignore lint/suspicious/noExplicitAny: message model may be stored loosely
+						model: (msg as any).model || selectedModelRef.current,
+						// biome-ignore lint/suspicious/noExplicitAny: experimental attachments are optional legacy field
+						attachments: (msg as any).experimental_attachments || [],
+						createdAt: Date.now(),
+					});
+				}
+				return newChatId;
+			} catch (e) {
+				console.error("branchChat failed", e);
+				return null;
+			}
+		}, [currentUserId, cache, messages, chatId]);
+
 	return (
 		<MessagesContext.Provider
 			value={{
@@ -603,6 +641,7 @@ export function MessagesProvider({
 				reload,
 				quotaExceeded,
 				rateLimited,
+				branchChat,
 			}}
 		>
 			{children}

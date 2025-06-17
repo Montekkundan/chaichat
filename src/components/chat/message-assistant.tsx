@@ -1,5 +1,5 @@
 import type { Message as MessageAISDK } from "@ai-sdk/react";
-import { ArrowClockwise, Check, Copy } from "@phosphor-icons/react";
+import { ArrowClockwise, Check, Copy, GitBranch } from "@phosphor-icons/react";
 import React, { useMemo } from "react";
 import {
 	Message,
@@ -26,6 +26,7 @@ type MessageAssistantProps = {
 	copyToClipboard?: () => void;
 	onReload?: () => void;
 	onRegenerate?: (model: string) => void;
+	onBranch?: () => void;
 	parts?: MessageAISDK["parts"];
 	status?: "streaming" | "ready" | "submitted" | "error";
 	model?: string;
@@ -41,6 +42,7 @@ export const MessageAssistant = React.memo(function MessageAssistant({
 	copyToClipboard,
 	onReload,
 	onRegenerate,
+	onBranch,
 	parts,
 	status,
 	model,
@@ -150,6 +152,20 @@ export const MessageAssistant = React.memo(function MessageAssistant({
 									) : (
 										<Copy className="size-4" />
 									)}
+								</button>
+							</MessageAction>
+							<MessageAction
+								tooltip="Branch chat"
+								side="bottom"
+								delayDuration={0}
+							>
+								<button
+									className="flex size-7.5 items-center justify-center rounded-full bg-transparent text-muted-foreground transition hover:bg-accent/60 hover:text-foreground"
+									aria-label="Branch chat"
+									onClick={onBranch}
+									type="button"
+								>
+									<GitBranch className="size-4" />
 								</button>
 							</MessageAction>
 							<MessageAction

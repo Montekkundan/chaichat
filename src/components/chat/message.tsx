@@ -15,6 +15,7 @@ type MessageProps = {
 	onEdit: (id: string, newText: string) => void;
 	onReload: () => void;
 	onRegenerate?: (model: string) => void;
+	onBranch?: () => void;
 	hasScrollAnchor?: boolean;
 	parts?: MessageType["parts"];
 	status?: "streaming" | "ready" | "submitted" | "error";
@@ -32,6 +33,7 @@ export function Message({
 	onEdit,
 	onReload,
 	onRegenerate,
+	onBranch,
 	hasScrollAnchor,
 	parts,
 	status,
@@ -74,6 +76,7 @@ export function Message({
 				copyToClipboard={copyToClipboard}
 				onReload={onReload}
 				onRegenerate={onRegenerate}
+				onBranch={onBranch}
 				isLast={isLast}
 				hasScrollAnchor={hasScrollAnchor}
 				parts={parts}

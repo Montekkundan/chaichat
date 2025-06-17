@@ -4,6 +4,7 @@ import { api } from "@/convex/_generated/api";
 import type { Doc, Id } from "@/convex/_generated/dataModel";
 import { useUser } from "@clerk/nextjs";
 import { useConvex, useMutation, useQuery } from "convex/react";
+import { useRouter } from "next/navigation";
 import {
 	createContext,
 	useCallback,
@@ -22,6 +23,7 @@ interface CacheContextType {
 		name: string,
 		model: string,
 		userIdOverride?: string,
+		parentChatId?: string,
 	) => Promise<string>;
 	deleteChat: (chatId: string) => Promise<void>;
 	updateChatModel: (chatId: string, model: string) => Promise<void>;
@@ -59,6 +61,8 @@ interface CacheContextType {
 	setOnMessagesChanged: (callback: (chatId: string) => void) => void;
 }
 
+export const OPTIMISTIC_PREFIX = "chai-";
+
 const CacheContext = createContext<CacheContextType | null>(null);
 
 export function useCache() {
@@ -73,6 +77,8 @@ export function CacheProvider({
 }: { children: React.ReactNode; initialChats?: Chat[] }) {
 	const { user } = useUser();
 	const convex = useConvex();
+	const router = useRouter();
+	const routerRef = useRef(router);
 	const [chats, setChats] = useState<Chat[]>(initialChats);
 	const [isLoading, setIsLoading] = useState(initialChats.length === 0);
 	const [isSyncing, setIsSyncing] = useState(false);
@@ -91,6 +97,9 @@ export function CacheProvider({
 
 	// Version cache - keyed by parentMessageId
 	const versionsCache = useRef<Map<string, Message[]>>(new Map());
+
+	// Map to translate optimistic chat IDs to their real Convex IDs once available (stable ref)
+	const optimisticToRealChatId = useRef<Map<string, string>>(new Map());
 
 	// Callback for forcing messages reload
 	const onMessagesChangedCallback = useRef<
@@ -178,6 +187,22 @@ export function CacheProvider({
 			syncWithConvex();
 		}
 	}, [convexChats, user?.id]);
+  
+	// Hydrate chats quickly from cookie to avoid UI flash
+	// biome-ignore lint/correctness/useExhaustiveDependencies: <explanation>
+		useEffect(() => {
+		if (initialChats.length === 0 && typeof document !== "undefined") {
+			try {
+				const match = document.cookie.match(/cc_chats=([^;]+)/);
+				if (match?.[1]) {
+					const parsed = JSON.parse(decodeURIComponent(match[1]));
+					if (Array.isArray(parsed) && parsed.length > 0) {
+						setChats(parsed as Chat[]);
+					}
+				}
+			} catch {/* ignore parse errors */}
+		}
+	}, []);
 
 	// Persist minimal chat list (id + name) to cookie for fast SSR
 	useEffect(() => {
@@ -187,6 +212,7 @@ export function CacheProvider({
 				_id: c._id,
 				name: c.name,
 				currentModel: c.currentModel,
+				parentChatId: c.parentChatId ?? null,
 			}));
 			const value = encodeURIComponent(JSON.stringify(minimal));
 			document.cookie = `cc_chats=${value}; path=/; max-age=604800; SameSite=Lax`;
@@ -203,22 +229,25 @@ export function CacheProvider({
 		[chats],
 	);
 
+	// biome-ignore lint/correctness/useExhaustiveDependencies: router is stable and intentional
 	const createChat = useCallback(
 		async (
 			name: string,
 			model: string,
 			userIdOverride?: string,
+			parentChatId?: string,
 		): Promise<string> => {
 			const uid = userIdOverride ?? user?.id;
 			if (!uid) throw new Error("User not authenticated");
 
-			const optimisticId = `optimistic-${Date.now()}`;
+			const optimisticId = `${OPTIMISTIC_PREFIX}${Date.now()}`;
 			const optimisticChat: Chat = {
 				_id: optimisticId,
 				name,
 				userId: uid,
 				currentModel: model,
 				initialModel: model,
+				parentChatId,
 				createdAt: Date.now(),
 				_creationTime: Date.now(),
 			};
@@ -226,32 +255,79 @@ export function CacheProvider({
 			setChats((prev) => [optimisticChat, ...prev]);
 			messagesCache.current.set(optimisticId, []);
 
-			try {
-				const newChatId = await createChatMutation({
-					name,
-					userId: uid,
-					model,
+			const mutationArgs: {
+				name: string;
+				userId: string;
+				model: string;
+				parentChatId?: Id<"chats">;
+			} = {
+				name,
+				userId: uid,
+				model,
+				...(parentChatId ? { parentChatId: parentChatId as Id<"chats"> } : {}),
+			};
+
+			void createChatMutation(mutationArgs)
+				.then(async (realId) => {
+					const realChat = { ...optimisticChat, _id: realId };
+					await db.chats.put(realChat);
+					setChats((prev) =>
+						prev.map((c) => (c._id === optimisticId ? realChat : c)),
+					);
+
+					const msgs = messagesCache.current.get(optimisticId) || [];
+
+					// Re-associate any optimistic messages with the new real chat id
+					const reassignedMsgs = msgs.map((m) => ({ ...m, chatId: realId }));
+
+					messagesCache.current.delete(optimisticId);
+					messagesCache.current.set(realId, reassignedMsgs);
+
+					// Persist reassigned messages to Dexie so they survive reloads
+					try {
+						await db.messages.bulkPut(reassignedMsgs);
+					} catch {/* ignore */}
+
+					// --- Push any optimistic messages to Convex now that we have a real chat id ---
+					for (const localMsg of reassignedMsgs) {
+						if (localMsg._id.startsWith(OPTIMISTIC_PREFIX)) {
+							try {
+								const newMessageId = await addMessageMutation({
+									chatId: realId as Id<"chats">,
+									userId: localMsg.userId,
+									role: localMsg.role,
+									content: localMsg.content,
+									model: localMsg.model,
+									attachments: localMsg.attachments,
+									...(localMsg.parentMessageId && {
+										parentMessageId: localMsg.parentMessageId as Id<"messages">,
+									}),
+									...(localMsg.version && { version: localMsg.version }),
+								});
+
+								// update caches with real message id
+								localMsg._id = newMessageId;
+							} catch {/* ignore network errors */}
+						}
+					}
+					onMessagesChangedCallback.current?.(realId);
+
+					// Record mapping so future message writes use the real id
+					optimisticToRealChatId.current.set(optimisticId, realId);
+
+					// Replace the URL if the user is still on the optimistic route
+					if (typeof window !== "undefined" && window.location.pathname.includes(optimisticId)) {
+						routerRef.current.replace(`/chat/${realId}`);
+					}
+				})
+				.catch((error) => {
+					console.error("createChat mutation failed", error);
+					setChats((prev) => prev.filter((c) => c._id !== optimisticId));
+					messagesCache.current.delete(optimisticId);
 				});
 
-				// Replace optimistic with real
-				const realChat = { ...optimisticChat, _id: newChatId };
-				await db.chats.put(realChat);
-
-				setChats((prev) =>
-					prev.map((chat) => (chat._id === optimisticId ? realChat : chat)),
-				);
-
-				// Update message cache key
-				const messages = messagesCache.current.get(optimisticId) || [];
-				messagesCache.current.delete(optimisticId);
-				messagesCache.current.set(newChatId, messages);
-
-				return newChatId;
-			} catch (error) {
-				setChats((prev) => prev.filter((chat) => chat._id !== optimisticId));
-				messagesCache.current.delete(optimisticId);
-				throw error;
-			}
+			// Return optimistic id immediately for snappy navigation
+			return optimisticId;
 		},
 		[user?.id, createChatMutation],
 	);
@@ -284,9 +360,27 @@ export function CacheProvider({
 					]),
 				]);
 
-				console.log(
-					`Successfully deleted chat ${chatId} and ${messagesToDelete.length} messages`,
+				// Remove parent link from any child chats in local state and Dexie
+				setChats((prev) =>
+					prev.map((c) =>
+						c.parentChatId === chatId ? { ...c, parentChatId: undefined } : c,
+					),
 				);
+				// Update dexie
+				try {
+					await db.chats
+						.where("parentChatId")
+						// biome-ignore lint/suspicious/noExplicitAny: <explanation>
+						.equals(chatId as any)
+						.modify({ parentChatId: undefined });
+				} catch {/* ignore */}
+
+				console.log(`Deleted chat ${chatId} and ${messagesToDelete.length} messages`);
+
+				// If user is currently viewing this chat, redirect home
+				if (typeof window !== "undefined" && window.location.pathname.includes(chatId)) {
+					routerRef.current.replace("/");
+				}
 			} catch (error) {
 				console.error("Failed to delete chat:", error);
 
@@ -316,17 +410,15 @@ export function CacheProvider({
 				),
 			);
 
-			try {
+			// Avoid server call if chatId still optimistic
+			if (!chatId.startsWith(OPTIMISTIC_PREFIX)) {
 				await updateChatModelMutation({
 					chatId: chatId as Id<"chats">,
 					model,
 				});
-
-				await db.chats.update(chatId, { currentModel: model });
-			} catch (error) {
-				toast({ title: "Failed to update model", status: "error" });
-				throw error;
 			}
+
+			await db.chats.update(chatId, { currentModel: model });
 		},
 		[updateChatModelMutation],
 	);
@@ -350,6 +442,13 @@ export function CacheProvider({
 			}
 
 			const fetchPromise = (async (): Promise<Message[]> => {
+				// If chatId is still optimistic, don't attempt server fetch
+				if (chatId.startsWith(OPTIMISTIC_PREFIX)) {
+					// Return whatever we have in cache (may be empty)
+					const cached = messagesCache.current.get(chatId) ?? [];
+					return cached;
+				}
+
 				// Return cached if available (already sorted and filtered)
 				const cached = messagesCache.current.get(chatId);
 				if (cached) {
@@ -472,7 +571,14 @@ export function CacheProvider({
 			isActive?: boolean;
 			createdAt: number;
 		}): Promise<string> => {
-			const optimisticId = `msg-${Date.now()}-${Math.random()}`;
+			// If this chatId has been resolved already, swap to real id immediately
+			let targetChatId = messageData.chatId;
+			const resolvedId = optimisticToRealChatId.current.get(targetChatId);
+			if (resolvedId) {
+				targetChatId = resolvedId;
+			}
+
+			const optimisticId = `${OPTIMISTIC_PREFIX}${Date.now()}-${Math.random()}`;
 			const optimisticMessage: Message = {
 				...messageData,
 				_id: optimisticId,
@@ -481,8 +587,7 @@ export function CacheProvider({
 				attachments: messageData.attachments,
 			};
 
-			const currentMessages =
-				messagesCache.current.get(messageData.chatId) || [];
+			const currentMessages = messagesCache.current.get(targetChatId) || [];
 			// If regenerated assistant reply, optimistically deactivate previous versions in cache
 			if (messageData.parentMessageId) {
 				const parentId = messageData.parentMessageId;
@@ -512,10 +617,10 @@ export function CacheProvider({
 			const sortedMessages = newMessages.sort(
 				(a, b) => a._creationTime - b._creationTime,
 			);
-			messagesCache.current.set(messageData.chatId, sortedMessages);
+			messagesCache.current.set(targetChatId, sortedMessages);
 
 			// Update LRU cache immediately with the new message
-			memLRU.current.set(messageData.chatId, {
+			memLRU.current.set(targetChatId, {
 				ts: Date.now(),
 				msgs: sortedMessages,
 			});
@@ -530,64 +635,73 @@ export function CacheProvider({
 				}
 			}
 
+			// Persist locally to Dexie even if chatId is still optimistic so the user
+			// doesn't lose their branched history on refresh
+			try {
+				await db.messages.put(optimisticMessage);
+			} catch {/* ignore dexie errors */}
+
 			// Notify the messages provider immediately about the optimistic update
-			onMessagesChangedCallback.current?.(messageData.chatId);
+			onMessagesChangedCallback.current?.(targetChatId);
 
 			try {
-				const convexData = {
-					chatId: messageData.chatId as Id<"chats">,
-					userId: messageData.userId,
-					role: messageData.role,
-					content: messageData.content,
-					model: messageData.model,
-					attachments: messageData.attachments,
-					...(messageData.parentMessageId && {
-						parentMessageId: messageData.parentMessageId as Id<"messages">,
-					}),
-					...(messageData.version && { version: messageData.version }),
-				};
+				// If chatId is still optimistic, delay server sync until realId exists
+				let newMessageId: string | undefined;
+				if (!targetChatId.startsWith(OPTIMISTIC_PREFIX)) {
+					const convexData = {
+						chatId: targetChatId as Id<"chats">,
+						userId: messageData.userId,
+						role: messageData.role,
+						content: messageData.content,
+						model: messageData.model,
+						attachments: messageData.attachments,
+						...(messageData.parentMessageId && {
+							parentMessageId: messageData.parentMessageId as Id<"messages">,
+						}),
+						...(messageData.version && { version: messageData.version }),
+					};
+					newMessageId = await addMessageMutation(convexData);
+				}
 
-				const newMessageId = await addMessageMutation(convexData);
+				if (newMessageId) {
+					const realMessage = { ...optimisticMessage, _id: newMessageId };
+					await db.messages.put(realMessage);
+					// Remove the old optimistic record to avoid duplicates
+					try {
+						await db.messages.delete(optimisticId);
+					} catch {/* ignore */}
 
-				const realMessage = { ...optimisticMessage, _id: newMessageId };
-				await db.messages.put(realMessage);
+					// Update cache ids
+					const messages = messagesCache.current.get(targetChatId) || [];
+					const updatedMessages = messages.map((msg) =>
+						msg._id === optimisticId ? realMessage : msg,
+					);
+					messagesCache.current.set(targetChatId, updatedMessages);
 
-				// Update the cache with the real message ID
-				const messages = messagesCache.current.get(messageData.chatId) || [];
-				const updatedMessages = messages.map((msg) =>
-					msg._id === optimisticId ? realMessage : msg,
-				);
-				const sortedUpdatedMessages = updatedMessages.sort(
-					(a, b) => a._creationTime - b._creationTime,
-				);
-				messagesCache.current.set(messageData.chatId, sortedUpdatedMessages);
+					// Persist these messages to Dexie under the real chat id so they
+					// survive a page refresh.
+					try {
+						await db.messages.bulkPut(updatedMessages);
+					} catch {/* ignore */}
+				}
 
-				// Update LRU cache with the real message
-				memLRU.current.set(messageData.chatId, {
-					ts: Date.now(),
-					msgs: sortedUpdatedMessages,
-				});
-
-				// Notify again after the real message is saved
-				onMessagesChangedCallback.current?.(messageData.chatId);
-
-				return newMessageId;
+				return newMessageId || optimisticId;
 			} catch (error) {
 				// Rollback: remove the optimistic message
-				const messages = messagesCache.current.get(messageData.chatId) || [];
+				const messages = messagesCache.current.get(targetChatId) || [];
 				const rolledBackMessages = messages.filter(
 					(msg) => msg._id !== optimisticId,
 				);
-				messagesCache.current.set(messageData.chatId, rolledBackMessages);
+				messagesCache.current.set(targetChatId, rolledBackMessages);
 
 				// Update LRU cache after rollback
-				memLRU.current.set(messageData.chatId, {
+				memLRU.current.set(targetChatId, {
 					ts: Date.now(),
 					msgs: rolledBackMessages,
 				});
 
 				// Notify about the rollback
-				onMessagesChangedCallback.current?.(messageData.chatId);
+				onMessagesChangedCallback.current?.(targetChatId);
 
 				throw error;
 			}
