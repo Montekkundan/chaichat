@@ -3,11 +3,25 @@ import Chat from "~/components/chat/chat";
 import { LayoutChat } from "~/components/chat/layout-chat";
 import { MessagesProvider } from "~/lib/providers/messages-provider";
 
-export default async function Page({ params, searchParams }: { params: { chatId: string }; searchParams?: { model?: string } }) {
-	const { chatId } = params;
+export default async function Page({
+	params,
+	searchParams,
+}: {
+	params: Promise<{ chatId: string }>;
+	searchParams?: Promise<{ model?: string }>;
+}) {
+	const { chatId } = await params;
+
 	const user = await currentUser();
 	const firstName = user?.firstName || undefined;
-	const initialModel = searchParams?.model;
+
+	let initialModel: string | undefined = undefined;
+	if (searchParams) {
+		const sp = await searchParams;
+		if (typeof sp?.model === "string") {
+			initialModel = sp.model;
+		}
+	}
 
 	return (
 		<LayoutChat>

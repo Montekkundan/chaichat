@@ -4,7 +4,7 @@ import { CheckIcon, MoonIcon, RepeatIcon, SunIcon } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
 
-import { api } from "convex/_generated/api";
+import { api } from "@/convex/_generated/api";
 import { useMutation } from "convex/react";
 import { useThemeConfig } from "~/components/active-theme";
 import { Button } from "~/components/ui/button";

@@ -171,9 +171,10 @@ function SingleToolView({
 
 	// If there's only one tool, display it directly
 	if (toolsToDisplay.length === 1) {
+		const firstTool = toolsToDisplay[0] as ToolInvocationUIPart;
 		return (
 			<SingleToolCard
-				toolData={toolsToDisplay[0]}
+				toolData={firstTool}
 				defaultOpen={defaultOpen}
 				className={className}
 			/>
@@ -315,10 +316,9 @@ function SingleToolCard({
 						{parsedResult.map(
 							(
 								item: { url: string; title: string; snippet?: string },
-								index: number,
 							) => (
 								<div
-									key={index}
+									key={item.url}
 									className="border-border border-b pb-3 last:border-0 last:pb-0"
 								>
 									<a

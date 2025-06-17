@@ -241,10 +241,10 @@ function estimateIntelligence(
 	return "High";
 }
 
-function formatModelName(modelName: string): string {
-	// Convert model name to a more readable format
-	return modelName
-		.split(":")[0] // Remove tag part
+function formatModelName(modelName?: string): string {
+	const nameStr = modelName ?? "";
+	const base = nameStr.split(":")[0] || "";
+	return base
 		.split("-")
 		.map((word) => word.charAt(0).toUpperCase() + word.slice(1))
 		.join(" ");

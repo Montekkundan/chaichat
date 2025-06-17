@@ -11,7 +11,7 @@ export const env = createEnv({
 		CONVEX_DEPLOYMENT: z.string(),
 		CLERK_SECRET_KEY: z.string(),
 		OPENAI_API_KEY: z.string(),
-		ENCRYPTION_KEY: z.string().optional(),
+		REDIS_URL: z.string(),
 	},
 
 	/**
@@ -37,7 +37,7 @@ export const env = createEnv({
 			process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
 		CLERK_SECRET_KEY: process.env.CLERK_SECRET_KEY,
 		OPENAI_API_KEY: process.env.OPENAI_API_KEY,
-		ENCRYPTION_KEY: process.env.ENCRYPTION_KEY,
+		REDIS_URL: process.env.REDIS_URL,
 		// NEXT_PUBLIC_CLIENTVAR: process.env.NEXT_PUBLIC_CLIENTVAR,
 	},
 	/**

@@ -1,4 +1,8 @@
 import { api } from "@/convex/_generated/api";
+import { createResumableStreamContext } from "resumable-stream";
+import { createDataStream } from "ai";
+import { generateId } from "ai";
+import { after } from "next/server";
 import type { Attachment } from "@ai-sdk/ui-utils";
 import { type Message as MessageAISDK, type ToolSet, streamText } from "ai";
 import { ConvexHttpClient } from "convex/browser";
@@ -13,6 +17,29 @@ import { cleanMessagesForTools } from "./utils";
 export const maxDuration = 60;
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+// TODO: ⚠️ Resumable streams still buggy; fix ASAP.
+// ---------------- Resumable stream helpers ----------------
+const streamContext = createResumableStreamContext({ waitUntil: after });
+
+// Lightweight in-memory map chatId -> streamIds (stored on globalThis).
+const chatStreams: Map<string, string[]> = ((): Map<string, string[]> => {
+	const g = globalThis as unknown as { __chaiChatStreams__?: Map<string, string[]> };
+	if (!g.__chaiChatStreams__) {
+		g.__chaiChatStreams__ = new Map<string, string[]>();
+	}
+	return g.__chaiChatStreams__;
+})();
+
+function appendStreamId(chatId: string, streamId: string) {
+	const arr = chatStreams.get(chatId) ?? [];
+	arr.push(streamId);
+	chatStreams.set(chatId, arr);
+}
+
+function loadStreams(chatId: string): string[] {
+	return chatStreams.get(chatId) ?? [];
+}
 
 type ChatRequest = {
 	messages: MessageAISDK[];
@@ -49,7 +76,6 @@ export async function POST(req: Request) {
 			);
 		}
 
-		// Initialize Convex client for server-side queries
 		const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL;
 		if (!convexUrl) {
 			throw new Error("NEXT_PUBLIC_CONVEX_URL is not configured");
@@ -70,26 +96,6 @@ export async function POST(req: Request) {
 				console.error("Failed to fetch user API keys:", error);
 			}
 		}
-
-		// const supabase = await validateAndTrackUsage({
-		//   userId,
-		//   model,
-		//   isAuthenticated,
-		// })
-
-		// const userMessage = messages[messages.length - 1]
-
-		// if (supabase && userMessage?.role === "user") {
-		//   await logUserMessage({
-		//     supabase,
-		//     userId,
-		//     chatId,
-		//     content: userMessage.content,
-		//     attachments: userMessage.experimental_attachments as Attachment[],
-		//     model,
-		//     isAuthenticated,
-		//   })
-		// }
 
 		// let agentConfig = null
 
@@ -238,9 +244,30 @@ export async function POST(req: Request) {
 		});
 		// ------------------------------------------------
 
-		const filteredMessages = messages.filter((m) => m.role !== "system");
+		// Filter out system messages and any messages that have no content or attachments.
+		// Gemini (and some other providers) return an error if a message has an empty "parts" array.
+		const filteredMessages = messages.filter((m) => {
+			if (m.role === "system") return false;
 
-		const result = streamText({
+			// Accept if there is non-empty textual content.
+			if (typeof m.content === "string" && m.content.trim().length > 0) {
+				return true;
+			}
+
+			// Otherwise, check if the message carries attachments.
+			const attachments = (
+				m as unknown as { experimental_attachments?: Attachment[] }
+			).experimental_attachments;
+
+			return Array.isArray(attachments) && attachments.length > 0;
+		});
+
+		const streamId = generateId();
+
+		// Record stream id for resumptions
+		appendStreamId(chatId, streamId);
+
+		const aiStream = streamText({
 			model: modelInstance,
 			system: effectiveSystemPrompt,
 			messages: filteredMessages,
@@ -263,17 +290,23 @@ export async function POST(req: Request) {
 			);
 		}
 
-		const originalResponse = result.toDataStreamResponse({
-			sendReasoning: true,
-			sendSources: true,
+		// DataStream wrapper for resumable support
+		// biome-ignore lint/suspicious/noExplicitAny: Buffer type depends on underlying implementation
+		const dataStream = createDataStream({
+			// `execute` pipes provider chunks into the resumable DataStream.
+			execute(buffer: unknown) {
+				aiStream.mergeIntoDataStream(buffer as never);
+			},
 		});
-		const headers = new Headers(originalResponse.headers);
-		headers.set("X-Chat-Id", chatId);
 
-		return new Response(originalResponse.body, {
-			status: originalResponse.status,
-			headers,
-		});
+		const originalResponse = await streamContext.resumableStream(streamId, () => dataStream);
+
+		if (!originalResponse) {
+			// fallback shouldn't happen but just in case
+			return new Response("Failed to create stream", { status: 500 });
+		}
+
+		return new Response(originalResponse, { status: 200, headers: new Headers() });
 	} catch (err: unknown) {
 		console.error("Error in /api/chat:", err);
 		const error = err as { code?: string; message?: string };
@@ -289,4 +322,26 @@ export async function POST(req: Request) {
 			{ status: 500 },
 		);
 	}
+}
+
+// ---------------- GET handler for resuming streams ----------------
+
+export async function GET(request: Request) {
+	const { searchParams } = new URL(request.url);
+	const chatId = searchParams.get("chatId");
+
+	if (!chatId) return new Response("chatId required", { status: 400 });
+
+	const streams = loadStreams(chatId);
+	if (streams.length === 0) return new Response("No streams", { status: 404 });
+
+	// `streams.length` is guaranteed to be > 0 here due to early return above.
+	const recent = streams[streams.length - 1] as string;
+
+	const emptyDataStream = createDataStream({ execute: () => {} });
+
+	const resumed = await streamContext.resumableStream(recent, () => emptyDataStream);
+	if (resumed) return new Response(resumed, { status: 200 });
+
+	return new Response(emptyDataStream, { status: 200 });
 }

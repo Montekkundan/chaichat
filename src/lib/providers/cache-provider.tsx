@@ -315,10 +315,7 @@ export function CacheProvider({
 					// Record mapping so future message writes use the real id
 					optimisticToRealChatId.current.set(optimisticId, realId);
 
-					// Replace the URL if the user is still on the optimistic route
-					if (typeof window !== "undefined" && window.location.pathname.includes(optimisticId)) {
-						routerRef.current.replace(`/chat/${realId}`);
-					}
+					// TODO: ⚠️ Resumable stream URL-swap hack is fragile; needs cleanup.
 				})
 				.catch((error) => {
 					console.error("createChat mutation failed", error);
@@ -442,11 +439,28 @@ export function CacheProvider({
 			}
 
 			const fetchPromise = (async (): Promise<Message[]> => {
-				// If chatId is still optimistic, don't attempt server fetch
+				// If chatId is still optimistic, skip Convex fetch but DO check Dexie so
+				// that a browser refresh still shows locally-saved messages.
 				if (chatId.startsWith(OPTIMISTIC_PREFIX)) {
-					// Return whatever we have in cache (may be empty)
-					const cached = messagesCache.current.get(chatId) ?? [];
-					return cached;
+					const cached = messagesCache.current.get(chatId);
+					if (cached) return cached;
+
+					try {
+						const localMessages = await db.messages
+							.where("chatId")
+							.equals(chatId)
+							.toArray();
+
+						if (localMessages.length > 0) {
+							const sorted = localMessages.sort((a, b) => a._creationTime - b._creationTime);
+							messagesCache.current.set(chatId, sorted);
+							return sorted;
+						}
+					} catch (err) {
+						console.error("Dexie lookup failed for optimistic chat", err);
+					}
+
+					return [];
 				}
 
 				// Return cached if available (already sorted and filtered)

@@ -258,14 +258,16 @@ export function MessagesProvider({
 					setMessages((prev) => [...prev, sysMsg]);
 
 					if (chatId) {
-						cache.addMessage({
-							chatId,
-							userId: currentUserId ?? "system",
-							role: "system",
-							content: sysMsg.content,
-							model: selectedModelRef.current,
-							createdAt: Date.now(),
-						});
+						// chatId is guaranteed to be defined because effect early-returned otherwise
+						void cache
+							.addMessage({
+								chatId: chatId as string,
+								userId: currentUserId ?? "system",
+								role: "system",
+								content: sysMsg.content,
+								model: selectedModelRef.current,
+								createdAt: Date.now(),
+							});
 					}
 					return;
 				}
@@ -282,14 +284,16 @@ export function MessagesProvider({
 					setMessages((prev) => [...prev, sysMsg]);
 
 					if (chatId) {
-						cache.addMessage({
-							chatId,
-							userId: currentUserId ?? "system",
-							role: "system",
-							content: sysMsg.content,
-							model: selectedModelRef.current,
-							createdAt: Date.now(),
-						});
+						// chatId is guaranteed to be defined because effect early-returned otherwise
+						void cache
+							.addMessage({
+								chatId: chatId as string,
+								userId: currentUserId ?? "system",
+								role: "system",
+								content: sysMsg.content,
+								model: selectedModelRef.current,
+								createdAt: Date.now(),
+							});
 					}
 					return;
 				}
@@ -340,6 +344,68 @@ export function MessagesProvider({
 		}
 	}, [cachedMessages, messages.length, setMessages]);
 
+	// ----- Resume streaming on refresh for optimistic chats -----
+	// biome-ignore lint/correctness/useExhaustiveDependencies: setMessages is stable from useChat
+	useEffect(() => {
+		if (!chatId) return;
+		// Only attempt resume if chatId is optimistic ( like chai-) and last message is from user
+		if (!chatId.startsWith(OPTIMISTIC_PREFIX)) return;
+		if (messages.length === 0) return;
+
+		const lastMsg = messages[messages.length - 1];
+		if (!lastMsg || lastMsg.role !== "user") return;
+
+		// Prevent duplicate resume attempts
+		let cancelled = false;
+
+		const assistantId: string = `live-${Date.now()}`;
+		startTransition(() =>
+			setMessages((curr) => [
+				...curr,
+				{ id: assistantId, role: "assistant", content: "", createdAt: Date.now() } as unknown as MessageAISDK,
+			]),
+		);
+		function appendChunk(chunk: string) {
+			if (cancelled) return;
+			// biome-ignore lint/suspicious/noExplicitAny: runtime concat for streaming text
+			startTransition(() =>
+				setMessages((curr) =>
+					curr.map((m) => {
+						if (m.id === assistantId) {
+							// biome-ignore lint/suspicious/noExplicitAny: casting to extend content property
+							const existing = (m as MessageAISDK & { content?: string }).content ?? "";
+							return { ...m, content: existing + chunk } as typeof m;
+						}
+						return m;
+					}),
+				),
+			);
+		}
+		function done() {
+			if (cancelled) return;
+			// Persist final assistant message
+			const finalContent = String(
+				(messages.find((m) => m.id === assistantId) as MessageAISDK & { content?: string })?.content ?? "",
+			);
+			void cache
+				.addMessage({
+					chatId: chatId as string,
+					userId: currentUserId ?? "system",
+					role: "assistant",
+					content: finalContent,
+					model: String(selectedModelRef.current || "gpt-4o"),
+					createdAt: Date.now(),
+				})
+				.catch(() => {});
+		}
+
+		resumeAssistantStream({ chatId, appendAssistantChunk: appendChunk, onDone: done });
+
+		return () => {
+			cancelled = true;
+		};
+	}, [chatId, messages, cache, currentUserId]);
+
 	const createNewChat = useCallback(
 		async (initialMessage: string, model: string): Promise<string> => {
 			if (!currentUserId) throw new Error("User not authenticated");
@@ -360,6 +426,7 @@ export function MessagesProvider({
 		[currentUserId, cache],
 	);
 
+	// biome-ignore lint/correctness/useExhaustiveDependencies: append and user?.id are stable across renders and intentionally excluded.
 	const sendMessage = useCallback(
 		(message: string, attachments: UploadedFile[] = []) => {
 			if (!currentUserId || !chatId) return;
@@ -368,19 +435,48 @@ export function MessagesProvider({
 			setIsSubmitting(true);
 
 			try {
-				// Track this message to save it later
-				pendingUserMessage.current = {
-					content: message,
-					attachments,
-					messageId: `temp-${Date.now()}`,
-				};
+				// 1) Persist immediately so the message survives refresh.
+				void cache
+					.addMessage({
+						chatId,
+						userId: currentUserId,
+						role: "user",
+						content: message,
+						model: selectedModelRef.current,
+						attachments,
+						createdAt: Date.now(),
+					})
+					.then((convexId) => {
+						// Update the AI-SDK message with the real/optimistic id so any
+						// later operations (e.g. regenerate) have access to it.
+						startTransition(() => {
+							setMessages((current) =>
+								current.map((msg) => {
+									if (
+										msg.role === "user" &&
+										msg.content === message &&
+										// Message was appended just now; it won't have a convexId yet
+										// biome-ignore lint/suspicious/noExplicitAny: convexId is an extension not present in the base Message type
+										!(msg as any).convexId
+									) {
+										return { ...msg, convexId } as typeof msg;
+									}
+									return msg;
+								}),
+							);
+						});
+					})
+					.catch((err) => {
+						console.error("Failed to persist user message early:", err);
+					});
 
-				// Use append to add the user message and trigger AI response
+				// 2) Trigger the AI SDK streaming request.
 				void append(
 					{
 						role: "user",
 						content: message,
-						experimental_attachments: attachments,
+						// biome-ignore lint/suspicious/noExplicitAny: upstream library expects this field name
+						experimental_attachments: attachments as any,
 					},
 					{
 						body: {
@@ -391,9 +487,12 @@ export function MessagesProvider({
 							systemPrompt: SYSTEM_PROMPT_DEFAULT,
 						},
 					},
-				).catch((error) => {
-					console.error("append failed:", error);
+				).catch((err) => {
+					console.error("append failed:", err);
 				});
+
+				// We've already persisted, so onFinish doesn't need to run its user-message save path.
+				pendingUserMessage.current = null;
 			} catch (error) {
 				try {
 					const errObj = JSON.parse((error as Error).message);
@@ -412,7 +511,7 @@ export function MessagesProvider({
 				setIsSubmitting(false);
 			}
 		},
-		[currentUserId, chatId, append, isSubmitting, user?.id],
+		[currentUserId, chatId, isSubmitting, cache, setMessages, append, user?.id],
 	);
 
 	// Send pending message when conditions are right (after sendMessage is defined)
@@ -647,4 +746,37 @@ export function MessagesProvider({
 			{children}
 		</MessagesContext.Provider>
 	);
+}
+
+// TODO: ⚠️ Resumable stream logic is still buggy; needs major fixes soon.
+async function resumeAssistantStream({
+	chatId,
+	appendAssistantChunk,
+	onDone,
+}: {
+	chatId: string;
+	appendAssistantChunk: (chunk: string) => void;
+	onDone: () => void;
+}) {
+	try {
+		const res = await fetch(`/api/chat?chatId=${encodeURIComponent(chatId)}`);
+		if (!res.ok || !res.body) {
+			onDone();
+			return;
+		}
+		const reader = res.body.getReader();
+		const decoder = new TextDecoder();
+		let done = false;
+		while (!done) {
+			const { value, done: readerDone } = await reader.read();
+			done = readerDone;
+			if (value) {
+				appendAssistantChunk(decoder.decode(value));
+			}
+		}
+	} catch (err) {
+		console.error("Failed to resume stream", err);
+	} finally {
+		onDone();
+	}
 }
