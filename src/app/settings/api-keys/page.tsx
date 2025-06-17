@@ -1,7 +1,7 @@
 "use client";
 
 import { api } from "@/convex/_generated/api";
-import { useMutation, useQuery } from "convex/react";
+import { useAction } from "convex/react";
 import { Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -22,14 +22,24 @@ function maskKey(key: string | undefined) {
 }
 
 export default function ApiKeysPage() {
-	const userKeys = useQuery(api.userKeys.getKeys, {}) as UserKeys | undefined;
-	const saveKey = useMutation(api.userKeys.saveKey);
+	const getKeys = useAction(api.userKeys.getKeys);
+	const saveKey = useAction(api.userKeys.saveKey);
+
+	const [userKeys, setUserKeys] = useState<UserKeys | undefined>(undefined);
 
 	const [openaiInput, setOpenaiInput] = useState("");
 	const [anthropicInput, setAnthropicInput] = useState("");
 	const [googleInput, setGoogleInput] = useState("");
 	const [mistralInput, setMistralInput] = useState("");
 	const [saving, setSaving] = useState(false);
+
+	// Fetch keys on mount
+	useEffect(() => {
+		(async () => {
+			const result = (await getKeys({})) as UserKeys;
+			setUserKeys(result);
+		})();
+	}, [getKeys]);
 
 	// initialise input with existing key (unmasked) when first loaded
 	useEffect(() => {

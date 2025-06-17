@@ -1,8 +1,8 @@
 "use client";
 
 import { api } from "@/convex/_generated/api";
-import { CaretDown, MagnifyingGlass, Star } from "@phosphor-icons/react";
-import { useQuery } from "convex/react";
+import { CaretDown, MagnifyingGlass, Star, Key } from "@phosphor-icons/react";
+import { useQuery, useAction } from "convex/react";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "~/components/ui/button";
 import {
@@ -27,7 +27,7 @@ import {
 } from "~/components/ui/tooltip";
 // import { PopoverContentAuth } from "~/components/chat-input/popover-content-auth"
 import { useBreakpoint } from "~/hooks/use-breakpoint";
-import { FREE_MODELS_IDS } from "~/lib/config";
+import { FREE_MODELS_IDS, PREMIUM_MODEL_IDS } from "~/lib/config";
 import type { ModelConfig } from "~/lib/models/types";
 import { PROVIDERS } from "~/lib/providers";
 import { useModels } from "~/lib/providers/models-provider";
@@ -40,6 +40,15 @@ type ModelSelectorProps = {
 	setSelectedModelId: (modelId: string) => void;
 	className?: string;
 	isUserAuthenticated?: boolean;
+};
+
+// Define shape for keys returned from server
+type UserKeys = {
+	openaiKey?: string;
+	anthropicKey?: string;
+	googleKey?: string;
+	mistralKey?: string;
+	xaiKey?: string;
 };
 
 export function ModelSelector({
@@ -115,6 +124,17 @@ export function ModelSelector({
 		}
 	}, [isDropdownOpen, selectedModelId]);
 
+	// Fetch keys via Convex action once
+	const getKeys = useAction(api.userKeys.getKeys);
+	const [userKeys, setUserKeys] = useState<UserKeys | undefined>(undefined);
+
+	useEffect(() => {
+		(async () => {
+			const result = (await getKeys({})) as UserKeys;
+			setUserKeys(result);
+		})();
+	}, [getKeys]);
+
 	const handleModelSelect = (model: ModelConfig) => {
 		const isPro = !FREE_MODELS_IDS.includes(model.id);
 
@@ -135,10 +155,29 @@ export function ModelSelector({
 	};
 
 	const renderModelItem = (model: ModelConfig) => {
-		const isPro = !FREE_MODELS_IDS.includes(model.id);
 		const provider = PROVIDERS.find((p) => p.id === model.providerId);
 
-		const locked = isPro && !isUserAuthenticated;
+		const isPremium = PREMIUM_MODEL_IDS.includes(model.id);
+		const isFree = FREE_MODELS_IDS.includes(model.id);
+		const isPro = !isFree; // non-free models are considered "Pro"
+
+		// Map provider id to the corresponding key field returned by the API
+		const providerKeyMap: Record<string, keyof UserKeys> = {
+			openai: "openaiKey",
+			claude: "anthropicKey",
+			anthropic: "anthropicKey",
+			gemini: "googleKey",
+			google: "googleKey",
+			mistral: "mistralKey",
+			grok: "xaiKey",
+			xai: "xaiKey",
+		};
+
+		const keyField = providerKeyMap[provider?.id ?? ""];
+		const hasUserKey = keyField && userKeys ? Boolean(userKeys[keyField]) : false;
+
+		// Locked if the user is not authenticated for pro OR it's a premium model without a user key
+		const locked = (isPro && !isUserAuthenticated) || (isPremium && !hasUserKey);
 
 		return (
 			// biome-ignore lint/a11y/useKeyWithClickEvents: interactive div for list item
@@ -161,6 +200,7 @@ export function ModelSelector({
 				{isPro && (
 					<div className="flex items-center gap-0.5 rounded-full border border-input bg-accent px-1.5 py-0.5 font-medium text-[10px] text-muted-foreground">
 						<Star className="size-2" />
+						{isPremium && <Key className="size-2" />}
 						<span>Pro</span>
 					</div>
 				)}
@@ -208,11 +248,6 @@ export function ModelSelector({
 	if (isMobile) {
 		return (
 			<>
-				{/* <ProModelDialog
-          isOpen={isProDialogOpen}
-          setIsOpen={setIsProDialogOpen}
-          currentModel={selectedProModel || ""}
-        /> */}
 				<Drawer open={isDrawerOpen} onOpenChange={setIsDrawerOpen}>
 					<DrawerTrigger asChild>{trigger}</DrawerTrigger>
 					<DrawerContent>
@@ -265,11 +300,6 @@ export function ModelSelector({
 
 	return (
 		<div>
-			{/* <ProModelDialog
-        isOpen={isProDialogOpen}
-        setIsOpen={setIsProDialogOpen}
-        currentModel={selectedProModel || ""}
-      /> */}
 			<Tooltip>
 				<DropdownMenu
 					open={isDropdownOpen}
@@ -332,13 +362,6 @@ export function ModelSelector({
 								</div>
 							)}
 						</div>
-
-						{/* Submenu positioned absolutely */}
-						{/* {hoveredModelData && (
-              <div className="absolute top-0 left-[calc(100%+8px)]">
-                <SubMenu hoveredModelData={hoveredModelData} />
-              </div>
-            )} */}
 					</DropdownMenuContent>
 				</DropdownMenu>
 			</Tooltip>

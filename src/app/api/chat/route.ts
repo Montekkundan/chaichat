@@ -63,7 +63,7 @@ export async function POST(req: Request) {
 		if (!isFreeModel && isAuthenticated) {
 			// Get user's API keys for premium models
 			try {
-				userApiKeys = await convex.query(api.userKeys.getUserKeysForAPI, {
+				userApiKeys = await convex.action(api.userKeys.getUserKeysForAPI, {
 					userId,
 				});
 			} catch (error) {
@@ -146,10 +146,11 @@ export async function POST(req: Request) {
 		// const hasTools = !!toolsToUse && Object.keys(toolsToUse).length > 0
 		// const cleanedMessages = cleanMessagesForTools(messages, hasTools)
 
-		let streamError: Error | null = null;
+		let streamError: unknown | null = null;
 
 		// Determine which API key to use
 		let apiKey: string | undefined;
+		let isBYOK = false; // true when user supplies their own premium key
 
 		if (isFreeModel) {
 			// Use project API key for free models
@@ -170,6 +171,7 @@ export async function POST(req: Request) {
 			}
 
 			apiKey = userKey;
+			isBYOK = true;
 		}
 
 		// Get the model instance with the appropriate API key
@@ -205,8 +207,13 @@ export async function POST(req: Request) {
 		}
 
 		// Determine cost for requested model
-		const cost = modelCost(model);
-		if (stdCredits < cost.standard || premiumCredits < cost.premium) {
+		const baseCost = modelCost(model);
+		const effectiveCost = {
+			standard: baseCost.standard,
+			premium: isBYOK ? 0 : baseCost.premium,
+		};
+
+		if (stdCredits < effectiveCost.standard || premiumCredits < effectiveCost.premium) {
 			return new Response(
 				JSON.stringify({
 					error: "Quota exceeded. Please upgrade your plan.",
@@ -220,9 +227,9 @@ export async function POST(req: Request) {
 			);
 		}
 
-		// Deduct credits
-		stdCredits -= cost.standard;
-		premiumCredits -= cost.premium;
+		// Deduct credits according to adjusted cost
+		stdCredits -= effectiveCost.standard;
+		premiumCredits -= effectiveCost.premium;
 		await convex.mutation(api.userQuota.updateQuota, {
 			userId,
 			std: stdCredits,
@@ -231,26 +238,29 @@ export async function POST(req: Request) {
 		});
 		// ------------------------------------------------
 
+		const filteredMessages = messages.filter((m) => m.role !== "system");
+
 		const result = streamText({
 			model: modelInstance,
 			system: effectiveSystemPrompt,
-			messages: messages,
-			// tools: toolsToUse as ToolSet,
+			messages: filteredMessages,
 			maxSteps: 10,
 			temperature: temperature || 0.8,
 			onError: (err: unknown) => {
-				console.error("🛑 streamText error:", err);
-				streamError = new Error(
-					(err as { error?: string })?.error ||
-						"AI generation failed. Please check your model or API key.",
-				);
+				console.error("🛑 Provider/stream error:", err);
+				streamError = err;
 			},
-			// onFinish: async ({ response }) => {
-			// },
 		});
 
 		if (streamError) {
-			throw streamError;
+			const errObj = streamError as Record<string, unknown>;
+			const msg = typeof errObj?.error === "string"
+				? errObj.error
+				: (streamError as Error)?.message ?? String(streamError);
+			return new Response(
+				JSON.stringify({ error: msg, code: "PROVIDER_ERROR" }),
+				{ status: 502 },
+			);
 		}
 
 		const originalResponse = result.toDataStreamResponse({
@@ -266,7 +276,6 @@ export async function POST(req: Request) {
 		});
 	} catch (err: unknown) {
 		console.error("Error in /api/chat:", err);
-		// Return a structured error response if the error is a UsageLimitError.
 		const error = err as { code?: string; message?: string };
 		if (error.code === "DAILY_LIMIT_REACHED") {
 			return new Response(
