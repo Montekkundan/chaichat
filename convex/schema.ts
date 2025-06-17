@@ -9,6 +9,7 @@ export default defineSchema({
     currentModel: v.string(),  // Current model being used
     createdAt: v.number(),
     parentChatId: v.optional(v.id("chats")), // branch parent
+    isPublic: v.optional(v.boolean()),
   }),
   users: defineTable({
     userId: v.string(),            // Clerk userId

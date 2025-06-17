@@ -2,12 +2,13 @@
 import { useUser } from "@clerk/nextjs";
 import { SignInButton } from "@clerk/nextjs";
 import { Unauthenticated } from "convex/react";
-import { GitBranch, Search, X } from "lucide-react";
+import { GitBranch, Search, X, Share2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-
-import { DeleteChatModal } from "~/components/modals/delete-chat-modal";
+import { useMutation } from "convex/react";
+import { api } from "@/convex/_generated/api";
+import { toast } from "~/components/ui/toast";
 import {
 	Sidebar,
 	SidebarContent,
@@ -20,6 +21,10 @@ import {
 import { useCache } from "~/lib/providers/cache-provider";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
+import { ShareChatModal } from "~/components/modals/share-chat-modal";
+import type { Id } from "@/convex/_generated/dataModel";
+
+import { DeleteChatModal } from "~/components/modals/delete-chat-modal";
 
 export function AppSidebar({
 	initialUser,
@@ -38,6 +43,8 @@ export function AppSidebar({
 	const [debouncedSearch, setDebouncedSearch] = useState("");
 	const [deleteModalOpen, setDeleteModalOpen] = useState(false);
 	const [chatToDelete, setChatToDelete] = useState<string | null>(null);
+	const toggleVisibility = useMutation(api.chat.toggleChatVisibility);
+	const [shareChatId, setShareChatId] = useState<string | null>(null);
 
 	const effectiveUser = user ?? initialUser;
 
@@ -74,6 +81,22 @@ export function AppSidebar({
 	const handleDeleteClick = (chatId: string) => {
 		setChatToDelete(chatId);
 		setDeleteModalOpen(true);
+	};
+
+	const setChatPublicState = async (chatId: string, newValue: boolean | undefined) => {
+		if (newValue === undefined) return;
+		try {
+			await toggleVisibility({ chatId: chatId as Id<"chats">, isPublic: newValue, userId: effectiveUser?.id ?? "" });
+			cache.refreshCache();
+			if (newValue) {
+				const url = `${window.location.origin}/p/${chatId}`;
+				await navigator.clipboard.writeText(url);
+				toast({ title: "Public link copied to clipboard", status: "success" });
+			}
+		} catch (e) {
+			console.error(e);
+			toast({ title: "Failed to update visibility", status: "error" });
+		}
 	};
 
 	const handleConfirmDelete = async () => {
@@ -143,7 +166,7 @@ export function AppSidebar({
 										>
 											<SidebarMenuButton
 												asChild
-												className="flex w-full items-center gap-1 pr-8"
+												className="flex w-full items-center gap-1 pr-12"
 											>
 												<Link
 													href={`/chat/${chat._id}`}
@@ -153,6 +176,9 @@ export function AppSidebar({
 														<GitBranch className="h-3 w-3 text-muted-foreground" />
 													)}
 													<span>{chat.name}</span>
+													{chat.isPublic && (
+														<Badge className="ml-1" variant="outline" >Public</Badge>
+													)}
 												</Link>
 											</SidebarMenuButton>
 
@@ -167,6 +193,14 @@ export function AppSidebar({
 												aria-label="Delete chat"
 											>
 												<X className="size-4" />
+											</button>
+											<button
+												type="button"
+												className="-translate-y-1/2 absolute top-1/2 right-8 hidden items-center justify-center rounded-full p-1 text-muted-foreground hover:bg-muted/20 hover:text-foreground focus:outline-none group-hover/chat:inline-flex"
+												onClick={(e)=>{e.preventDefault();setShareChatId(chat._id);}}
+												aria-label="Share chat"
+											>
+												<Share2 className="size-4" />
 											</button>
 										</SidebarMenuItem>
 									))
@@ -218,6 +252,17 @@ export function AppSidebar({
 				onCancel={handleCancelDelete}
 				onConfirm={handleConfirmDelete}
 			/>
+			{shareChatId && (
+				<ShareChatModal
+					open={shareChatId !== null}
+					onOpenChange={(open) => {
+						if (!open) setShareChatId(null);
+				 }}
+					chatId={shareChatId}
+					isPublic={cache.chats.find((c) => c._id === shareChatId)?.isPublic}
+					onToggle={(newVal) => setChatPublicState(shareChatId, newVal)}
+				/>
+			)}
 		</Sidebar>
 	);
 }

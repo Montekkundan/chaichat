@@ -9,6 +9,7 @@ export interface Chat {
 	initialModel: string;
 	parentChatId?: string;
 	_creationTime: number;
+	isPublic: boolean;
 }
 
 export interface Message {
@@ -45,9 +46,9 @@ export class ChaiChatDB extends Dexie {
 
 	constructor() {
 		super("ChaiChatDB");
-		this.version(4)
+		this.version(5)
 			.stores({
-				chats: "_id, userId, name, createdAt, currentModel, parentChatId",
+				chats: "_id, userId, name, createdAt, currentModel, parentChatId, isPublic",
 				messages:
 					"_id, chatId, userId, createdAt, parentMessageId, version, isActive, model, attachments",
 				users: "id, fullName",
@@ -67,6 +68,7 @@ export class ChaiChatDB extends Dexie {
 					.toCollection()
 					.modify((chat) => {
 						if (chat.parentChatId === undefined) chat.parentChatId = undefined;
+						if (chat.isPublic === undefined) chat.isPublic = false;
 					});
 			});
 	}

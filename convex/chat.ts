@@ -2,8 +2,8 @@ import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 
 export const createChat = mutation({
-  args: { name: v.string(), userId: v.string(), model: v.string(), parentChatId: v.optional(v.id("chats")) },
-  handler: async (ctx, { name, userId, model, parentChatId }) => {
+  args: { name: v.string(), userId: v.string(), model: v.string(), parentChatId: v.optional(v.id("chats")), isPublic: v.optional(v.boolean()) },
+  handler: async (ctx, { name, userId, model, parentChatId, isPublic = false }) => {
     const identity = await ctx.auth.getUserIdentity();
     const actualUserId = identity?.subject || userId;
     const chatId = await ctx.db.insert("chats", {
@@ -13,6 +13,7 @@ export const createChat = mutation({
       currentModel: model,
       createdAt: Date.now(),
       parentChatId,
+      isPublic,
     } as any);
     return chatId;
   },
@@ -248,5 +249,49 @@ export const markAsOriginalVersion = mutation({
       version: 1,
       isActive: false, // The new regenerated version will be active
     });
+  },
+});
+
+// Toggle a chat's visibility between private (default) and public.
+export const toggleChatVisibility = mutation({
+  args: { chatId: v.id("chats"), isPublic: v.boolean(), userId: v.string() },
+  handler: async (ctx, { chatId, isPublic, userId }) => {
+    // Only the chat owner can toggle visibility
+    const chat = await ctx.db.get(chatId);
+    if (!chat) throw new Error("Chat not found");
+
+    const identity = await ctx.auth.getUserIdentity();
+    const actualUserId = identity?.subject || userId;
+    if (chat.userId !== actualUserId) {
+      throw new Error("Not authorized");
+    }
+
+    await ctx.db.patch(chatId, { isPublic });
+  },
+});
+
+// Fetch a chat + messages if it's public (or if caller is owner).
+export const getPublicChat = query({
+  args: { chatId: v.id("chats"), userId: v.optional(v.string()) },
+  handler: async (ctx, { chatId, userId }) => {
+    const chat = await ctx.db.get(chatId);
+    if (!chat) return null;
+
+    const identity = await ctx.auth.getUserIdentity();
+    const actualUserId = identity?.subject || userId;
+
+    if (!chat.isPublic && chat.userId !== actualUserId) {
+      return null; // not allowed
+    }
+
+    const messages = await ctx.db
+      .query("messages")
+      .withIndex("by_chat_active_time", (q) =>
+        q.eq("chatId", chatId).eq("isActive", true)
+      )
+      .order("asc")
+      .collect();
+
+    return { chat, messages };
   },
 });
