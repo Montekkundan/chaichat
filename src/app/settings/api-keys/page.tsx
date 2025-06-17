@@ -4,6 +4,7 @@ import { api } from "@/convex/_generated/api";
 import { useAction } from "convex/react";
 import { Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { Button } from "~/components/ui/button";
 
 type UserKeys = {
 	openaiKey?: string;
@@ -40,15 +41,6 @@ export default function ApiKeysPage() {
 			setUserKeys(result);
 		})();
 	}, [getKeys]);
-
-	// initialise input with existing key (unmasked) when first loaded
-	useEffect(() => {
-		if (!userKeys) return;
-		if (userKeys.openaiKey) setOpenaiInput(userKeys.openaiKey);
-		if (userKeys.anthropicKey) setAnthropicInput(userKeys.anthropicKey);
-		if (userKeys.googleKey) setGoogleInput(userKeys.googleKey);
-		if (userKeys.mistralKey) setMistralInput(userKeys.mistralKey);
-	}, [userKeys]);
 
 	const handleSaveProvider = async (provider: ProviderId, value: string) => {
 		const trimmed = value.trim();
@@ -115,20 +107,18 @@ export default function ApiKeysPage() {
 					<p className="mb-1 block font-medium text-sm">Current key</p>
 					<div className="mb-3 text-sm">{maskKey(p.key)}</div>
 					<input
-						type="text"
+						type="password"
 						className="mb-3 w-full rounded border p-2 text-sm"
 						placeholder="••••••"
 						value={p.state}
 						onChange={(e) => p.set(e.target.value)}
 					/>
-					<button
-						type="button"
+					<Button
 						disabled={saving || !p.state.trim()}
 						onClick={() => handleSaveProvider(p.provider, p.state)}
-						className="rounded bg-black px-4 py-2 text-white disabled:opacity-50"
 					>
 						{saving ? "Saving..." : "Save key"}
-					</button>
+					</Button>
 				</div>
 			))}
 		</div>

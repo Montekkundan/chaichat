@@ -2,10 +2,26 @@
 
 import { api } from "@/convex/_generated/api";
 import { useMutation, useQuery } from "convex/react";
-import { Loader2 } from "lucide-react";
+import { Loader2, Check } from "lucide-react";
 import { useEffect, useState } from "react";
 import { RECOMMENDED_MODEL_IDS } from "~/lib/config";
 import { useModels } from "~/lib/providers/models-provider";
+import OpenAIIcon from "~/components/icons/openai";
+import GeminiIcon from "~/components/icons/gemini";
+import ClaudeIcon from "~/components/icons/claude";
+import MistralIcon from "~/components/icons/mistral";
+import GrokIcon from "~/components/icons/grok";
+import { Button } from "~/components/ui/button";
+
+const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
+	openai: OpenAIIcon,
+	gemini: GeminiIcon,
+	google: GeminiIcon,
+	claude: ClaudeIcon,
+	anthropic: ClaudeIcon,
+	mistral: MistralIcon,
+	grok: GrokIcon,
+};
 
 export default function ModelsPage() {
 	const preferred = useQuery(api.userPreferences.getPreferredModels, {}) as
@@ -64,47 +80,51 @@ export default function ModelsPage() {
 			<h1 className="mb-6 font-semibold text-2xl">Model Visibility</h1>
 
 			<div className="mb-4 flex gap-3">
-				<button
-					type="button"
-					onClick={useRecommended}
-					className="rounded bg-secondary px-3 py-2 text-sm hover:bg-secondary/60"
-				>
+				<Button variant="secondary" size="sm" onClick={useRecommended}>
 					Use recommended ({RECOMMENDED_MODEL_IDS.length})
-				</button>
-				<button
-					type="button"
-					onClick={selectAll}
-					className="rounded bg-secondary px-3 py-2 text-sm hover:bg-secondary/60"
-				>
+				</Button>
+				<Button variant="secondary" size="sm" onClick={selectAll}>
 					Select all ({models.length})
-				</button>
+				</Button>
 			</div>
 
-			<div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3">
-				{models.map((m) => (
-					<label
-						key={m.id}
-						className="flex cursor-pointer items-center gap-2 rounded border p-2 text-sm hover:bg-muted/30"
-					>
-						<input
-							type="checkbox"
-							className="h-4 w-4"
-							checked={selected.includes(m.id)}
-							onChange={() => toggleModel(m.id)}
-						/>
-						{m.name}
-					</label>
-				))}
+			<div className="grid gap-6 sm:grid-cols-2">
+				{models.map((m) => {
+					const checked = selected.includes(m.id);
+					const Icon = ICON_MAP[m.providerId] ?? (() => null);
+					return (
+						<Button
+							key={m.id}
+							variant="outline"
+							size="lg"
+							onClick={() => toggleModel(m.id)}
+							className={`relative w-full justify-start px-6 py-6 hover:bg-muted/20 text-base ${checked ? 'border-primary/70 bg-primary/5' : ''}`}
+						>
+							{checked && (
+								<span className="absolute right-2 top-2 rounded-full bg-primary p-0.5 text-white">
+									<Check className="h-3 w-3" />
+								</span>
+							)}
+							<div className="flex items-center gap-4">
+								<Icon className="h-8 w-8" />
+								<div>
+									<div className="font-medium">{m.name}</div>
+									<div className="text-xs text-muted-foreground capitalize">{m.provider}</div>
+								</div>
+							</div>
+						</Button>
+					);
+				})}
 			</div>
 
-			<button
+			<Button
 				type="button"
 				disabled={saving}
 				onClick={handleSave}
-				className="mt-6 rounded bg-black px-4 py-2 text-white disabled:opacity-50"
+				className="mt-6"
 			>
 				{saving ? "Saving..." : "Save preferences"}
-			</button>
+			</Button>
 		</div>
 	);
 }
