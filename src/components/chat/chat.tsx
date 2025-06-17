@@ -99,7 +99,7 @@ export default function Chat({ initialName }: ChatProps = {}) {
 				const newChatId = await createNewChat(messageToSend, selectedModel);
 				// Navigate to the new chat; provider will send message automatically from query param
 				router.push(
-					`/chat/${newChatId}?q=${encodeURIComponent(messageToSend)}`,
+					`/chat/${newChatId}?q=${encodeURIComponent(messageToSend)}&model=${selectedModel}`,
 				);
 			} catch (error) {
 				console.error("Failed to create chat:", error);
