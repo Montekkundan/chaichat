@@ -48,7 +48,8 @@ export class ChaiChatDB extends Dexie {
 		super("ChaiChatDB");
 		this.version(5)
 			.stores({
-				chats: "_id, userId, name, createdAt, currentModel, parentChatId, isPublic",
+				chats:
+					"_id, userId, name, createdAt, currentModel, parentChatId, isPublic",
 				messages:
 					"_id, chatId, userId, createdAt, parentMessageId, version, isActive, model, attachments",
 				users: "id, fullName",

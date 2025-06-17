@@ -1,14 +1,15 @@
 "use client";
+import { api } from "@/convex/_generated/api";
+import type { Id } from "@/convex/_generated/dataModel";
 import { useUser } from "@clerk/nextjs";
 import { SignInButton } from "@clerk/nextjs";
 import { Unauthenticated } from "convex/react";
-import { GitBranch, Search, X, Share2 } from "lucide-react";
+import { useMutation } from "convex/react";
+import { GitBranch, Search, Share2, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { useMutation } from "convex/react";
-import { api } from "@/convex/_generated/api";
-import { toast } from "~/components/ui/toast";
+import { ShareChatModal } from "~/components/modals/share-chat-modal";
 import {
 	Sidebar,
 	SidebarContent,
@@ -18,11 +19,10 @@ import {
 	SidebarMenuButton,
 	SidebarMenuItem,
 } from "~/components/ui/sidebar";
+import { toast } from "~/components/ui/toast";
 import { useCache } from "~/lib/providers/cache-provider";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
-import { ShareChatModal } from "~/components/modals/share-chat-modal";
-import type { Id } from "@/convex/_generated/dataModel";
 
 import { DeleteChatModal } from "~/components/modals/delete-chat-modal";
 
@@ -83,10 +83,17 @@ export function AppSidebar({
 		setDeleteModalOpen(true);
 	};
 
-	const setChatPublicState = async (chatId: string, newValue: boolean | undefined) => {
+	const setChatPublicState = async (
+		chatId: string,
+		newValue: boolean | undefined,
+	) => {
 		if (newValue === undefined) return;
 		try {
-			await toggleVisibility({ chatId: chatId as Id<"chats">, isPublic: newValue, userId: effectiveUser?.id ?? "" });
+			await toggleVisibility({
+				chatId: chatId as Id<"chats">,
+				isPublic: newValue,
+				userId: effectiveUser?.id ?? "",
+			});
 			cache.refreshCache();
 			if (newValue) {
 				const url = `${window.location.origin}/p/${chatId}`;
@@ -177,7 +184,9 @@ export function AppSidebar({
 													)}
 													<span>{chat.name}</span>
 													{chat.isPublic && (
-														<Badge className="ml-1" variant="outline" >Public</Badge>
+														<Badge className="ml-1" variant="outline">
+															Public
+														</Badge>
 													)}
 												</Link>
 											</SidebarMenuButton>
@@ -197,7 +206,10 @@ export function AppSidebar({
 											<button
 												type="button"
 												className="-translate-y-1/2 absolute top-1/2 right-8 hidden items-center justify-center rounded-full p-1 text-muted-foreground hover:bg-muted/20 hover:text-foreground focus:outline-none group-hover/chat:inline-flex"
-												onClick={(e)=>{e.preventDefault();setShareChatId(chat._id);}}
+												onClick={(e) => {
+													e.preventDefault();
+													setShareChatId(chat._id);
+												}}
 												aria-label="Share chat"
 											>
 												<Share2 className="size-4" />
@@ -257,7 +269,7 @@ export function AppSidebar({
 					open={shareChatId !== null}
 					onOpenChange={(open) => {
 						if (!open) setShareChatId(null);
-				 }}
+					}}
 					chatId={shareChatId}
 					isPublic={cache.chats.find((c) => c._id === shareChatId)?.isPublic}
 					onToggle={(newVal) => setChatPublicState(shareChatId, newVal)}

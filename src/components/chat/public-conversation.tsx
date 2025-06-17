@@ -1,27 +1,27 @@
-'use client';
+"use client";
 
-import { Conversation } from '~/components/chat/conversation';
+import { Conversation } from "~/components/chat/conversation";
 
-import type { Message as MessageType } from '@ai-sdk/react';
+import type { Message as MessageType } from "@ai-sdk/react";
 
-type MessageWithModel = Omit<MessageType, 'role'> & {
-  role: 'user' | 'assistant' | 'system' | 'data';
-  model?: string;
+type MessageWithModel = Omit<MessageType, "role"> & {
+	role: "user" | "assistant" | "system" | "data";
+	model?: string;
 };
 
 type Props = {
-  messages: MessageWithModel[];
+	messages: MessageWithModel[];
 };
 
 export function PublicConversation({ messages }: Props) {
-  const noop = () => {};
-  return (
-    <Conversation
-      messages={messages}
-      status="ready"
-      onDelete={noop}
-      onEdit={noop}
-      onReload={noop}
-    />
-  );
-} 
+	const noop = () => {};
+	return (
+		<Conversation
+			messages={messages}
+			status="ready"
+			onDelete={noop}
+			onEdit={noop}
+			onReload={noop}
+		/>
+	);
+}
