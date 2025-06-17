@@ -23,6 +23,12 @@ export interface Message {
 	parentMessageId?: string;
 	version?: number;
 	isActive?: boolean;
+	attachments?: {
+		name: string;
+		url: string;
+		contentType: string;
+		size: number;
+	}[];
 }
 
 export interface UserProfile {
@@ -38,15 +44,15 @@ export class ChaiChatDB extends Dexie {
 
 	constructor() {
 		super("ChaiChatDB");
-		this.version(2)
+		this.version(3)
 			.stores({
 				chats: "_id, userId, name, createdAt, currentModel",
 				messages:
-					"_id, chatId, userId, createdAt, parentMessageId, version, isActive, model",
+					"_id, chatId, userId, createdAt, parentMessageId, version, isActive, model, attachments",
 				users: "id, fullName",
 			})
 			.upgrade((tx) => {
-				// Migration for version 2
+				// Migration for version 3 - ensure fields exist
 				return tx
 					.table("messages")
 					.toCollection()
@@ -57,6 +63,9 @@ export class ChaiChatDB extends Dexie {
 						// Ensure model field exists for existing messages
 						if (!message.model) {
 							message.model = "gpt-4o"; // Default model for existing messages
+						}
+						if (message.attachments === undefined) {
+							message.attachments = [];
 						}
 					});
 			});

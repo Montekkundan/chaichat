@@ -31,6 +31,12 @@ interface CacheContextType {
 		role: "user" | "assistant" | "system";
 		content: string;
 		model: string;
+		attachments?: {
+			name: string;
+			url: string;
+			contentType: string;
+			size: number;
+		}[];
 		parentMessageId?: string;
 		version?: number;
 		isActive?: boolean;
@@ -447,6 +453,12 @@ export function CacheProvider({
 			role: "user" | "assistant" | "system";
 			content: string;
 			model: string;
+			attachments?: {
+				name: string;
+				url: string;
+				contentType: string;
+				size: number;
+			}[];
 			parentMessageId?: string;
 			version?: number;
 			isActive?: boolean;
@@ -458,6 +470,7 @@ export function CacheProvider({
 				_id: optimisticId,
 				_creationTime: messageData.createdAt, // Use the provided createdAt time
 				isActive: messageData.isActive ?? true,
+				attachments: messageData.attachments,
 			};
 
 			const currentMessages =
@@ -496,6 +509,7 @@ export function CacheProvider({
 					role: messageData.role,
 					content: messageData.content,
 					model: messageData.model,
+					attachments: messageData.attachments,
 					...(messageData.parentMessageId && {
 						parentMessageId: messageData.parentMessageId as Id<"messages">,
 					}),

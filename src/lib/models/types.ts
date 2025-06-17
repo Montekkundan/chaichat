@@ -21,6 +21,8 @@ type ModelConfig = {
 	reasoning?: boolean;
 	openSource?: boolean;
 
+	attachments?: boolean; // Whether the model supports file/image attachments
+
 	speed?: "Fast" | "Medium" | "Slow";
 	intelligence?: "Low" | "Medium" | "High";
 

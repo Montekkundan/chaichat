@@ -1,22 +1,13 @@
 import { api } from "@/convex/_generated/api";
-// import { Provider } from "@/lib/user-keys"
 import type { Attachment } from "@ai-sdk/ui-utils";
 import { type Message as MessageAISDK, type ToolSet, streamText } from "ai";
 import { ConvexHttpClient } from "convex/browser";
-// import { loadAgent } from "@/lib/agents/load-agent"
 import { FREE_MODELS_IDS, SYSTEM_PROMPT_DEFAULT } from "~/lib/config";
-// import { loadMCPToolsFromURL } from "@/lib/mcp/load-mcp-from-url"
 import { getAllModels } from "~/lib/models";
 import { openproviders } from "~/lib/openproviders";
 import { getProviderForModel } from "~/lib/openproviders/provider-map";
 import { modelCost, shouldReset } from "~/lib/subscription";
 import { PLANS } from "~/lib/config";
-// import {
-//   logUserMessage,
-//   storeAssistantMessage,
-//   trackSpecialAgentUsage,
-//   validateAndTrackUsage,
-// } from "./api"
 import { cleanMessagesForTools } from "./utils";
 
 export const maxDuration = 60;
@@ -111,6 +102,21 @@ export async function POST(req: Request) {
 
 		if (!modelConfig || !modelConfig.apiSdk) {
 			throw new Error(`Model ${model} not found`);
+		}
+
+		// Validate attachment support
+		const hasAttachmentsInMessages = messages.some((m) => {
+			const attachments = (m as unknown as { experimental_attachments?: Attachment[] }).experimental_attachments;
+			return Array.isArray(attachments) && attachments.length > 0;
+		});
+		if (hasAttachmentsInMessages && !modelConfig?.attachments && !modelConfig?.vision) {
+			return new Response(
+				JSON.stringify({
+					error: "The selected model does not support file or image attachments.",
+					code: "ATTACHMENT_NOT_SUPPORTED",
+				}),
+				{ status: 400 },
+			);
 		}
 
 		const effectiveSystemPrompt =
@@ -232,17 +238,8 @@ export async function POST(req: Request) {
 						"AI generation failed. Please check your model or API key.",
 				);
 			},
-
-			onFinish: async ({ response }) => {
-				// if (supabase) {
-				//   await storeAssistantMessage({
-				//     supabase,
-				//     chatId,
-				//     messages:
-				//       response.messages as unknown as import("@/app/types/api.types").Message[],
-				//   })
-				// }
-			},
+			// onFinish: async ({ response }) => {
+			// },
 		});
 
 		if (streamError) {

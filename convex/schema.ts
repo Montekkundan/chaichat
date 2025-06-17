@@ -37,6 +37,16 @@ export default defineSchema({
     parentMessageId: v.optional(v.id("messages")), // Links to the original message
     version: v.optional(v.number()), // Version number (1, 2, 3, etc.)
     isActive: v.optional(v.boolean()),
+    attachments: v.optional(
+      v.array(
+        v.object({
+          name: v.string(),
+          url: v.string(),
+          contentType: v.string(),
+          size: v.number(),
+        }),
+      ),
+    ),
   }).index("by_chat", ["chatId"])
     .index("by_user", ["userId"])
     .index("by_parent", ["parentMessageId"])

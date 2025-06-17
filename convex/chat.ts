@@ -35,16 +35,27 @@ export const addMessage = mutation({
     role: v.union(v.literal("user"), v.literal("assistant"), v.literal("system")),
     content: v.string(),
     model: v.string(),
+    attachments: v.optional(
+      v.array(
+        v.object({
+          name: v.string(),
+          url: v.string(),
+          contentType: v.string(),
+          size: v.number(),
+        }),
+      ),
+    ),
     parentMessageId: v.optional(v.id("messages")),
     version: v.optional(v.number()),
   },
-  handler: async (ctx, { chatId, userId, role, content, model, parentMessageId, version }) => {
+  handler: async (ctx, { chatId, userId, role, content, model, attachments, parentMessageId, version }) => {
     const messageId = await ctx.db.insert("messages", {
       chatId,
       userId,
       role,
       content,
       model,
+      attachments,
       createdAt: Date.now(),
       parentMessageId,
       version,

@@ -1,9 +1,9 @@
 import { claudeModels } from "./data/claude";
-import { deepseekModels } from "./data/deepseek";
+// import { deepseekModels } from "./data/deepseek";
 import { geminiModels } from "./data/gemini";
 import { grokModels } from "./data/grok";
 import { mistralModels } from "./data/mistral";
-import { getOllamaModels, ollamaModels } from "./data/ollama";
+// import { getOllamaModels, ollamaModels } from "./data/ollama";
 import { openaiModels } from "./data/openai";
 import type { ModelConfig } from "./types";
 
@@ -11,11 +11,11 @@ import type { ModelConfig } from "./types";
 export const STATIC_MODELS: ModelConfig[] = [
 	...openaiModels,
 	...mistralModels,
-	...deepseekModels,
+	// ...deepseekModels,
 	...claudeModels,
 	...grokModels,
 	...geminiModels,
-	...ollamaModels, // Static fallback Ollama models
+	// ...ollamaModels, 
 
 	// not ready
 	// ...llamaModels,
@@ -37,7 +37,7 @@ export async function getAllModels(): Promise<ModelConfig[]> {
 
 	try {
 		// Get dynamically detected Ollama models
-		const detectedOllamaModels = await getOllamaModels();
+		// const detectedOllamaModels = await getOllamaModels();
 
 		// Combine static models (excluding static Ollama models) with detected ones
 		const staticModelsWithoutOllama = STATIC_MODELS.filter(
@@ -46,7 +46,7 @@ export async function getAllModels(): Promise<ModelConfig[]> {
 
 		dynamicModelsCache = [
 			...staticModelsWithoutOllama,
-			...detectedOllamaModels,
+			// ...detectedOllamaModels,
 		];
 
 		lastFetchTime = now;

@@ -1,6 +1,6 @@
 "use client";
-import { ArrowUp, Stop, Warning } from "@phosphor-icons/react";
-import { useCallback, useState } from "react";
+import { ArrowUp, Stop, Globe } from "@phosphor-icons/react";
+import { useCallback, useState, useRef } from "react";
 import { CookiePreferencesModal } from "~/components/modals/cookie-preferences-modal";
 import { Button } from "~/components/ui/button";
 import {
@@ -11,16 +11,23 @@ import {
 } from "~/components/ui/prompt-input";
 import { getModelInfo } from "~/lib/models";
 import { ModelSelector } from "./model-selector";
+import { generateReactHelpers } from "@uploadthing/react";
+import type { UploadRouter } from "~/app/api/uploadthing/core";
+import { Paperclip } from "lucide-react";
+import { useQuota } from "~/lib/providers/quota-provider";
+import { FileList } from "./file-list";
+import { toast } from "~/components/ui/toast";
+import { filterValidFiles } from "~/lib/file-upload/validation";
 
 type ChatInputProps = {
 	value: string;
 	onValueChange: (value: string) => void;
-	onSend: () => void;
+	onSend: (attachments: import("./file-items").UploadedFile[]) => void;
 	isSubmitting?: boolean;
 	hasMessages?: boolean;
-	// files: File[]
-	// onFileUpload: (files: File[]) => void
-	// onFileRemove: (file: File) => void
+	files: import("./file-items").UploadedFile[];
+	onFileUpload: (files: import("./file-items").UploadedFile[]) => void;
+	onFileRemove: (file: import("./file-items").UploadedFile) => void;
 	// onSuggestion: (suggestion: string) => void
 	// hasSuggestions?: boolean
 	onSelectModel: (model: string) => void;
@@ -38,9 +45,9 @@ export function ChatInput({
 	onValueChange,
 	onSend,
 	isSubmitting,
-	// files,
-	// onFileUpload,
-	// onFileRemove,
+	files,
+	onFileUpload,
+	onFileRemove,
 	// onSuggestion,
 	// hasSuggestions,
 	onSelectModel,
@@ -54,74 +61,25 @@ export function ChatInput({
 }: ChatInputProps) {
 	const selectModelConfig = getModelInfo(selectedModel);
 	const hasToolSupport = Boolean(selectModelConfig?.tools);
+	const allowWebSearch = hasToolSupport || selectModelConfig?.tags?.includes("search");
+
+	// Helper to check if a string is only whitespace characters
 	const isOnlyWhitespace = (text: string) => !/[^\s]/.test(text);
 
-	// Handle search toggle
-	// biome-ignore lint/correctness/useExhaustiveDependencies: <explanation>
-	//   const handleSearchToggle = useCallback(
-	//     (enabled: boolean) => {
-	//       toggleSearch(enabled)
-	//       const agentId = enabled ? "search" : null
-	//       onSearchToggle?.(enabled, agentId)
-	//     },
-	//     [toggleSearch, onSearchToggle]
-	//   )
+	// Determine if the current model supports file/image attachments.
+	// Prefer explicit `attachments` flag, otherwise fall back to models that have vision capability.
+	const modelAllowsAttachments =
+		selectModelConfig?.attachments ?? Boolean(selectModelConfig?.vision);
 
-	//   const handleSend = useCallback(() => {
-	//     if (isSubmitting) {
-	//       return
-	//     }
+	// -------- UploadThing setup (must come before handlers that use startUpload) --------
+	const uploadHelpers = generateReactHelpers<UploadRouter>();
+	const { useUploadThing } = uploadHelpers;
+	const { startUpload, isUploading } = useUploadThing("chatFiles");
 
-	//     if (status === "streaming") {
-	//       stop()
-	//       return
-	//     }
+	// Track files selected/pasted but not yet uploaded
+	const pendingFilesRef = useRef<File[]>([]);
 
-	//     onSend()
-	//   }, [isSubmitting, onSend, status, stop])
-
-	const handleSend = useCallback(() => {
-		if (isSubmitting || disabled) {
-			return;
-		}
-
-		if (status === "streaming") {
-			stop();
-			return;
-		}
-
-		onSend();
-	}, [isSubmitting, onSend, status, stop, disabled]);
-
-	// biome-ignore lint/correctness/useExhaustiveDependencies: <explanation>
-	const handleKeyDown = useCallback(
-		(e: React.KeyboardEvent) => {
-			// First process agent command related key handling
-			//   agentCommand.handleKeyDown(e)
-
-			if (isSubmitting) {
-				e.preventDefault();
-				return;
-			}
-
-			if (e.key === "Enter" && status === "streaming") {
-				e.preventDefault();
-				return;
-			}
-
-			//   if (e.key === "Enter" && !e.shiftKey && !agentCommand.showAgentCommand) {
-			//     if (isOnlyWhitespace(value)) {
-			//       return
-			//     }
-
-			//     e.preventDefault()
-			//     onSend()
-			//   }
-		},
-		[isSubmitting, onSend, status, value],
-	);
-
-	// biome-ignore lint/correctness/useExhaustiveDependencies: <explanation>
+	// Handle paste events (defined after startUpload to avoid TS errors)
 	const handlePaste = useCallback(
 		async (e: ClipboardEvent) => {
 			const items = e.clipboardData?.items;
@@ -143,26 +101,168 @@ export function ChatInput({
 					if (item.type.startsWith("image/")) {
 						const file = item.getAsFile();
 						if (file) {
-							const newFile = new File(
-								[file],
-								`pasted-image-${Date.now()}.${file.type.split("/")[1]}`,
-								{ type: file.type },
-							);
+							const newFile = new File([file], `pasted-image-${Date.now()}.${file.type.split("/")[1]}`, { type: file.type });
 							imageFiles.push(newFile);
 						}
 					}
 				}
 
-				// if (imageFiles.length > 0) {
-				//   onFileUpload(imageFiles)
-				// }
+				if (imageFiles.length > 0) {
+					// Validate against limits and mime types
+					const { validFiles, errors } = filterValidFiles(
+						imageFiles,
+						files.length,
+					);
+					if (errors.length) {
+						toast({ title: errors.join("\n"), status: "error" });
+					}
+
+					if (validFiles.length === 0) return;
+
+					// Create local preview objects and queue files
+					const previews = validFiles.map((file) => {
+						pendingFilesRef.current.push(file);
+						return {
+							name: file.name,
+							url: URL.createObjectURL(file),
+							contentType: file.type,
+							size: file.size,
+							local: true,
+						} as import("./file-items").UploadedFile;
+					});
+					onFileUpload(previews);
+				}
 			}
-			// Text pasting will work by default for everyone
 		},
-		[isUserAuthenticated],
+		[isUserAuthenticated, onFileUpload, files.length],
 	);
 
+	const handleSend = useCallback(async () => {
+		if (isSubmitting || disabled) {
+			return;
+		}
+
+		if (status === "streaming") {
+			stop();
+			return;
+		}
+
+		// Prepare attachment list (defaults to current files prop)
+		let attachmentsToSend: import("./file-items").UploadedFile[] = files;
+
+		// First, upload any pending local files
+		if (pendingFilesRef.current.length > 0) {
+			try {
+				const uploadRes = await startUpload(pendingFilesRef.current);
+				if (!uploadRes) throw new Error("Upload failed");
+				const uploaded = uploadRes.map((r: { name: string; url: string }, idx: number) => ({
+					name: r.name,
+					url: r.url,
+					contentType: pendingFilesRef.current[idx]?.type ?? "",
+					size: pendingFilesRef.current[idx]?.size ?? 0,
+				})) as import("./file-items").UploadedFile[];
+
+				const newList = files.filter((f) => !f.local).concat(uploaded);
+				// Update Chat state so previews convert to real files
+				onFileUpload(newList);
+				// Point attachmentsToSend to the definitive uploaded list
+				attachmentsToSend = newList;
+			} catch (err) {
+				console.error("Upload before send failed", err);
+				toast({ title: "Upload failed", status: "error" });
+				return; // abort send
+			} finally {
+				pendingFilesRef.current = [];
+			}
+		}
+
+		// Finally invoke parent onSend with the final confirmed list
+		onSend(attachmentsToSend);
+	}, [isSubmitting, disabled, status, stop, onSend, startUpload, files, onFileUpload]);
+
+	// biome-ignore lint/correctness/useExhaustiveDependencies: <explanation>
+	const handleKeyDown = useCallback(
+		(e: React.KeyboardEvent) => {
+			// First process agent command related key handling
+			//   agentCommand.handleKeyDown(e)
+
+			if (isSubmitting) {
+				e.preventDefault();
+				return;
+			}
+
+			if (e.key === "Enter" && status === "streaming") {
+				e.preventDefault();
+				return;
+			}
+
+			if (e.key === "Enter" && !e.shiftKey /* && !agentCommand.showAgentCommand */) {
+				if (isOnlyWhitespace(value) && files.length === 0) {
+					return;
+				}
+				e.preventDefault();
+				handleSend();
+			}
+		},
+		[isSubmitting, status, value, files, handleSend],
+	);
+
+	// ---------------- Upload handling -----------------
+	const fileInputRef = useRef<HTMLInputElement>(null);
 	const [showCookieModal, setShowCookieModal] = useState(false);
+	const quota = useQuota();
+
+	// Uploads are disabled either when the user is out of quota or when the selected model doesn't support attachments
+	const fileQuotaExceeded =
+		quota.stdCredits <= 0 && quota.premiumCredits <= 0;
+	const uploadDisabled = fileQuotaExceeded || !modelAllowsAttachments;
+
+	const handleLocalFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+		if (uploadDisabled) return;
+		if (!e.target.files) return;
+		const rawFiles = Array.from(e.target.files);
+
+		const { validFiles, errors } = filterValidFiles(rawFiles, files.length);
+		if (errors.length) {
+			toast({ title: errors.join("\n"), status: "error" });
+		}
+
+		if (validFiles.length === 0) {
+			e.target.value = "";
+			return;
+		}
+
+		// Store validated files locally and show previews
+		const previews = validFiles.map((file) => {
+			pendingFilesRef.current.push(file);
+			return {
+				name: file.name,
+				url: URL.createObjectURL(file),
+				contentType: file.type,
+				size: file.size,
+				local: true,
+			} as import("./file-items").UploadedFile;
+		});
+		if (previews.length > 0) {
+			onFileUpload(previews);
+		}
+		// reset input so same file can be selected again
+		e.target.value = "";
+	};
+
+	const handleFileRemove = (file: import("./file-items").UploadedFile) => {
+		onFileRemove(file);
+		if (file.local) {
+			pendingFilesRef.current = pendingFilesRef.current.filter((f) => f.name !== file.name || f.size !== file.size);
+		}
+	};
+
+	const [isSearchEnabled, setIsSearchEnabled] = useState(false);
+	const toggleSearch = () => {
+		setIsSearchEnabled((prev) => !prev);
+		// future onSearchToggle?.(enabled,...)
+	};
+
 	const mainContent = (
 		<div className="w-full max-w-3xl">
 			<PromptInput
@@ -190,7 +290,9 @@ export function ChatInput({
             selectedAgent={agentCommand.selectedAgent}
             removeSelectedAgent={agentCommand.removeSelectedAgent}
           /> */}
-				{/* <FileList files={files} onFileRemove={onFileRemove} /> */}
+				{modelAllowsAttachments && (
+					<FileList files={files} onFileRemove={handleFileRemove} />
+				)}
 				<PromptInputTextarea
 					placeholder="Ask ChaiChat"
 					onKeyDown={handleKeyDown}
@@ -200,38 +302,53 @@ export function ChatInput({
 					// ref={agentCommand.textareaRef}
 				/>
 				<PromptInputActions className="mt-5 w-full justify-between px-3 pb-3">
-					<div className="flex gap-2">
-						{/* <ButtonFileUpload
-                onFileUpload={onFileUpload}
-                isUserAuthenticated={isUserAuthenticated}
-                model={selectedModel}
-              /> */}
+					<div className="flex gap-2 items-center">
+						{/* Upload files */}
+						{modelAllowsAttachments && (
+							<PromptInputAction tooltip="Attach files">
+								<label className={`flex h-8 w-8 items-center justify-center rounded-2xl ${uploadDisabled ? "cursor-not-allowed opacity-40" : "cursor-pointer hover:bg-muted/40"}`}>
+									<input
+										ref={fileInputRef}
+										type="file"
+										multiple
+										onChange={handleLocalFileChange}
+										className="hidden"
+									/>
+									{isUploading ? (
+										<svg className="size-5 animate-spin text-primary" viewBox="0 0 24 24" aria-hidden="true">
+											<circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+										</svg>
+									) : (
+										<Paperclip className="size-5 text-primary" />
+									)}
+								</label>
+							</PromptInputAction>
+						)}
 						<ModelSelector
 							selectedModelId={selectedModel}
 							setSelectedModelId={onSelectModel}
 							isUserAuthenticated={isUserAuthenticated}
 							className="rounded-full"
 						/>
-						{/* <ButtonSearch
-                isSelected={isSearchEnabled}
-                onToggle={handleSearchToggle}
-                isAuthenticated={isUserAuthenticated}
-              /> */}
-						{/* {currentAgent && !hasToolSupport && (
-                <div className="flex items-center gap-1">
-                  <Warning className="size-4" />
-                  <p className="line-clamp-2 text-xs">
-                    {selectedModel} does not support tools. Agents may not work
-                    as expected.
-                  </p>
-                </div>
-              )} */}
+						{allowWebSearch && (
+							<PromptInputAction tooltip={isSearchEnabled ? "Disable search" : "Search"}>
+								<Button
+									variant="outline"
+									size="icon"
+									className={`rounded-full ${isSearchEnabled ? "bg-primary text-primary-foreground" : ""}`}
+									onClick={toggleSearch}
+								>
+									<Globe size={18} />
+									<span className="sr-only">Toggle web search</span>
+								</Button>
+							</PromptInputAction>
+						)}
 					</div>
 					<PromptInputAction tooltip={status === "streaming" ? "Stop" : "Send"}>
 						<Button
 							size="sm"
 							className="size-9 rounded-full transition-all duration-300 ease-out"
-							disabled={disabled || !value || isSubmitting || isOnlyWhitespace(value)}
+							disabled={disabled || isUploading || (isOnlyWhitespace(value) && files.length === 0) || isSubmitting}
 							type="button"
 							onClick={handleSend}
 							aria-label={status === "streaming" ? "Stop" : "Send message"}

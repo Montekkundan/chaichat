@@ -77,48 +77,77 @@ export function MessageUser({
 				hasScrollAnchor && "min-h-scroll-anchor",
 			)}
 		>
-			{attachments?.map((attachment, index) => (
-				<div
-					className="flex flex-row gap-2"
-					key={`${attachment.name}-${index}`}
-				>
-					{attachment.contentType?.startsWith("image") ? (
-						<MorphingDialog
-							transition={{
-								type: "spring",
-								stiffness: 280,
-								damping: 18,
-								mass: 0.3,
-							}}
-						>
-							<MorphingDialogTrigger className="z-10">
-								<Image
-									className="mb-1 w-40 rounded-md"
-									key={attachment.name}
-									src={attachment.url}
-									alt={attachment.name || "Attachment"}
-									width={160}
-									height={120}
-								/>
-							</MorphingDialogTrigger>
-							<MorphingDialogContainer>
-								<MorphingDialogContent className="relative rounded-lg">
-									<MorphingDialogImage
-										src={attachment.url}
-										alt={attachment.name || ""}
-										className="max-h-[90vh] max-w-[90vw] object-contain"
-									/>
-								</MorphingDialogContent>
-								<MorphingDialogClose className="text-primary" />
-							</MorphingDialogContainer>
-						</MorphingDialog>
-					) : attachment.contentType?.startsWith("text") ? (
-						<div className="mb-3 h-24 w-40 overflow-hidden rounded-md border p-2 text-primary text-xs">
-							{getTextFromDataUrl(attachment.url)}
-						</div>
-					) : null}
-				</div>
-			))}
+			{/* --- Attachments display --- */}
+			{(() => {
+				if (!attachments || attachments.length === 0) return null;
+
+				// Separate image attachments for special stacking
+				const imageAttachments = attachments.filter((a) => a.contentType?.startsWith("image"));
+				const otherAttachments = attachments.filter((a) => !a.contentType?.startsWith("image"));
+
+				const rotationPalette = [-6, -2, 2, 6];
+
+				return (
+					<>
+						{/* Stacked images */}
+						{imageAttachments.length > 0 && (
+							<div className="relative mb-2 w-40 h-28">
+								{imageAttachments.map((attachment, idx) => {
+									const rotation = rotationPalette[idx % rotationPalette.length];
+									const offset = idx * 6; // px shift
+									return (
+										<MorphingDialog
+											key={`${attachment.name}-${idx}`}
+											transition={{ type: "spring", stiffness: 280, damping: 18, mass: 0.3 }}
+											images={imageAttachments}
+											initialIndex={idx}
+										>
+											<MorphingDialogTrigger
+												className="absolute top-0 left-0 z-10"
+												imageIndex={idx}
+											>
+												<div
+													style={{ transform: `rotate(${rotation}deg) translate(${offset}px, ${-offset}px)`, zIndex: idx }}
+													className="origin-center"
+												>
+													<Image
+														className="w-40 h-28 rounded-md object-cover shadow-md"
+														src={attachment.url}
+														alt={attachment.name || "Attachment"}
+														width={160}
+														height={112}
+													/>
+												</div>
+											</MorphingDialogTrigger>
+											<MorphingDialogContainer>
+												<MorphingDialogContent className="relative rounded-lg">
+													<MorphingDialogImage
+														src={attachment.url}
+														alt={attachment.name || ""}
+														className="max-h-[90vh] max-w-[90vw] object-contain"
+													/>
+												</MorphingDialogContent>
+												<MorphingDialogClose className="text-primary" />
+											</MorphingDialogContainer>
+										</MorphingDialog>
+									);
+								})}
+							</div>
+						)}
+
+						{/* Non-image attachments or single images listed vertically as before */}
+						{otherAttachments.map((attachment, index) => (
+							<div className="flex flex-row gap-2" key={`${attachment.name}-other-${index}`}>
+								{attachment.contentType?.startsWith("text") ? (
+									<div className="mb-3 h-24 w-40 overflow-hidden rounded-md border p-2 text-primary text-xs">
+										{getTextFromDataUrl(attachment.url)}
+									</div>
+								) : null}
+							</div>
+						))}
+					</>
+				);
+			})()}
 			{isEditing ? (
 				<div
 					className="relative flex min-w-[180px] flex-col gap-2 rounded-3xl bg-accent px-5 py-2.5"

@@ -19,6 +19,7 @@ import { SYSTEM_PROMPT_DEFAULT } from "~/lib/config";
 import { API_ROUTE_CHAT } from "~/lib/routes";
 import { useCache } from "./cache-provider";
 import { getAnonId } from "~/lib/anon-id";
+import type { UploadedFile } from "~/components/chat-input/file-items";
 
 interface MessagesContextType {
 	messages: MessageAISDK[];
@@ -29,7 +30,7 @@ interface MessagesContextType {
 	isSubmitting: boolean;
 	selectedModel: string;
 	setSelectedModel: (model: string) => void;
-	sendMessage: (message: string) => Promise<void>;
+	sendMessage: (message: string, attachments?: UploadedFile[]) => void;
 	createNewChat: (initialMessage: string, model: string) => Promise<string>;
 	changeModel: (model: string) => Promise<void>;
 	regenerateMessage: (messageIndex: number, newModel?: string) => Promise<void>;
@@ -81,6 +82,7 @@ export function MessagesProvider({
 	// Track the last user message that needs to be saved to cache
 	const pendingUserMessage = useRef<{
 		content: string;
+		attachments: UploadedFile[];
 		messageId: string;
 	} | null>(null);
 
@@ -109,6 +111,7 @@ export function MessagesProvider({
 					convexId: m._id,
 					_creationTime: m._creationTime,
 					createdAt: new Date(m.createdAt),
+					experimental_attachments: m.attachments ?? [],
 				})) as MessageAISDK[];
 
 				setCachedMessages(aiSdkMessages);
@@ -145,6 +148,7 @@ export function MessagesProvider({
 						userId: currentUserId,
 						role: "user",
 						content: pendingUserMessage.current.content,
+						attachments: pendingUserMessage.current.attachments,
 						model: selectedModel,
 						createdAt: Date.now(),
 					});
@@ -345,7 +349,7 @@ export function MessagesProvider({
 	);
 
 	const sendMessage = useCallback(
-		async (message: string) => {
+		(message: string, attachments: UploadedFile[] = []) => {
 			if (!currentUserId || !chatId) return;
 			if (isSubmitting) return;
 
@@ -355,14 +359,16 @@ export function MessagesProvider({
 				// Track this message to save it later
 				pendingUserMessage.current = {
 					content: message,
+					attachments,
 					messageId: `temp-${Date.now()}`,
 				};
 
 				// Use append to add the user message and trigger AI response
-				await append(
+				void append(
 					{
 						role: "user",
 						content: message,
+						experimental_attachments: attachments,
 					},
 					{
 						body: {
@@ -373,7 +379,9 @@ export function MessagesProvider({
 							systemPrompt: SYSTEM_PROMPT_DEFAULT,
 						},
 					},
-				);
+				).catch((error) => {
+					console.error("append failed:", error);
+				});
 			} catch (error) {
 				try {
 					const errObj = JSON.parse((error as Error).message);
@@ -388,6 +396,7 @@ export function MessagesProvider({
 					status: "error",
 				});
 			} finally {
+				// we clear submitting immediately; loader handled by upstream hooks
 				setIsSubmitting(false);
 			}
 		},
@@ -407,7 +416,7 @@ export function MessagesProvider({
 			hasSentPending.current = true;
 
 			setTimeout(() => {
-				sendMessage(pendingInputToSend);
+				sendMessage(pendingInputToSend, []);
 				setPendingInputToSend(null);
 			}, 300);
 		}

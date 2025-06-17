@@ -15,6 +15,7 @@ import { useMessages } from "~/lib/providers/messages-provider";
 import { cn } from "~/lib/utils";
 import { useSidebar } from "../ui/sidebar";
 import { useQuota } from "~/lib/providers/quota-provider";
+import type { UploadedFile } from "~/components/chat-input/file-items";
 
 type ChatProps = { initialName?: string };
 
@@ -24,6 +25,7 @@ export default function Chat({ initialName }: ChatProps = {}) {
 	const router = useRouter();
 	const [isCreatingChat, setIsCreatingChat] = useState(false);
 	const [hasNavigated, setHasNavigated] = useState(false);
+	const [attachments, setAttachments] = useState<UploadedFile[]>([]);
 
 	const {
 		messages,
@@ -71,26 +73,52 @@ export default function Chat({ initialName }: ChatProps = {}) {
 		// TODO: implement reload in provider if needed
 	};
 
-	const handleSend = async () => {
-		if (!input.trim()) return;
+	const handleFileUpload = (files: UploadedFile[]) => {
+		setAttachments((prev) => [...prev, ...files]);
+	};
 
-		// If no chatId, create a new chat first
+	const handleFileRemove = (file: UploadedFile) => {
+		setAttachments((prev) => prev.filter((f) => f !== file));
+	};
+
+	const handleSend = async (attachmentFiles: UploadedFile[] = []) => {
+		if (!input.trim() && attachmentFiles.length === 0) return;
+
+		// Capture current data before we clear UI (optimistic)
+		const messageToSend = input;
+		const attToSend = attachmentFiles;
+
+		// Optimistically clear UI for snappy feel
+		setInput("");
+		setAttachments([]);
+
+		// If no chatId, create a new chat first (async)
 		if (!chatIdString) {
 			setIsCreatingChat(true);
 			try {
-				const newChatId = await createNewChat(input, selectedModel);
-				// Navigate to the new chat and the message will be sent automatically
-				router.push(`/chat/${newChatId}?q=${encodeURIComponent(input)}`);
+				const newChatId = await createNewChat(messageToSend, selectedModel);
+				// Navigate to the new chat; provider will send message automatically from query param
+				router.push(`/chat/${newChatId}?q=${encodeURIComponent(messageToSend)}`);
 			} catch (error) {
 				console.error("Failed to create chat:", error);
+				// Revert UI on error
+				setInput(messageToSend);
+				setAttachments(attToSend);
 			} finally {
 				setIsCreatingChat(false);
 			}
 			return;
 		}
 
-		// Send message in existing chat
-		await sendMessage(input);
+		// Send message in existing chat (async, but UI already cleared)
+		try {
+			sendMessage(messageToSend, attToSend);
+		} catch (err) {
+			console.error("Send message failed:", err);
+			// On failure restore content so user can retry
+			setInput(messageToSend);
+			setAttachments(attToSend);
+		}
 	};
 
 	const isLoading = isSubmitting || isCreatingChat || status === "streaming";
@@ -122,6 +150,9 @@ export default function Chat({ initialName }: ChatProps = {}) {
 									isUserAuthenticated={!!user?.id}
 									stop={stop}
 									status={status}
+									files={attachments}
+									onFileUpload={handleFileUpload}
+									onFileRemove={handleFileRemove}
 								/>
 							</div>
 						</div>
