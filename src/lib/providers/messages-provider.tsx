@@ -94,6 +94,11 @@ export function MessagesProvider({
 		null,
 	);
 
+	const selectedModelRef = useRef(selectedModel);
+	useEffect(() => {
+		selectedModelRef.current = selectedModel;
+	}, [selectedModel]);
+
 	// Load messages from cache when chatId changes
 	useEffect(() => {
 		const loadMessages = async () => {
@@ -150,7 +155,7 @@ export function MessagesProvider({
 						role: "user",
 						content: pendingUserMessage.current.content,
 						attachments: pendingUserMessage.current.attachments,
-						model: selectedModel,
+						model: selectedModelRef.current,
 						createdAt: Date.now(),
 					});
 
@@ -185,7 +190,7 @@ export function MessagesProvider({
 							userId: currentUserId,
 							role: "assistant",
 							content: message.content,
-							model: selectedModel,
+							model: selectedModelRef.current,
 							parentMessageId: regenerationContext.current.parentMessageId,
 							version: regenerationContext.current.version,
 							createdAt: Date.now(),
@@ -198,7 +203,7 @@ export function MessagesProvider({
 										? {
 												...msg,
 												convexId: convexMessageId,
-												model: selectedModel,
+												model: selectedModelRef.current,
 											}
 										: msg,
 								),
@@ -213,7 +218,7 @@ export function MessagesProvider({
 							userId: currentUserId,
 							role: "assistant",
 							content: message.content,
-							model: selectedModel,
+							model: selectedModelRef.current,
 							createdAt: Date.now(),
 						});
 
@@ -224,7 +229,7 @@ export function MessagesProvider({
 										? {
 												...msg,
 												convexId: convexMessageId,
-												model: selectedModel,
+												model: selectedModelRef.current,
 											}
 										: msg,
 								),
@@ -256,7 +261,7 @@ export function MessagesProvider({
 							userId: currentUserId ?? "system",
 							role: "system",
 							content: sysMsg.content,
-							model: selectedModel,
+							model: selectedModelRef.current,
 							createdAt: Date.now(),
 						});
 					}
@@ -280,7 +285,7 @@ export function MessagesProvider({
 							userId: currentUserId ?? "system",
 							role: "system",
 							content: sysMsg.content,
-							model: selectedModel,
+							model: selectedModelRef.current,
 							createdAt: Date.now(),
 						});
 					}
@@ -379,7 +384,7 @@ export function MessagesProvider({
 						body: {
 							chatId: chatId as Id<"chats">,
 							userId: currentUserId,
-							model: selectedModel,
+							model: selectedModelRef.current,
 							isAuthenticated: !!user?.id,
 							systemPrompt: SYSTEM_PROMPT_DEFAULT,
 						},
@@ -405,7 +410,7 @@ export function MessagesProvider({
 				setIsSubmitting(false);
 			}
 		},
-		[currentUserId, chatId, selectedModel, append, isSubmitting, user?.id],
+		[currentUserId, chatId, append, isSubmitting, user?.id],
 	);
 
 	// Send pending message when conditions are right (after sendMessage is defined)
@@ -487,8 +492,8 @@ export function MessagesProvider({
 					return;
 				}
 
-				const modelToUse = newModel || selectedModel;
-				if (newModel && newModel !== selectedModel) {
+				const modelToUse = newModel || selectedModelRef.current;
+				if (newModel && newModel !== selectedModelRef.current) {
 					await changeModel(newModel);
 				}
 
@@ -535,8 +540,8 @@ export function MessagesProvider({
 					version: nextVersion,
 				};
 
-				// Remove assistant message and any messages after it from UI
-				const messagesToKeep = messages.slice(0, messageIndex);
+				// Remove the original user message at (messageIndex - 1) along with the assistant
+				const messagesToKeep = messages.slice(0, Math.max(0, messageIndex - 1));
 				startTransition(() => setMessages(messagesToKeep));
 
 				// Use append to regenerate instead of reload to avoid duplication
@@ -569,7 +574,6 @@ export function MessagesProvider({
 		[
 			currentUserId,
 			chatId,
-			selectedModel,
 			messages,
 			setMessages,
 			append,

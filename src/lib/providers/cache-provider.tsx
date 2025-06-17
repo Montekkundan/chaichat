@@ -483,6 +483,29 @@ export function CacheProvider({
 
 			const currentMessages =
 				messagesCache.current.get(messageData.chatId) || [];
+			// If regenerated assistant reply, optimistically deactivate previous versions in cache
+			if (messageData.parentMessageId) {
+				const parentId = messageData.parentMessageId;
+				for (const msg of currentMessages) {
+					if (msg._id === parentId || msg.parentMessageId === parentId) {
+						msg.isActive = false;
+					}
+				}
+
+				// dexie(fire and forget)
+				try {
+					const idsToPatch = currentMessages
+						.filter((m) => m._id === parentId || m.parentMessageId === parentId)
+						.map((m) => m._id as Id<"messages">);
+					if (idsToPatch.length > 0) {
+						void Promise.all(
+							idsToPatch.map((id) =>
+								db.messages.update(id, { isActive: false }),
+							),
+						).catch(() => {});
+					}
+				} catch {/* ignore */}
+			}
 			// Add the new message at the end (it should have the latest timestamp)
 			const newMessages = [...currentMessages, optimisticMessage];
 			// Sort to ensure proper order, but new messages should naturally be at the end
@@ -628,6 +651,32 @@ export function CacheProvider({
 				await markAsOriginalVersionMutation({
 					messageId: messageId as Id<"messages">,
 				});
+
+				// ----- Update local caches so UI reflects the change immediately -----
+				let chatIdOfMessage: string | null = null;
+				for (const [chatId, msgs] of messagesCache.current.entries()) {
+					if (msgs.some((m) => m._id === messageId)) {
+						chatIdOfMessage = chatId;
+						break;
+					}
+				}
+
+				// Update in-memory and LRU caches
+				if (chatIdOfMessage) {
+					const msgs = messagesCache.current.get(chatIdOfMessage) || [];
+					const patched = msgs.map((m) =>
+						m._id === messageId ? { ...m, version: 1, isActive: false } : m,
+					);
+					messagesCache.current.set(chatIdOfMessage, patched);
+					memLRU.current.set(chatIdOfMessage, { ts: Date.now(), msgs: patched });
+
+					// Persist to Dexie
+					try {
+						await db.messages.update(messageId, { version: 1, isActive: false });
+					} catch {/* ignore */}
+
+					onMessagesChangedCallback.current?.(chatIdOfMessage);
+				}
 			} catch (error) {
 				console.error("Failed to mark as original version:", error);
 				throw error;
