@@ -11,7 +11,6 @@ import {
 } from "~/components/ui/dropdown-menu";
 import { Input } from "~/components/ui/input";
 import { FREE_MODELS_IDS } from "~/lib/config";
-import type { ModelConfig } from "~/lib/models/types";
 import { PROVIDERS } from "~/lib/providers";
 import { useModels } from "~/lib/providers/models-provider";
 import { cn } from "~/lib/utils";

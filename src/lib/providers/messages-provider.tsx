@@ -259,15 +259,14 @@ export function MessagesProvider({
 
 					if (chatId) {
 						// chatId is guaranteed to be defined because effect early-returned otherwise
-						void cache
-							.addMessage({
-								chatId: chatId as string,
-								userId: currentUserId ?? "system",
-								role: "system",
-								content: sysMsg.content,
-								model: selectedModelRef.current,
-								createdAt: Date.now(),
-							});
+						void cache.addMessage({
+							chatId: chatId as string,
+							userId: currentUserId ?? "system",
+							role: "system",
+							content: sysMsg.content,
+							model: selectedModelRef.current,
+							createdAt: Date.now(),
+						});
 					}
 					return;
 				}
@@ -285,15 +284,14 @@ export function MessagesProvider({
 
 					if (chatId) {
 						// chatId is guaranteed to be defined because effect early-returned otherwise
-						void cache
-							.addMessage({
-								chatId: chatId as string,
-								userId: currentUserId ?? "system",
-								role: "system",
-								content: sysMsg.content,
-								model: selectedModelRef.current,
-								createdAt: Date.now(),
-							});
+						void cache.addMessage({
+							chatId: chatId as string,
+							userId: currentUserId ?? "system",
+							role: "system",
+							content: sysMsg.content,
+							model: selectedModelRef.current,
+							createdAt: Date.now(),
+						});
 					}
 					return;
 				}
@@ -362,18 +360,22 @@ export function MessagesProvider({
 		startTransition(() =>
 			setMessages((curr) => [
 				...curr,
-				{ id: assistantId, role: "assistant", content: "", createdAt: Date.now() } as unknown as MessageAISDK,
+				{
+					id: assistantId,
+					role: "assistant",
+					content: "",
+					createdAt: Date.now(),
+				} as unknown as MessageAISDK,
 			]),
 		);
 		function appendChunk(chunk: string) {
 			if (cancelled) return;
-			// biome-ignore lint/suspicious/noExplicitAny: runtime concat for streaming text
 			startTransition(() =>
 				setMessages((curr) =>
 					curr.map((m) => {
 						if (m.id === assistantId) {
-							// biome-ignore lint/suspicious/noExplicitAny: casting to extend content property
-							const existing = (m as MessageAISDK & { content?: string }).content ?? "";
+							const existing =
+								(m as MessageAISDK & { content?: string }).content ?? "";
 							return { ...m, content: existing + chunk } as typeof m;
 						}
 						return m;
@@ -385,7 +387,11 @@ export function MessagesProvider({
 			if (cancelled) return;
 			// Persist final assistant message
 			const finalContent = String(
-				(messages.find((m) => m.id === assistantId) as MessageAISDK & { content?: string })?.content ?? "",
+				(
+					messages.find((m) => m.id === assistantId) as MessageAISDK & {
+						content?: string;
+					}
+				)?.content ?? "",
 			);
 			void cache
 				.addMessage({
@@ -399,7 +405,11 @@ export function MessagesProvider({
 				.catch(() => {});
 		}
 
-		resumeAssistantStream({ chatId, appendAssistantChunk: appendChunk, onDone: done });
+		resumeAssistantStream({
+			chatId,
+			appendAssistantChunk: appendChunk,
+			onDone: done,
+		});
 
 		return () => {
 			cancelled = true;
@@ -426,7 +436,6 @@ export function MessagesProvider({
 		[currentUserId, cache],
 	);
 
-	// biome-ignore lint/correctness/useExhaustiveDependencies: append and user?.id are stable across renders and intentionally excluded.
 	const sendMessage = useCallback(
 		(message: string, attachments: UploadedFile[] = []) => {
 			if (!currentUserId || !chatId) return;
@@ -689,18 +698,24 @@ export function MessagesProvider({
 	const branchChat = useCallback(
 		async (uptoIndex: number): Promise<string | null> => {
 			if (!currentUserId) return null;
-			const name = messages.find((m) => m.role === "user")?.content.slice(0, 30) || "Branched chat";
+			const name =
+				messages.find((m) => m.role === "user")?.content.slice(0, 30) ||
+				"Branched chat";
 			try {
-				const newChatId = await cache.createChat(name, selectedModelRef.current, currentUserId, chatId);
+				const newChatId = await cache.createChat(
+					name,
+					selectedModelRef.current,
+					currentUserId,
+					chatId,
+				);
 
 				// excluding system and inactive versions
-				const msgsToCopy = messages
-					.slice(0, uptoIndex + 1)
-					.filter((m) =>
+				const msgsToCopy = messages.slice(0, uptoIndex + 1).filter(
+					(m) =>
 						m.role === "user" ||
 						// biome-ignore lint/suspicious/noExplicitAny: messages typed loosely from AI SDK
 						(m.role === "assistant" && ((m as any).isActive ?? true)),
-					);
+				);
 				for (const msg of msgsToCopy) {
 					await cache.addMessage({
 						chatId: newChatId,
@@ -719,7 +734,9 @@ export function MessagesProvider({
 				console.error("branchChat failed", e);
 				return null;
 			}
-		}, [currentUserId, cache, messages, chatId]);
+		},
+		[currentUserId, cache, messages, chatId],
+	);
 
 	return (
 		<MessagesContext.Provider

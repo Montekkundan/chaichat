@@ -1,8 +1,8 @@
 "use client";
 
 import { api } from "@/convex/_generated/api";
-import { CaretDown, MagnifyingGlass, Star, Key } from "@phosphor-icons/react";
-import { useQuery, useAction } from "convex/react";
+import { CaretDown, Key, MagnifyingGlass, Star } from "@phosphor-icons/react";
+import { useAction, useQuery } from "convex/react";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "~/components/ui/button";
 import {
@@ -15,11 +15,9 @@ import {
 import {
 	DropdownMenu,
 	DropdownMenuContent,
-	DropdownMenuItem,
 	DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
 import { Input } from "~/components/ui/input";
-import { Popover, PopoverTrigger } from "~/components/ui/popover";
 import {
 	Tooltip,
 	TooltipContent,
@@ -174,10 +172,12 @@ export function ModelSelector({
 		};
 
 		const keyField = providerKeyMap[provider?.id ?? ""];
-		const hasUserKey = keyField && userKeys ? Boolean(userKeys[keyField]) : false;
+		const hasUserKey =
+			keyField && userKeys ? Boolean(userKeys[keyField]) : false;
 
 		// Locked if the user is not authenticated for pro OR it's a premium model without a user key
-		const locked = (isPro && !isUserAuthenticated) || (isPremium && !hasUserKey);
+		const locked =
+			(isPro && !isUserAuthenticated) || (isPremium && !hasUserKey);
 
 		return (
 			// biome-ignore lint/a11y/useKeyWithClickEvents: interactive div for list item

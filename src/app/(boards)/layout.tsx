@@ -16,6 +16,8 @@ export default async function BoardsLayout({
 		: undefined;
 
 	return (
-		<BoardsLayoutClient initialUser={minimalUser}>{children}</BoardsLayoutClient>
+		<BoardsLayoutClient initialUser={minimalUser}>
+			{children}
+		</BoardsLayoutClient>
 	);
 }

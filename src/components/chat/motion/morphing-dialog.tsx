@@ -5,7 +5,6 @@ import {
 	AnimatePresence,
 	MotionConfig,
 	type Transition,
-	type Variant,
 	motion,
 } from "motion/react";
 import React, {

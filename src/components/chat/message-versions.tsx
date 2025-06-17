@@ -1,13 +1,12 @@
 "use client";
 
 import { api } from "@/convex/_generated/api";
-import { OPTIMISTIC_PREFIX } from "~/lib/providers/cache-provider";
 import type { Id } from "@/convex/_generated/dataModel";
 import { CaretLeft, CaretRight } from "@phosphor-icons/react";
 import { useMutation, useQuery } from "convex/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "~/components/ui/button";
-import type { Message } from "~/db";
+import { OPTIMISTIC_PREFIX } from "~/lib/providers/cache-provider";
 import { useCache } from "~/lib/providers/cache-provider";
 import { cn } from "~/lib/utils";
 import { MessageContentSkeleton } from "./message-content-skeleton";
@@ -51,7 +50,9 @@ export function MessageVersions({
 			}
 			if (
 				convexId &&
-				(convexId.startsWith("msg-") || convexId.startsWith("temp-") || convexId.startsWith(OPTIMISTIC_PREFIX)) &&
+				(convexId.startsWith("msg-") ||
+					convexId.startsWith("temp-") ||
+					convexId.startsWith(OPTIMISTIC_PREFIX)) &&
 				!loggedIds.current.has(convexId)
 			) {
 				console.warn(

@@ -314,9 +314,7 @@ function SingleToolCard({
 				return (
 					<div className="space-y-3">
 						{parsedResult.map(
-							(
-								item: { url: string; title: string; snippet?: string },
-							) => (
+							(item: { url: string; title: string; snippet?: string }) => (
 								<div
 									key={item.url}
 									className="border-border border-b pb-3 last:border-0 last:pb-0"

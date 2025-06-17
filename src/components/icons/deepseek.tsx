@@ -1,8 +1,8 @@
-import * as React from "react";
 import type { SVGProps } from "react";
 
 export default function DeepSeekIcon(props: SVGProps<SVGSVGElement>) {
 	return (
+		// biome-ignore lint/a11y/noSvgWithoutTitle: <explanation>
 		<svg
 			width={24}
 			height={24}

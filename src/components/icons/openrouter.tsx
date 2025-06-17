@@ -1,7 +1,7 @@
-import * as React from "react";
 import type { SVGProps } from "react";
 
 const Icon = (props: SVGProps<SVGSVGElement>) => (
+	// biome-ignore lint/a11y/noSvgWithoutTitle: <explanation>
 	<svg
 		fill="none"
 		fillRule="evenodd"

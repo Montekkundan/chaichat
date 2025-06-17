@@ -7,7 +7,6 @@ import { cookies } from "next/headers";
 import { ActiveThemeProvider } from "~/components/active-theme";
 import ConvexClientProvider from "~/components/providers/convex-client-provider";
 import { ThemeProvider } from "~/components/providers/theme-provider";
-import { Toaster } from "~/components/ui/sonner";
 import { DEFAULT_APP_THEME } from "~/lib/config";
 import { CacheProvider } from "~/lib/providers/cache-provider";
 import { ChatsProvider } from "~/lib/providers/chats-provider";

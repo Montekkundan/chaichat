@@ -187,10 +187,10 @@ export function CacheProvider({
 			syncWithConvex();
 		}
 	}, [convexChats, user?.id]);
-  
+
 	// Hydrate chats quickly from cookie to avoid UI flash
 	// biome-ignore lint/correctness/useExhaustiveDependencies: <explanation>
-		useEffect(() => {
+	useEffect(() => {
 		if (initialChats.length === 0 && typeof document !== "undefined") {
 			try {
 				const match = document.cookie.match(/cc_chats=([^;]+)/);
@@ -200,7 +200,9 @@ export function CacheProvider({
 						setChats(parsed as Chat[]);
 					}
 				}
-			} catch {/* ignore parse errors */}
+			} catch {
+				/* ignore parse errors */
+			}
 		}
 	}, []);
 
@@ -286,7 +288,9 @@ export function CacheProvider({
 					// Persist reassigned messages to Dexie so they survive reloads
 					try {
 						await db.messages.bulkPut(reassignedMsgs);
-					} catch {/* ignore */}
+					} catch {
+						/* ignore */
+					}
 
 					// --- Push any optimistic messages to Convex now that we have a real chat id ---
 					for (const localMsg of reassignedMsgs) {
@@ -307,7 +311,9 @@ export function CacheProvider({
 
 								// update caches with real message id
 								localMsg._id = newMessageId;
-							} catch {/* ignore network errors */}
+							} catch {
+								/* ignore network errors */
+							}
 						}
 					}
 					onMessagesChangedCallback.current?.(realId);
@@ -370,12 +376,19 @@ export function CacheProvider({
 						// biome-ignore lint/suspicious/noExplicitAny: <explanation>
 						.equals(chatId as any)
 						.modify({ parentChatId: undefined });
-				} catch {/* ignore */}
+				} catch {
+					/* ignore */
+				}
 
-				console.log(`Deleted chat ${chatId} and ${messagesToDelete.length} messages`);
+				console.log(
+					`Deleted chat ${chatId} and ${messagesToDelete.length} messages`,
+				);
 
 				// If user is currently viewing this chat, redirect home
-				if (typeof window !== "undefined" && window.location.pathname.includes(chatId)) {
+				if (
+					typeof window !== "undefined" &&
+					window.location.pathname.includes(chatId)
+				) {
 					routerRef.current.replace("/");
 				}
 			} catch (error) {
@@ -452,7 +465,9 @@ export function CacheProvider({
 							.toArray();
 
 						if (localMessages.length > 0) {
-							const sorted = localMessages.sort((a, b) => a._creationTime - b._creationTime);
+							const sorted = localMessages.sort(
+								(a, b) => a._creationTime - b._creationTime,
+							);
 							messagesCache.current.set(chatId, sorted);
 							return sorted;
 						}
@@ -623,7 +638,9 @@ export function CacheProvider({
 							),
 						).catch(() => {});
 					}
-				} catch {/* ignore */}
+				} catch {
+					/* ignore */
+				}
 			}
 			// Add the new message at the end (it should have the latest timestamp)
 			const newMessages = [...currentMessages, optimisticMessage];
@@ -653,7 +670,9 @@ export function CacheProvider({
 			// doesn't lose their branched history on refresh
 			try {
 				await db.messages.put(optimisticMessage);
-			} catch {/* ignore dexie errors */}
+			} catch {
+				/* ignore dexie errors */
+			}
 
 			// Notify the messages provider immediately about the optimistic update
 			onMessagesChangedCallback.current?.(targetChatId);
@@ -683,7 +702,9 @@ export function CacheProvider({
 					// Remove the old optimistic record to avoid duplicates
 					try {
 						await db.messages.delete(optimisticId);
-					} catch {/* ignore */}
+					} catch {
+						/* ignore */
+					}
 
 					// Update cache ids
 					const messages = messagesCache.current.get(targetChatId) || [];
@@ -696,7 +717,9 @@ export function CacheProvider({
 					// survive a page refresh.
 					try {
 						await db.messages.bulkPut(updatedMessages);
-					} catch {/* ignore */}
+					} catch {
+						/* ignore */
+					}
 				}
 
 				return newMessageId || optimisticId;
@@ -796,12 +819,20 @@ export function CacheProvider({
 						m._id === messageId ? { ...m, version: 1, isActive: false } : m,
 					);
 					messagesCache.current.set(chatIdOfMessage, patched);
-					memLRU.current.set(chatIdOfMessage, { ts: Date.now(), msgs: patched });
+					memLRU.current.set(chatIdOfMessage, {
+						ts: Date.now(),
+						msgs: patched,
+					});
 
 					// Persist to Dexie
 					try {
-						await db.messages.update(messageId, { version: 1, isActive: false });
-					} catch {/* ignore */}
+						await db.messages.update(messageId, {
+							version: 1,
+							isActive: false,
+						});
+					} catch {
+						/* ignore */
+					}
 
 					onMessagesChangedCallback.current?.(chatIdOfMessage);
 				}

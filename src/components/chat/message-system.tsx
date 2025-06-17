@@ -1,4 +1,3 @@
-import React from "react";
 import { Message, MessageContent } from "~/components/prompt-kit/message";
 import { cn } from "~/lib/utils";
 

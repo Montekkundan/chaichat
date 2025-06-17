@@ -1,7 +1,7 @@
 "use client";
 
 import type { Message as MessageType } from "@ai-sdk/react";
-import { Check, Copy, PencilSimple, Trash } from "@phosphor-icons/react";
+import { Check, Copy } from "@phosphor-icons/react";
 import Image from "next/image";
 import { useRef, useState } from "react";
 import {

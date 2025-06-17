@@ -1,18 +1,16 @@
 import { api } from "@/convex/_generated/api";
-import { createResumableStreamContext } from "resumable-stream";
+import type { Attachment } from "@ai-sdk/ui-utils";
 import { createDataStream } from "ai";
 import { generateId } from "ai";
-import { after } from "next/server";
-import type { Attachment } from "@ai-sdk/ui-utils";
-import { type Message as MessageAISDK, type ToolSet, streamText } from "ai";
+import { type Message as MessageAISDK, streamText } from "ai";
 import { ConvexHttpClient } from "convex/browser";
+import { after } from "next/server";
+import { createResumableStreamContext } from "resumable-stream";
 import { FREE_MODELS_IDS, SYSTEM_PROMPT_DEFAULT } from "~/lib/config";
 import { PLANS } from "~/lib/config";
 import { getAllModels } from "~/lib/models";
-import { openproviders } from "~/lib/openproviders";
 import { getProviderForModel } from "~/lib/openproviders/provider-map";
 import { modelCost, shouldReset } from "~/lib/subscription";
-import { cleanMessagesForTools } from "./utils";
 
 export const maxDuration = 60;
 export const runtime = "nodejs";
@@ -24,7 +22,9 @@ const streamContext = createResumableStreamContext({ waitUntil: after });
 
 // Lightweight in-memory map chatId -> streamIds (stored on globalThis).
 const chatStreams: Map<string, string[]> = ((): Map<string, string[]> => {
-	const g = globalThis as unknown as { __chaiChatStreams__?: Map<string, string[]> };
+	const g = globalThis as unknown as {
+		__chaiChatStreams__?: Map<string, string[]>;
+	};
 	if (!g.__chaiChatStreams__) {
 		g.__chaiChatStreams__ = new Map<string, string[]>();
 	}
@@ -219,7 +219,10 @@ export async function POST(req: Request) {
 			premium: isBYOK ? 0 : baseCost.premium,
 		};
 
-		if (stdCredits < effectiveCost.standard || premiumCredits < effectiveCost.premium) {
+		if (
+			stdCredits < effectiveCost.standard ||
+			premiumCredits < effectiveCost.premium
+		) {
 			return new Response(
 				JSON.stringify({
 					error: "Quota exceeded. Please upgrade your plan.",
@@ -281,9 +284,10 @@ export async function POST(req: Request) {
 
 		if (streamError) {
 			const errObj = streamError as Record<string, unknown>;
-			const msg = typeof errObj?.error === "string"
-				? errObj.error
-				: (streamError as Error)?.message ?? String(streamError);
+			const msg =
+				typeof errObj?.error === "string"
+					? errObj.error
+					: ((streamError as Error)?.message ?? String(streamError));
 			return new Response(
 				JSON.stringify({ error: msg, code: "PROVIDER_ERROR" }),
 				{ status: 502 },
@@ -291,7 +295,6 @@ export async function POST(req: Request) {
 		}
 
 		// DataStream wrapper for resumable support
-		// biome-ignore lint/suspicious/noExplicitAny: Buffer type depends on underlying implementation
 		const dataStream = createDataStream({
 			// `execute` pipes provider chunks into the resumable DataStream.
 			execute(buffer: unknown) {
@@ -299,14 +302,20 @@ export async function POST(req: Request) {
 			},
 		});
 
-		const originalResponse = await streamContext.resumableStream(streamId, () => dataStream);
+		const originalResponse = await streamContext.resumableStream(
+			streamId,
+			() => dataStream,
+		);
 
 		if (!originalResponse) {
 			// fallback shouldn't happen but just in case
 			return new Response("Failed to create stream", { status: 500 });
 		}
 
-		return new Response(originalResponse, { status: 200, headers: new Headers() });
+		return new Response(originalResponse, {
+			status: 200,
+			headers: new Headers(),
+		});
 	} catch (err: unknown) {
 		console.error("Error in /api/chat:", err);
 		const error = err as { code?: string; message?: string };
@@ -340,7 +349,10 @@ export async function GET(request: Request) {
 
 	const emptyDataStream = createDataStream({ execute: () => {} });
 
-	const resumed = await streamContext.resumableStream(recent, () => emptyDataStream);
+	const resumed = await streamContext.resumableStream(
+		recent,
+		() => emptyDataStream,
+	);
 	if (resumed) return new Response(resumed, { status: 200 });
 
 	return new Response(emptyDataStream, { status: 200 });

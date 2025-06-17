@@ -1,7 +1,6 @@
 import type { Message } from "@ai-sdk/react";
 import type { User } from "@clerk/nextjs/server";
 import { useCallback } from "react";
-import { toast } from "~/components/ui/toast";
 import { useChatDraft } from "~/hooks/use-chat-draft";
 
 type UseChatHandlersProps = {

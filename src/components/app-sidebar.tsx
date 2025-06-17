@@ -2,7 +2,7 @@
 import { useUser } from "@clerk/nextjs";
 import { SignInButton } from "@clerk/nextjs";
 import { Unauthenticated } from "convex/react";
-import { Search, X, GitBranch } from "lucide-react";
+import { GitBranch, Search, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -18,8 +18,8 @@ import {
 	SidebarMenuItem,
 } from "~/components/ui/sidebar";
 import { useCache } from "~/lib/providers/cache-provider";
-import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
+import { Button } from "./ui/button";
 
 export function AppSidebar({
 	initialUser,
@@ -99,7 +99,7 @@ export function AppSidebar({
 	return (
 		<Sidebar>
 			<SidebarHeader>
-				<div className="flex items-center justify-center gap-1 py-1 pt-2 ml-8 text-center tracking-tight">
+				<div className="ml-8 flex items-center justify-center gap-1 py-1 pt-2 text-center tracking-tight">
 					<span className="text-xl">ChaiChat</span>
 					<Badge className="text-[8px]">ALPHA</Badge>
 				</div>
@@ -141,9 +141,17 @@ export function AppSidebar({
 											key={chat._id}
 											className="group/chat relative"
 										>
-											<SidebarMenuButton asChild className="w-full pr-8 flex items-center gap-1">
-												<Link href={`/chat/${chat._id}`} className="flex items-center gap-1">
-													{chat.parentChatId && <GitBranch className="h-3 w-3 text-muted-foreground" />}
+											<SidebarMenuButton
+												asChild
+												className="flex w-full items-center gap-1 pr-8"
+											>
+												<Link
+													href={`/chat/${chat._id}`}
+													className="flex items-center gap-1"
+												>
+													{chat.parentChatId && (
+														<GitBranch className="h-3 w-3 text-muted-foreground" />
+													)}
 													<span>{chat.name}</span>
 												</Link>
 											</SidebarMenuButton>

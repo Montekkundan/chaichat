@@ -22,6 +22,7 @@ export function SearchImages({ results }: { results: ImageResult[] }) {
 				const favicon = getFavicon(img.sourceUrl);
 				return hiddenIndexes.has(i) ? null : (
 					<a
+						// biome-ignore lint/suspicious/noArrayIndexKey: <explanation>
 						key={i}
 						href={addUTM(img.sourceUrl)}
 						target="_blank"

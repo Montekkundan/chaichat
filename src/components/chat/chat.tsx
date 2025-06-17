@@ -3,7 +3,6 @@
 import { useUser } from "@clerk/nextjs";
 import type { User } from "@clerk/nextjs/server";
 import { Settings2, SunMoon } from "lucide-react";
-import { AnimatePresence, motion } from "motion/react";
 import { useTheme } from "next-themes";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
@@ -14,7 +13,6 @@ import { useChatHandlers } from "~/components/chat-input/use-chat-handlers";
 import { Conversation } from "~/components/chat/conversation";
 import { useMessages } from "~/lib/providers/messages-provider";
 import { useQuota } from "~/lib/providers/quota-provider";
-import { cn } from "~/lib/utils";
 import { useSidebar } from "../ui/sidebar";
 
 type ChatProps = { initialName?: string };
