@@ -15,6 +15,7 @@ import { QuotaProvider } from "~/lib/providers/quota-provider";
 import { PostHogProvider } from "~/components/providers/posthog-provider";
 import { ErrorBoundary } from "~/components/providers/error-boundary";
 import { APP_DESCRIPTION, APP_NAME, APP_OG_IMAGE, APP_URL } from "~/lib/config";
+import { Analytics } from '@vercel/analytics/next';
 
 const geistSans = Geist({
 	variable: "--font-geist-sans",
@@ -120,6 +121,7 @@ export default async function RootLayout({
 													<QuotaProvider>
 														{/* <Toaster position="top-center" /> */}
 														{children}
+														<Analytics />
 													</QuotaProvider>
 												</ModelsProvider>
 											</ChatsProvider>
