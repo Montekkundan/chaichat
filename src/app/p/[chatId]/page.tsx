@@ -8,10 +8,12 @@ type SimpleTextPart = { type: "text"; text: string };
 
 export default async function PublicChatPage({
 	params,
+	searchParams,
 }: {
-	params: { chatId: string };
+	params: Promise<{ chatId: string }>;
+	searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
-	const { chatId } = params;
+	const { chatId } = await params;
 	const data = await fetchQuery(api.chat.getPublicChat, {
 		chatId: chatId as Id<"chats">,
 	});
