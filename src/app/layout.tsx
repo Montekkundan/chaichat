@@ -14,6 +14,7 @@ import { ModelsProvider } from "~/lib/providers/models-provider";
 import { QuotaProvider } from "~/lib/providers/quota-provider";
 import { PostHogProvider } from "~/components/providers/posthog-provider";
 import { ErrorBoundary } from "~/components/providers/error-boundary";
+import { APP_DESCRIPTION, APP_NAME, APP_OG_IMAGE, APP_URL } from "~/lib/config";
 
 const geistSans = Geist({
 	variable: "--font-geist-sans",
@@ -26,9 +27,29 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-	title: "ChaiChat",
-	description: "AI-powered chat application",
+	title: APP_NAME,
+	description: APP_DESCRIPTION,
 	icons: [{ rel: "icon", url: "/favicon.ico" }],
+	openGraph: {
+		title: APP_NAME,
+		description: APP_DESCRIPTION,
+		url: APP_URL,
+		type: "website",
+		images: [
+			{
+				url: `${APP_URL}${APP_OG_IMAGE}`,
+				width: 1200,
+				height: 630,
+				alt: APP_NAME,
+			},
+		],
+	},
+	twitter: {
+		card: "summary_large_image",
+		title: APP_NAME,
+		description: APP_DESCRIPTION,
+		images: [`${APP_URL}${APP_OG_IMAGE}`],
+	},
 };
 
 export default async function RootLayout({
