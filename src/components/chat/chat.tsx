@@ -83,6 +83,7 @@ export default function Chat({ initialName }: ChatProps = {}) {
 	const handleSend = async (
 		attachmentFiles: UploadedFile[] = [],
 		searchEnabled = false,
+		captchaToken?: string,
 	) => {
 		if (!input.trim() && attachmentFiles.length === 0) return;
 
@@ -116,7 +117,7 @@ export default function Chat({ initialName }: ChatProps = {}) {
 
 		// Send message in existing chat (async, but UI already cleared)
 		try {
-			sendMessage(messageToSend, attToSend, searchEnabled);
+			sendMessage(messageToSend, attToSend, searchEnabled, captchaToken);
 		} catch (err) {
 			console.error("Send message failed:", err);
 			// On failure restore content so user can retry
@@ -273,7 +274,7 @@ function AnonQuotaBanner() {
 	return (
 		<div className="pointer-events-auto mb-2 rounded-md bg-muted/50 px-4 py-1 text-muted-foreground text-sm backdrop-blur-lg">
 			{remaining} free messages left.{" "}
-			<Link href="/sign-in" className="underline">
+			<Link href="/login" className="underline">
 				Sign in
 			</Link>{" "}
 			for more.

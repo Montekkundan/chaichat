@@ -19,11 +19,17 @@ import { getModelInfo } from "~/lib/models";
 import { useQuota } from "~/lib/providers/quota-provider";
 import { FileList } from "./file-list";
 import { ModelSelector } from "./model-selector";
+import dynamic from "next/dynamic";
+import { createPortal } from "react-dom";
 
 type ChatInputProps = {
 	value: string;
 	onValueChange: (value: string) => void;
-	onSend: (attachments: import("./file-items").UploadedFile[], isSearchEnabled: boolean) => void;
+	onSend: (
+		attachments: import("./file-items").UploadedFile[],
+		isSearchEnabled: boolean,
+		captchaToken?: string,
+	) => void;
 	isSubmitting?: boolean;
 	hasMessages?: boolean;
 	files: import("./file-items").UploadedFile[];
@@ -40,6 +46,11 @@ type ChatInputProps = {
 	// onSearchToggle?: (enabled: boolean, agentId: string | null) => void
 	position?: "centered" | "bottom";
 };
+
+// biome-ignore lint/suspicious/noExplicitAny: dynamic load of third-party module without types
+const HCaptcha = dynamic<any>(() => import("@hcaptcha/react-hcaptcha"), {
+	ssr: false,
+});
 
 export function ChatInput({
 	value,
@@ -150,6 +161,12 @@ export function ChatInput({
 		setIsSearchEnabled((prev) => !prev);
 	};
 
+	// hCaptcha handling (anonymous users)
+	const [showCaptcha, setShowCaptcha] = useState(false);
+	const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+
+	const siteKey = process.env.NEXT_PUBLIC_HCAPTCHA_SITE_KEY ?? "";
+
 	const handleSend = useCallback(async () => {
 		if (isSubmitting || disabled) {
 			return;
@@ -158,6 +175,15 @@ export function ChatInput({
 		if (status === "streaming") {
 			stop();
 			return;
+		}
+
+		// Anonymous users must solve captcha first (once per day)
+		if (!isUserAuthenticated) {
+			const hasCookie = document.cookie.includes("cc_captcha=1");
+			if (!hasCookie && !captchaToken) {
+				setShowCaptcha(true);
+				return;
+			}
 		}
 
 		// Prepare attachment list (defaults to current files prop)
@@ -191,8 +217,12 @@ export function ChatInput({
 			}
 		}
 
-		// Finally invoke parent onSend with the final confirmed list (search flag)
-		onSend(attachmentsToSend, isSearchEnabled);
+		onSend(attachmentsToSend, isSearchEnabled, captchaToken ?? undefined);
+
+		// Reset captcha token after successful send
+		if (captchaToken) {
+			setCaptchaToken(null);
+		}
 	}, [
 		isSubmitting,
 		disabled,
@@ -203,6 +233,8 @@ export function ChatInput({
 		files,
 		onFileUpload,
 		isSearchEnabled,
+		captchaToken,
+		isUserAuthenticated,
 	]);
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: <explanation>
@@ -436,12 +468,36 @@ export function ChatInput({
 		</div>
 	);
 
-	if (position === "bottom") {
-		return (
-			<div className="fixed inset-x-0 bottom-0 z-20 flex w-full justify-center p-4">
-				{mainContent}
-			</div>
-		);
-	}
-	return mainContent;
+	return (
+		<>
+			{mainContent}
+			{showCaptcha && !isUserAuthenticated &&
+				createPortal(
+					<div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50">
+						<div className="rounded-md bg-background p-4">
+							{siteKey ? (
+								<HCaptcha
+									sitekey={siteKey}
+									onVerify={(token: string) => {
+										// Store token
+										setCaptchaToken(token);
+										setShowCaptcha(false);
+										setTimeout(() => {
+											handleSend();
+										}, 50);
+									}}
+									onError={() => {
+										setShowCaptcha(false);
+										toast({ title: "Captcha verification failed", status: "error" });
+									}}
+								/>
+							) : (
+								<p className="text-sm text-muted-foreground">Captcha site key not configured.</p>
+							)}
+						</div>
+					</div>,
+					document.body,
+				)}
+		</>
+	);
 }

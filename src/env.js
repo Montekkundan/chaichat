@@ -12,6 +12,7 @@ export const env = createEnv({
 		CLERK_SECRET_KEY: z.string(),
 		OPENAI_API_KEY: z.string(),
 		REDIS_URL: z.string(),
+		HCAPTCHA_SECRET_KEY: z.string().optional(),
 	},
 
 	/**
@@ -23,6 +24,7 @@ export const env = createEnv({
 		// NEXT_PUBLIC_CLIENTVAR: z.string(),
 		NEXT_PUBLIC_CONVEX_URL: z.string(),
 		NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: z.string(),
+		NEXT_PUBLIC_HCAPTCHA_SITE_KEY: z.string().optional(),
 	},
 
 	/**
@@ -38,6 +40,8 @@ export const env = createEnv({
 		CLERK_SECRET_KEY: process.env.CLERK_SECRET_KEY,
 		OPENAI_API_KEY: process.env.OPENAI_API_KEY,
 		REDIS_URL: process.env.REDIS_URL,
+		HCAPTCHA_SECRET_KEY: process.env.HCAPTCHA_SECRET_KEY,
+		NEXT_PUBLIC_HCAPTCHA_SITE_KEY: process.env.NEXT_PUBLIC_HCAPTCHA_SITE_KEY,
 		// NEXT_PUBLIC_CLIENTVAR: process.env.NEXT_PUBLIC_CLIENTVAR,
 	},
 	/**

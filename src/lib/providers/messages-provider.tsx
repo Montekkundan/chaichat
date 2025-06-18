@@ -31,7 +31,7 @@ interface MessagesContextType {
 	isSubmitting: boolean;
 	selectedModel: string;
 	setSelectedModel: (model: string) => void;
-	sendMessage: (message: string, attachments?: UploadedFile[], search?: boolean) => void;
+	sendMessage: (message: string, attachments?: UploadedFile[], search?: boolean, captchaToken?: string) => void;
 	createNewChat: (initialMessage: string, model: string) => Promise<string>;
 	changeModel: (model: string) => Promise<void>;
 	regenerateMessage: (messageIndex: number, newModel?: string) => Promise<void>;
@@ -437,7 +437,12 @@ export function MessagesProvider({
 	);
 
 	const sendMessage = useCallback(
-		(message: string, attachments: UploadedFile[] = [], search = false) => {
+		(
+			message: string,
+			attachments: UploadedFile[] = [],
+			search = false,
+			captchaToken?: string,
+		) => {
 			if (!currentUserId || !chatId) return;
 			if (isSubmitting) return;
 
@@ -495,6 +500,7 @@ export function MessagesProvider({
 							isAuthenticated: !!user?.id,
 							systemPrompt: SYSTEM_PROMPT_DEFAULT,
 							searchEnabled: search,
+							...(captchaToken ? { captchaToken } : {}),
 						},
 					},
 				).catch((err) => {

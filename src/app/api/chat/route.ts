@@ -55,6 +55,7 @@ type ChatRequest = {
 	regenerateMessageId?: string;
 	temperature?: number;
 	searchEnabled?: boolean;
+	captchaToken?: string;
 };
 
 export async function POST(req: Request) {
@@ -72,7 +73,8 @@ export async function POST(req: Request) {
 			regenerateMessageId,
 			temperature,
 			searchEnabled = false,
-		} = body as ChatRequest;
+			captchaToken,
+		} = body as ChatRequest & { captchaToken?: string };
 
 		if (!messages || !chatId || !userId) {
 			return new Response(
@@ -80,6 +82,40 @@ export async function POST(req: Request) {
 				{ status: 400 },
 			);
 		}
+
+		// ---------------- hCaptcha check (anonymous users) ----------------
+		let setCaptchaCookie = false;
+		const cookiesHeader = req.headers.get("cookie") ?? "";
+		const hasCaptchaCookie = /cc_captcha=1/.test(cookiesHeader);
+		if (!isAuthenticated && !hasCaptchaCookie) {
+			const secret = process.env.HCAPTCHA_SECRET_KEY;
+			if (!secret) throw new Error("HCAPTCHA_SECRET_KEY is not configured");
+
+			if (!captchaToken) {
+				return new Response(
+					JSON.stringify({ error: "Captcha token missing", code: "CAPTCHA_REQUIRED" }),
+					{ status: 400 },
+				);
+			}
+
+			const verifyRes = await fetch("https://api.hcaptcha.com/siteverify", {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/x-www-form-urlencoded",
+				},
+				body: `secret=${encodeURIComponent(secret)}&response=${encodeURIComponent(captchaToken)}`,
+			});
+			const verifyJson = (await verifyRes.json()) as { success: boolean };
+			if (!verifyJson.success) {
+				return new Response(
+					JSON.stringify({ error: "Captcha verification failed", code: "CAPTCHA_FAILED" }),
+					{ status: 400 },
+				);
+			}
+			// mark to set cookie
+			setCaptchaCookie = true;
+		}
+		// -------------------------------------------------------------------
 
 		const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL;
 		if (!convexUrl) {
@@ -359,10 +395,11 @@ export async function POST(req: Request) {
 			return new Response("Failed to create stream", { status: 500 });
 		}
 
-		return new Response(dataStream, {
-			status: 200,
-			headers: new Headers(),
-		});
+		const headers = new Headers();
+		if (setCaptchaCookie) {
+			headers.append("Set-Cookie", "cc_captcha=1; Path=/; Max-Age=86400; SameSite=Lax");
+		}
+		return new Response(dataStream, { status: 200, headers });
 	} catch (err: unknown) {
 		console.error("Error in /api/chat:", err);
 		const error = err as { code?: string; message?: string };

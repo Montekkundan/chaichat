@@ -2,10 +2,10 @@ import type { Message as MessageAISDK } from "@ai-sdk/react";
 import { ArrowClockwise, Check, Copy, GitBranch } from "@phosphor-icons/react";
 import React, { useMemo } from "react";
 import {
-	Message,
-	MessageAction,
-	MessageActions,
-	MessageContent,
+  Message,
+  MessageAction,
+  MessageActions,
+  MessageContent,
 } from "~/components/prompt-kit/message";
 import { cn } from "~/lib/utils";
 import { getSources } from "./get-sources";
@@ -33,21 +33,21 @@ type MessageAssistantProps = {
 };
 
 export const MessageAssistant = React.memo(function MessageAssistant({
-	children,
+  children,
 	id,
 	convexId,
-	isLast,
-	hasScrollAnchor,
-	copied,
-	copyToClipboard,
-	onReload,
+  isLast,
+  hasScrollAnchor,
+  copied,
+  copyToClipboard,
+  onReload,
 	onRegenerate,
 	onBranch,
-	parts,
-	status,
+  parts,
+  status,
 	model,
 }: MessageAssistantProps) {
-	// const { preferences } = useUserPreferences()
+  // const { preferences } = useUserPreferences()
 	const sources = useMemo(() => getSources(parts), [parts]);
 
 	const toolInvocationParts = useMemo(
@@ -65,20 +65,20 @@ export const MessageAssistant = React.memo(function MessageAssistant({
 
 	const searchImageResults = useMemo(
 		() =>
-			parts
-				?.filter(
-					(part) =>
-						part.type === "tool-invocation" &&
-						part.toolInvocation?.state === "result" &&
-						part.toolInvocation?.toolName === "imageSearch" &&
+    parts
+      ?.filter(
+        (part) =>
+          part.type === "tool-invocation" &&
+          part.toolInvocation?.state === "result" &&
+          part.toolInvocation?.toolName === "imageSearch" &&
 						part.toolInvocation?.result?.content?.[0]?.type === "images",
-				)
-				.flatMap((part) =>
-					part.type === "tool-invocation" &&
-					part.toolInvocation?.state === "result" &&
-					part.toolInvocation?.toolName === "imageSearch" &&
-					part.toolInvocation?.result?.content?.[0]?.type === "images"
-						? (part.toolInvocation?.result?.content?.[0]?.results ?? [])
+      )
+      .flatMap((part) =>
+        part.type === "tool-invocation" &&
+        part.toolInvocation?.state === "result" &&
+        part.toolInvocation?.toolName === "imageSearch" &&
+        part.toolInvocation?.result?.content?.[0]?.type === "images"
+          ? (part.toolInvocation?.result?.content?.[0]?.results ?? [])
 						: [],
 				) ?? [],
 		[parts],
@@ -99,26 +99,26 @@ export const MessageAssistant = React.memo(function MessageAssistant({
 		[children],
 	);
 
-	return (
-		<Message
-			className={cn(
-				"group flex w-full max-w-3xl flex-1 items-start gap-4 px-6 pb-2",
+  return (
+    <Message
+      className={cn(
+        "group flex w-full max-w-3xl flex-1 items-start gap-4 px-6 pb-2",
 				hasScrollAnchor && "min-h-scroll-anchor",
-			)}
-		>
-			<div className={cn("flex min-w-full flex-col gap-2", isLast && "pb-8")}>
-				{reasoningParts?.reasoning && (
-					<Reasoning reasoning={reasoningParts.reasoning} />
-				)}
+      )}
+    >
+      <div className={cn("flex min-w-full flex-col gap-2", isLast && "pb-8")}>
+        {reasoningParts?.reasoning && (
+          <Reasoning reasoning={reasoningParts.reasoning} />
+        )}
 
-				{toolInvocationParts && toolInvocationParts.length > 0 && (
-					// preferences.showToolInvocations && (
-					<ToolInvocation toolInvocations={toolInvocationParts} />
-				)}
+        {toolInvocationParts && toolInvocationParts.length > 0 && (
+          // preferences.showToolInvocations && (
+            <ToolInvocation toolInvocations={toolInvocationParts} />
+          )}
 
-				{searchImageResults.length > 0 && (
-					<SearchImages results={searchImageResults} />
-				)}
+        {searchImageResults.length > 0 && (
+          <SearchImages results={searchImageResults} />
+        )}
 
 				{id && !contentNullOrEmpty ? (
 					<MessageVersions messageId={id} convexId={convexId}>
@@ -128,32 +128,32 @@ export const MessageAssistant = React.memo(function MessageAssistant({
 					messageContent
 				) : null}
 
-				{sources && sources.length > 0 && <SourcesList sources={sources} />}
+        {sources && sources.length > 0 && <SourcesList sources={sources} />}
 
-				{isLastStreaming || contentNullOrEmpty ? null : (
+        {isLastStreaming || contentNullOrEmpty ? null : (
 					<div className="flex items-center gap-2">
-						<MessageActions
-							className={cn(
+          <MessageActions
+            className={cn(
 								"-ml-2 flex gap-0 opacity-0 transition-opacity group-hover:opacity-100",
-							)}
-						>
-							<MessageAction
-								tooltip={copied ? "Copied!" : "Copy text"}
-								side="bottom"
-							>
-								<button
+            )}
+          >
+            <MessageAction
+              tooltip={copied ? "Copied!" : "Copy text"}
+              side="bottom"
+            >
+              <button
 									className="flex size-7.5 items-center justify-center rounded-full bg-transparent text-muted-foreground transition hover:bg-accent/60 hover:text-foreground"
-									aria-label="Copy text"
-									onClick={copyToClipboard}
-									type="button"
-								>
-									{copied ? (
-										<Check className="size-4" />
-									) : (
-										<Copy className="size-4" />
-									)}
-								</button>
-							</MessageAction>
+                aria-label="Copy text"
+                onClick={copyToClipboard}
+                type="button"
+              >
+                {copied ? (
+                  <Check className="size-4" />
+                ) : (
+                  <Copy className="size-4" />
+                )}
+              </button>
+            </MessageAction>
 							<MessageAction
 								tooltip="Branch chat"
 								side="bottom"
@@ -182,13 +182,13 @@ export const MessageAssistant = React.memo(function MessageAssistant({
 									}}
 								>
 									<div className="flex items-center">
-										<button
+              <button
 											className="flex size-7.5 items-center justify-center rounded-full bg-transparent text-muted-foreground transition hover:bg-accent/60 hover:text-foreground"
-											aria-label="Regenerate"
-											type="button"
-										>
-											<ArrowClockwise className="size-4" />
-										</button>
+                aria-label="Regenerate"
+                type="button"
+              >
+                <ArrowClockwise className="size-4" />
+              </button>
 										{model && (
 											<span className="ml-2 text-muted-foreground text-xs">
 												{model}
@@ -196,11 +196,11 @@ export const MessageAssistant = React.memo(function MessageAssistant({
 										)}
 									</div>
 								</RegenerateDropdown>
-							</MessageAction>
-						</MessageActions>
+            </MessageAction>
+          </MessageActions>
 					</div>
-				)}
-			</div>
-		</Message>
+        )}
+      </div>
+    </Message>
 	);
 });

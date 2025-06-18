@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import { AppSidebar } from "~/components/app-sidebar";
 import { TopLeftControls } from "~/components/chat/top-left-controls";
 import { SidebarProvider, useSidebar } from "~/components/ui/sidebar";
@@ -16,6 +16,13 @@ export default function ChatLayoutClient({
 	children,
 	initialUser,
 }: { children: ReactNode; initialUser?: MinimalUser }) {
+	useEffect(() => {
+		document.body.classList.add("overflow-hidden");
+		return () => {
+			document.body.classList.remove("overflow-hidden");
+		};
+	}, []);
+
 	return (
 		<SidebarProvider>
 			<TopLeftControls />
