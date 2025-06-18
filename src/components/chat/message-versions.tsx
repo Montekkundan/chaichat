@@ -16,6 +16,7 @@ type MessageVersionsProps = {
 	convexId?: string;
 	children: React.ReactNode;
 	className?: string;
+	onVersionChange?: (versionModel?: string) => void;
 };
 
 export function MessageVersions({
@@ -23,9 +24,9 @@ export function MessageVersions({
 	convexId,
 	children,
 	className,
+	onVersionChange,
 }: MessageVersionsProps) {
 	const [isLoadingVersion, setIsLoadingVersion] = useState(false);
-	const cache = useCache();
 	const loggedIds = useRef(new Set<string>());
 
 	// Only use convexId if it exists and is a valid Convex ID
@@ -80,12 +81,17 @@ export function MessageVersions({
 		return activeIndex !== -1 ? activeIndex : 0;
 	}, [versions]);
 
+	useEffect(() => {
+		if (!onVersionChange) return;
+		if (!versions || versions.length === 0) return;
+		const currentVersion = versions[currentVersionIndex];
+		onVersionChange(currentVersion?.model as string | undefined);
+	}, [versions, currentVersionIndex, onVersionChange]);
+
 	// If there's only one version or no valid convex ID, just render the children
 	if (!actualConvexId || !versions || versions.length <= 1) {
 		return <div className={className}>{children}</div>;
 	}
-
-	const currentVersion = versions[currentVersionIndex];
 	const hasMultipleVersions = versions.length > 1;
 
 	const handlePrevious = async () => {

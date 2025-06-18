@@ -559,6 +559,7 @@ export function MessagesProvider({
 	const changeModel = useCallback(
 		async (newModel: string) => {
 			setSelectedModel(newModel);
+			selectedModelRef.current = newModel;
 
 			// If we have a chat, update it in the cache
 			if (chatId && currentUserId) {
@@ -658,11 +659,17 @@ export function MessagesProvider({
 					version: nextVersion,
 				};
 
-				// Remove the original user message at (messageIndex - 1) along with the assistant
-				const messagesToKeep = messages.slice(0, Math.max(0, messageIndex - 1));
+				// Remove the original user + assistant messages locally before regeneration starts
+				const originalUserId = userMessage.id as string;
+				const originalAssistantId = assistantMessage.id as string;
+
+				const messagesToKeep = messages.filter(
+					(m) => m.id !== originalUserId && m.id !== originalAssistantId,
+				);
+
 				startTransition(() => setMessages(messagesToKeep));
 
-				// Use append to regenerate instead of reload to avoid duplication
+				// after appended, ensure the originals stay removed.
 				await append(
 					{
 						role: "user",
@@ -677,6 +684,14 @@ export function MessagesProvider({
 							systemPrompt: SYSTEM_PROMPT_DEFAULT,
 						},
 					},
+				);
+
+				startTransition(() =>
+					setMessages((curr) =>
+						curr.filter(
+							(m) => m.id !== originalUserId && m.id !== originalAssistantId,
+						),
+					),
 				);
 			} catch (error) {
 				console.error("Failed to regenerate message:", error);

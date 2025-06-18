@@ -39,8 +39,16 @@ export function Conversation({
 		initialMessageCount.current = messages.length;
 	}
 
+	// Keep only active assistant messages (or those without isActive flag)
+	// Non-assistant roles are always kept.
+	const activeMessages = messages.filter((m) => {
+		if (m.role !== "assistant") return true;
+		// biome-ignore lint/suspicious/noExplicitAny: runtime field
+		return (m as any).isActive !== false;
+	});
+
 	// Sort messages by timestamp to ensure chronological order (oldest first, newest last)
-	const sortedMessages = [...messages].sort((a, b) => {
+	const sortedMessages = [...activeMessages].sort((a, b) => {
 		// Use createdAt if available, otherwise fall back to _creationTime or current time
 		const aTime = (
 			"_creationTime" in a
