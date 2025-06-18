@@ -322,6 +322,24 @@ export function CacheProvider({
 					// Record mapping so future message writes use the real id
 					optimisticToRealChatId.current.set(optimisticId, realId);
 
+					// --- Clean up any leftover optimistic rows in Dexie & memory ---
+					try {
+						await db.messages
+							.where("chatId")
+							.equals(realId)
+							.and((m) => m._id.startsWith(OPTIMISTIC_PREFIX))
+							.delete();
+
+						// Remove them from in-memory caches too
+						const withoutOpt = (messagesCache.current.get(realId) || []).filter(
+							(m) => !m._id.startsWith(OPTIMISTIC_PREFIX),
+						);
+						messagesCache.current.set(realId, withoutOpt);
+						memLRU.current.set(realId, { ts: Date.now(), msgs: withoutOpt });
+					} catch {
+						/* ignore */
+					}
+
 					// TODO: ⚠️ Resumable stream URL-swap hack is fragile; needs cleanup.
 				})
 				.catch((error) => {
@@ -453,7 +471,7 @@ export function CacheProvider({
 			}
 
 			const fetchPromise = (async (): Promise<Message[]> => {
-				// If chatId is still optimistic, skip Convex fetch but DO check Dexie so
+				// If chatId is still optimistic, skip Convex fetch but do check Dexie so
 				// that a browser refresh still shows locally-saved messages.
 				if (chatId.startsWith(OPTIMISTIC_PREFIX)) {
 					const cached = messagesCache.current.get(chatId);
@@ -466,11 +484,37 @@ export function CacheProvider({
 							.toArray();
 
 						if (localMessages.length > 0) {
-							const sorted = localMessages.sort(
+							// ---- cleanup duplicate optimistic rows ----
+							const hasRealRows = localMessages.some(
+								(m) => !m._id.startsWith(OPTIMISTIC_PREFIX),
+							);
+							let cleaned = localMessages;
+							if (hasRealRows) {
+								const toDeleteIds = localMessages
+									.filter((m) => m._id.startsWith(OPTIMISTIC_PREFIX))
+									.map((m) => m._id);
+								if (toDeleteIds.length > 0) {
+									try {
+										await db.messages.bulkDelete(toDeleteIds);
+									} catch {}
+
+									cleaned = localMessages.filter(
+										(m) => !m._id.startsWith(OPTIMISTIC_PREFIX),
+									);
+								}
+							}
+
+							// Sort messages by creation time to ensure correct order
+							const sortedMessages = cleaned.sort(
 								(a, b) => a._creationTime - b._creationTime,
 							);
-							messagesCache.current.set(chatId, sorted);
-							return sorted;
+							messagesCache.current.set(chatId, sortedMessages);
+							memLRU.current.set(chatId, {
+								ts: Date.now(),
+								msgs: sortedMessages,
+							});
+
+							return sortedMessages;
 						}
 					} catch (err) {
 						console.error("Dexie lookup failed for optimistic chat", err);
