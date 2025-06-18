@@ -82,7 +82,8 @@ export function SourcesList({ sources, className }: SourcesListProps) {
 							initial={{ height: 0, opacity: 0 }}
 							animate={{ height: "auto", opacity: 1 }}
 							exit={{ height: 0, opacity: 0 }}
-							transition={TRANSITION}
+							// biome-ignore lint/suspicious/noExplicitAny: <explanation>
+							transition={TRANSITION as any}
 							className="overflow-hidden"
 						>
 							<ul className="space-y-2 px-3 pt-3 pb-3">

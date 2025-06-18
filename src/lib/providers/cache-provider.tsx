@@ -252,6 +252,7 @@ export function CacheProvider({
 				parentChatId,
 				createdAt: Date.now(),
 				_creationTime: Date.now(),
+				isPublic: false,
 			};
 
 			setChats((prev) => [optimisticChat, ...prev]);

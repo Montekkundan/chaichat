@@ -43,6 +43,7 @@ export default async function RootLayout({
 		initialModel: string;
 		createdAt: number;
 		_creationTime: number;
+		isPublic: boolean;
 	};
 
 	let initialChats: BasicChat[] = [];
@@ -61,6 +62,7 @@ export default async function RootLayout({
 						initialModel: obj.currentModel ?? "",
 						createdAt: 0,
 						_creationTime: 0,
+						isPublic: false,
 					};
 				});
 			}

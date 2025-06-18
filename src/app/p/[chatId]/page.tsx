@@ -6,9 +6,10 @@ import { PublicConversation } from "~/components/chat/public-conversation";
 
 type SimpleTextPart = { type: "text"; text: string };
 
-export default async function PublicChatPage({
-	params,
-}: { params: { chatId: string } }) {
+export default async function PublicChatPage(
+	_props: unknown,
+	{ params }: { params: { chatId: string } }
+) {
 	const { chatId } = params;
 	const data = await fetchQuery(api.chat.getPublicChat, {
 		chatId: chatId as Id<"chats">,
