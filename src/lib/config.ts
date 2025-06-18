@@ -1,5 +1,3 @@
-import { env } from "~/env";
-
 export const SYSTEM_PROMPT_DEFAULT =
 	"You are ChaiChat, a helpful assistant. You are able to answer questions and help with tasks.";
 
@@ -15,7 +13,7 @@ export const DEFAULT_APP_THEME = "t3chat";
 export const APP_NAME = "ChaiChat";
 export const APP_DESCRIPTION =
 	"AI-powered chat assistant with GPT-4o and other models. Made for T3 Chat Cloneathon";
-export const APP_URL = env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+export const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 export const APP_OG_IMAGE = "/images/og.png";
 
 // Recommended models to show user
