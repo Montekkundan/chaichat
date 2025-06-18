@@ -12,6 +12,8 @@ import { CacheProvider } from "~/lib/providers/cache-provider";
 import { ChatsProvider } from "~/lib/providers/chats-provider";
 import { ModelsProvider } from "~/lib/providers/models-provider";
 import { QuotaProvider } from "~/lib/providers/quota-provider";
+import { PostHogProvider } from "~/components/providers/posthog-provider";
+import { ErrorBoundary } from "~/components/providers/error-boundary";
 
 const geistSans = Geist({
 	variable: "--font-geist-sans",
@@ -81,27 +83,31 @@ export default async function RootLayout({
 				<body
 					className={`bg-sidebar theme-${activeThemeValue ?? DEFAULT_APP_THEME}`}
 				>
-					<ThemeProvider
-						attribute="class"
-						defaultTheme="system"
-						enableSystem
-						disableTransitionOnChange
-					>
-						<ActiveThemeProvider initialTheme={activeThemeValue}>
-							<ConvexClientProvider>
-								<CacheProvider initialChats={initialChats}>
-									<ChatsProvider>
-										<ModelsProvider>
-											<QuotaProvider>
-												{/* <Toaster position="top-center" /> */}
-												{children}
-											</QuotaProvider>
-										</ModelsProvider>
-									</ChatsProvider>
-								</CacheProvider>
-							</ConvexClientProvider>
-						</ActiveThemeProvider>
-					</ThemeProvider>
+					<PostHogProvider>
+						<ErrorBoundary>
+							<ThemeProvider
+								attribute="class"
+								defaultTheme="system"
+								enableSystem
+								disableTransitionOnChange
+							>
+								<ActiveThemeProvider initialTheme={activeThemeValue}>
+									<ConvexClientProvider>
+										<CacheProvider initialChats={initialChats}>
+											<ChatsProvider>
+												<ModelsProvider>
+													<QuotaProvider>
+														{/* <Toaster position="top-center" /> */}
+														{children}
+													</QuotaProvider>
+												</ModelsProvider>
+											</ChatsProvider>
+										</CacheProvider>
+									</ConvexClientProvider>
+								</ActiveThemeProvider>
+							</ThemeProvider>
+						</ErrorBoundary>
+					</PostHogProvider>
 				</body>
 			</html>
 		</ClerkProvider>

@@ -426,7 +426,7 @@ export async function GET(request: Request) {
 	if (!chatId) return new Response("chatId required", { status: 400 });
 
 	const streams = loadStreams(chatId);
-	if (streams.length === 0) return new Response("No streams", { status: 404 });
+	if (streams.length === 0) return new Response(null, { status: 204 });
 
 	// `streams.length` is guaranteed to be > 0 here due to early return above.
 	const recent = streams[streams.length - 1] as string;
