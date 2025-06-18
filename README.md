@@ -1,29 +1,97 @@
-# Create T3 App
+# ChaiChat
 
-This is a [T3 Stack](https://create.t3.gg/) project bootstrapped with `create-t3-app`.
+> Modern AI-powered chat app built with Next.js 15, Convex, **AI-SDK**, and the T3 stack.
 
-## What's next? How do I make an app with this?
+## Features
 
-We try to keep this project as simple as possible, so you can start with just the scaffolding we set up for you, and add additional things later when they become necessary.
+* **Next.js 15 / App Router** – React 19, Server & Client components, edge-ready.
+* **Convex** realtime database – optimistic writes, branching chats, Dexie offline cache.
+* **AI-SDK** integrations (OpenAI GPT-4o, Gemini Flash, Claude, etc.) with resumable streaming.
+* File & image uploads via **uploadthing**.
+* Anonymous rate-limited usage with **hCaptcha** gate.
+* **PostHog** analytics & error capture.
+* Dark / light themes, animated UI (Framer Motion).
+* Fully typed (`strict` TS) and linted (Biome).
 
-If you are not familiar with the different technologies used in this project, please refer to the respective docs. If you still are in the wind, please join our [Discord](https://t3.gg/discord) and ask for help.
+---
 
-- [Next.js](https://nextjs.org)
-- [NextAuth.js](https://next-auth.js.org)
-- [Prisma](https://prisma.io)
-- [Drizzle](https://orm.drizzle.team)
-- [Tailwind CSS](https://tailwindcss.com)
-- [tRPC](https://trpc.io)
+## Project structure (high-level)
 
-## Learn More
+```
+convex/              – Convex functions & schema
+public/              – static assets (place og.png here!)
+src/app/             – Next.js routes & layouts
+src/components/      – UI & feature components
+src/lib/             – shared utilities (AI models, providers, config, …)
+src/styles/          – Tailwind & global CSS
+tsconfig.json        – strict TS config
+```
 
-To learn more about the [T3 Stack](https://create.t3.gg/), take a look at the following resources:
+---
 
-- [Documentation](https://create.t3.gg/)
-- [Learn the T3 Stack](https://create.t3.gg/en/faq#what-learning-resources-are-currently-available) — Check out these awesome tutorials
+## Quick start
 
-You can check out the [create-t3-app GitHub repository](https://github.com/t3-oss/create-t3-app) — your feedback and contributions are welcome!
+1. **Clone & install**
 
-## How do I deploy this?
+   ```bash
+   git clone <repo>
+   cd chaichat
+   bun install   # or pnpm / npm / yarn
+   ```
 
-Follow our deployment guides for [Vercel](https://create.t3.gg/en/deployment/vercel), [Netlify](https://create.t3.gg/en/deployment/netlify) and [Docker](https://create.t3.gg/en/deployment/docker) for more information.
+2. **Environment variables** – copy & fill:
+
+   ```bash
+   cp .env.example .env.local
+   # edit .env.local with your own keys
+   ```
+
+3. **Run dev server**
+
+   ```bash
+   bun run dev      # next dev --turbo
+   bun run dev:convex  # (separate terminal) Convex local
+   ```
+
+4. Visit `http://localhost:3000`.
+
+---
+
+## Required environment variables
+
+| Key | Description |
+|-----|-------------|
+| `NEXT_PUBLIC_CONVEX_URL` | Convex deployment URL (from `convex dashboard`) |
+| `CONVEX_DEPLOYMENT`      | Convex deployment ID (dev / prod) |
+| `CLERK_SECRET_KEY` & `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Clerk auth keys (or skip if not using auth) |
+| `OPENAI_API_KEY`         | For GPT-4o & other OpenAI models |
+| `REDIS_URL`              | Optional – resumable-stream production store |
+| `HCAPTCHA_SECRET_KEY` & `NEXT_PUBLIC_HCAPTCHA_SITE_KEY` | Required to gate anonymous messages |
+| `NEXT_PUBLIC_POSTHOG_KEY` & `NEXT_PUBLIC_POSTHOG_HOST` | Enable analytics / error capture |
+| `NEXT_PUBLIC_APP_URL`    | Full origin (e.g. `https://myapp.com`) – used in OG tags |
+
+> See `src/env.js` for the validated schema.
+
+---
+
+## Open-Graph image
+
+Place `public/images/og.png` (1200×630) – it will be used for Twitter / OG tags set in `src/app/layout.tsx`.
+
+---
+
+## Scripts
+
+| Command | Description |
+|---------|-------------|
+| `bun run dev`    | Next.js dev server |
+| `bun run dev:convex` | Convex local dev |
+| `bun run build`  | `next build` + Convex deploy hook |
+| `bun run preview`| Start production server |
+| `bun run check`  | Lint & type-check |
+
+---
+
+## License
+
+MIT – © 20XX Your Name
