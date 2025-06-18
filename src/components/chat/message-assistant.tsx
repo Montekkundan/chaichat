@@ -164,49 +164,43 @@ export const MessageAssistant = React.memo(function MessageAssistant({
 									)}
 								</button>
 							</MessageAction>
-							<MessageAction
-								tooltip="Branch chat"
-								side="bottom"
-								delayDuration={0}
-							>
-								<button
-									className="flex size-7.5 items-center justify-center rounded-full bg-transparent text-muted-foreground transition hover:bg-accent/60 hover:text-foreground"
-									aria-label="Branch chat"
-									onClick={onBranch}
-									type="button"
-								>
-									<GitBranch className="size-4" />
-								</button>
-							</MessageAction>
-							<MessageAction
-								tooltip="Regenerate"
-								side="bottom"
-								delayDuration={0}
-							>
-								<RegenerateDropdown
-									currentModel={activeModel || ""}
-									onRegenerate={(selectedModel: string) => {
-										if (onRegenerate) {
-											onRegenerate(selectedModel);
-										}
-									}}
-								>
-									<div className="flex items-center">
-										<button
-											className="flex size-7.5 items-center justify-center rounded-full bg-transparent text-muted-foreground transition hover:bg-accent/60 hover:text-foreground"
-											aria-label="Regenerate"
-											type="button"
-										>
-											<ArrowClockwise className="size-4" />
-										</button>
-										{activeModel && (
-											<span className="ml-2 text-muted-foreground text-xs">
-												{activeModel}
-											</span>
-										)}
-									</div>
-								</RegenerateDropdown>
-							</MessageAction>
+
+							{onBranch && (
+								<MessageAction tooltip="Branch chat" side="bottom" delayDuration={0}>
+									<button
+										className="flex size-7.5 items-center justify-center rounded-full bg-transparent text-muted-foreground transition hover:bg-accent/60 hover:text-foreground"
+										aria-label="Branch chat"
+										onClick={onBranch}
+										type="button"
+									>
+										<GitBranch className="size-4" />
+									</button>
+								</MessageAction>
+							)}
+
+							{onRegenerate && (
+								<MessageAction tooltip="Regenerate" side="bottom" delayDuration={0}>
+									<RegenerateDropdown
+										currentModel={activeModel || ""}
+										onRegenerate={(selectedModel: string) => onRegenerate(selectedModel)}
+									>
+										<div className="flex items-center">
+											<button
+												className="flex size-7.5 items-center justify-center rounded-full bg-transparent text-muted-foreground transition hover:bg-accent/60 hover:text-foreground"
+												aria-label="Regenerate"
+												type="button"
+											>
+												<ArrowClockwise className="size-4" />
+											</button>
+											{activeModel && (
+												<span className="ml-2 text-muted-foreground text-xs">
+													{activeModel}
+												</span>
+											)}
+										</div>
+									</RegenerateDropdown>
+								</MessageAction>
+							)}
 						</MessageActions>
 					</div>
 				)}

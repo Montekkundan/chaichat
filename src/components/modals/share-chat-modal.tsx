@@ -4,6 +4,14 @@ import { useEffect, useState } from "react";
 import { Dialog, DialogContent, DialogTitle } from "~/components/ui/dialog";
 import { toast } from "~/components/ui/toast";
 import { Button } from "../ui/button";
+import { cn } from "~/lib/utils";
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipProvider,
+	TooltipTrigger,
+} from "~/components/ui/tooltip";
+import { Check, Copy as CopyIcon } from "lucide-react";
 
 interface ShareChatModalProps {
 	open: boolean;
@@ -11,6 +19,55 @@ interface ShareChatModalProps {
 	chatId: string;
 	isPublic?: boolean;
 	onToggle: (newValue: boolean) => Promise<void>;
+}
+
+function CopyButton({ text }: { text: string }) {
+	const [copied, setCopied] = useState(false);
+
+	const handleCopy = async () => {
+		try {
+			await navigator.clipboard.writeText(text);
+			setCopied(true);
+			setTimeout(() => setCopied(false), 1500);
+		} catch (err) {
+			console.error("Failed to copy text:", err);
+		}
+	};
+
+	return (
+		<TooltipProvider delayDuration={0}>
+			<Tooltip>
+				<TooltipTrigger asChild>
+					<Button
+						variant="outline"
+						size="icon"
+						className="disabled:opacity-100 relative"
+						onClick={handleCopy}
+						aria-label={copied ? "Copied" : "Copy to clipboard"}
+						disabled={copied}
+					>
+						<div
+							className={cn(
+								"transition-all",
+								copied ? "scale-100 opacity-100" : "scale-0 opacity-0",
+							)}
+						>
+							<Check className="stroke-emerald-500" size={16} strokeWidth={2} aria-hidden="true" />
+						</div>
+						<div
+							className={cn(
+								"absolute transition-all",
+								copied ? "scale-0 opacity-0" : "scale-100 opacity-100",
+							)}
+						>
+							<CopyIcon size={16} strokeWidth={2} aria-hidden="true" />
+						</div>
+					</Button>
+				</TooltipTrigger>
+				<TooltipContent className="px-2 py-1 text-xs">Click to copy</TooltipContent>
+			</Tooltip>
+		</TooltipProvider>
+	);
 }
 
 export function ShareChatModal({
@@ -53,30 +110,20 @@ export function ShareChatModal({
 						Share Chat
 					</DialogTitle>
 					<div className="mb-4 border-white/10 border-b" />
-					<div className="space-y-4">
+					<div className="space-y-4 overflow-hidden">
 						<p className="text-sm text-white/80">
 							{publicState
 								? "This chat is currently public. Anyone with the link can view it."
 								: "This chat is private. Toggle to generate a public link."}
 						</p>
 						{publicState && (
-							<div className="flex items-center justify-between rounded-md bg-background px-3 py-2 text-sm">
-								<span className="truncate">{`${window.location.origin}/p/${chatId}`}</span>
-								<Button
-									size="sm"
-									onClick={async () => {
-										await navigator.clipboard.writeText(
-											`${window.location.origin}/p/${chatId}`,
-										);
-										toast({ title: "Link copied", status: "info" });
-									}}
-								>
-									Copy
-								</Button>
+							<div className="flex items-center gap-2 rounded-md bg-background px-3 py-2 text-sm">
+								<span className="truncate flex-1">{`${window.location.origin}/p/${chatId}`}</span>
+								<CopyButton text={`${window.location.origin}/p/${chatId}`} />
 							</div>
 						)}
 					</div>
-					<div className="mt-6 flex justify-end gap-2">
+					<div className="mt-6 flex flex-wrap justify-end gap-2">
 						<Button
 							variant="ghost"
 							disabled={pending}
