@@ -97,9 +97,11 @@ export function MessageUser({
 						{imageAttachments.length > 0 && (
 							<div className="relative mb-2 h-28 w-40">
 								{imageAttachments.map((attachment, idx) => {
-									const rotation =
-										rotationPalette[idx % rotationPalette.length];
-									const offset = idx * 6; // px shift
+									const isStack = imageAttachments.length > 1;
+									const rotation = isStack
+										? rotationPalette[idx % rotationPalette.length]
+										: 0;
+									const offset = isStack ? idx * 6 : 0;
 									return (
 										<MorphingDialog
 											key={`${attachment.name}-${idx}`}
