@@ -31,7 +31,7 @@ interface MessagesContextType {
 	isSubmitting: boolean;
 	selectedModel: string;
 	setSelectedModel: (model: string) => void;
-	sendMessage: (message: string, attachments?: UploadedFile[]) => void;
+	sendMessage: (message: string, attachments?: UploadedFile[], search?: boolean) => void;
 	createNewChat: (initialMessage: string, model: string) => Promise<string>;
 	changeModel: (model: string) => Promise<void>;
 	regenerateMessage: (messageIndex: number, newModel?: string) => Promise<void>;
@@ -437,7 +437,7 @@ export function MessagesProvider({
 	);
 
 	const sendMessage = useCallback(
-		(message: string, attachments: UploadedFile[] = []) => {
+		(message: string, attachments: UploadedFile[] = [], search = false) => {
 			if (!currentUserId || !chatId) return;
 			if (isSubmitting) return;
 
@@ -494,6 +494,7 @@ export function MessagesProvider({
 							model: selectedModelRef.current,
 							isAuthenticated: !!user?.id,
 							systemPrompt: SYSTEM_PROMPT_DEFAULT,
+							searchEnabled: search,
 						},
 					},
 				).catch((err) => {
@@ -536,7 +537,7 @@ export function MessagesProvider({
 			hasSentPending.current = true;
 
 			setTimeout(() => {
-				sendMessage(pendingInputToSend, []);
+				sendMessage(pendingInputToSend, [], false);
 				setPendingInputToSend(null);
 			}, 300);
 		}

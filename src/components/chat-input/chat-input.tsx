@@ -1,5 +1,6 @@
 "use client";
 import { ArrowUp, Globe, Stop } from "@phosphor-icons/react";
+import { motion } from "framer-motion";
 import { generateReactHelpers } from "@uploadthing/react";
 import { Paperclip } from "lucide-react";
 import { useCallback, useRef, useState } from "react";
@@ -22,7 +23,7 @@ import { ModelSelector } from "./model-selector";
 type ChatInputProps = {
 	value: string;
 	onValueChange: (value: string) => void;
-	onSend: (attachments: import("./file-items").UploadedFile[]) => void;
+	onSend: (attachments: import("./file-items").UploadedFile[], isSearchEnabled: boolean) => void;
 	isSubmitting?: boolean;
 	hasMessages?: boolean;
 	files: import("./file-items").UploadedFile[];
@@ -61,8 +62,9 @@ export function ChatInput({
 }: ChatInputProps) {
 	const selectModelConfig = getModelInfo(selectedModel);
 	const hasToolSupport = Boolean(selectModelConfig?.tools);
-	const allowWebSearch =
-		hasToolSupport || selectModelConfig?.tags?.includes("search");
+	const allowWebSearch = ["openai", "google"].includes(
+		selectModelConfig?.providerId ?? ""
+	);
 
 	// Helper to check if a string is only whitespace characters
 	const isOnlyWhitespace = (text: string) => !/[^\s]/.test(text);
@@ -142,6 +144,12 @@ export function ChatInput({
 		[isUserAuthenticated, onFileUpload, files.length],
 	);
 
+	// Web search toggle state
+	const [isSearchEnabled, setIsSearchEnabled] = useState(false);
+	const toggleSearch = () => {
+		setIsSearchEnabled((prev) => !prev);
+	};
+
 	const handleSend = useCallback(async () => {
 		if (isSubmitting || disabled) {
 			return;
@@ -183,8 +191,8 @@ export function ChatInput({
 			}
 		}
 
-		// Finally invoke parent onSend with the final confirmed list
-		onSend(attachmentsToSend);
+		// Finally invoke parent onSend with the final confirmed list (search flag)
+		onSend(attachmentsToSend, isSearchEnabled);
 	}, [
 		isSubmitting,
 		disabled,
@@ -194,6 +202,7 @@ export function ChatInput({
 		startUpload,
 		files,
 		onFileUpload,
+		isSearchEnabled,
 	]);
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: <explanation>
@@ -277,12 +286,6 @@ export function ChatInput({
 				(f) => f.name !== file.name || f.size !== file.size,
 			);
 		}
-	};
-
-	const [isSearchEnabled, setIsSearchEnabled] = useState(false);
-	const toggleSearch = () => {
-		setIsSearchEnabled((prev) => !prev);
-		// future onSearchToggle?.(enabled,...)
 	};
 
 	const mainContent = (
@@ -370,13 +373,20 @@ export function ChatInput({
 								tooltip={isSearchEnabled ? "Disable search" : "Search"}
 							>
 								<Button
-									variant="outline"
-									size="icon"
-									className={`rounded-full ${isSearchEnabled ? "bg-primary text-primary-foreground" : ""}`}
+									variant={isSearchEnabled ? "secondary" : "outline"}
+									size="sm"
+									className="flex items-center gap-1 rounded-full px-2 py-1"
 									onClick={toggleSearch}
 								>
 									<Globe size={18} />
-									<span className="sr-only">Toggle web search</span>
+									<motion.span
+										initial={{ width: 0, opacity: 0 }}
+										animate={isSearchEnabled ? { width: "auto", opacity: 1 } : { width: 0, opacity: 0 }}
+										transition={{ type: "spring", duration: 0.2 }}
+										className="overflow-hidden whitespace-nowrap text-xs"
+									>
+										Search
+									</motion.span>
 								</Button>
 							</PromptInputAction>
 						)}

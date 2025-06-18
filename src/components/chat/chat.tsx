@@ -80,7 +80,10 @@ export default function Chat({ initialName }: ChatProps = {}) {
 		setAttachments((prev) => prev.filter((f) => f !== file));
 	};
 
-	const handleSend = async (attachmentFiles: UploadedFile[] = []) => {
+	const handleSend = async (
+		attachmentFiles: UploadedFile[] = [],
+		searchEnabled = false,
+	) => {
 		if (!input.trim() && attachmentFiles.length === 0) return;
 
 		// Capture current data before we clear UI (optimistic)
@@ -113,7 +116,7 @@ export default function Chat({ initialName }: ChatProps = {}) {
 
 		// Send message in existing chat (async, but UI already cleared)
 		try {
-			sendMessage(messageToSend, attToSend);
+			sendMessage(messageToSend, attToSend, searchEnabled);
 		} catch (err) {
 			console.error("Send message failed:", err);
 			// On failure restore content so user can retry

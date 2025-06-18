@@ -19,6 +19,7 @@ const TRANSITION = {
 	bounce: 0,
 };
 
+// TODO: implement this in message-assistant
 export function SourcesList({ sources, className }: SourcesListProps) {
 	const [isExpanded, setIsExpanded] = useState(false);
 	const [failedFavicons, setFailedFavicons] = useState<Set<string>>(new Set());

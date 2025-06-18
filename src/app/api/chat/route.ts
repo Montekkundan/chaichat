@@ -11,6 +11,9 @@ import { PLANS } from "~/lib/config";
 import { getAllModels } from "~/lib/models";
 import { getProviderForModel } from "~/lib/openproviders/provider-map";
 import { modelCost, shouldReset } from "~/lib/subscription";
+import type { LanguageModelV1 } from "@ai-sdk/provider";
+import { openproviders } from "~/lib/openproviders";
+import { createOpenAI, openai as defaultOpenAI } from "@ai-sdk/openai";
 
 export const maxDuration = 60;
 export const runtime = "nodejs";
@@ -51,6 +54,7 @@ type ChatRequest = {
 	agentId?: string;
 	regenerateMessageId?: string;
 	temperature?: number;
+	searchEnabled?: boolean;
 };
 
 export async function POST(req: Request) {
@@ -67,6 +71,7 @@ export async function POST(req: Request) {
 			agentId,
 			regenerateMessageId,
 			temperature,
+			searchEnabled = false,
 		} = body as ChatRequest;
 
 		if (!messages || !chatId || !userId) {
@@ -132,9 +137,14 @@ export async function POST(req: Request) {
 			);
 		}
 
-		const effectiveSystemPrompt =
+		let effectiveSystemPrompt =
 			// agentConfig?.systemPrompt ||
 			systemPrompt || SYSTEM_PROMPT_DEFAULT;
+
+		if (searchEnabled && modelConfig.providerId === "openai") {
+			effectiveSystemPrompt +=
+				"\nYou have access to a web search tool named `openai.web_search_preview`. When the user asks about real-time or recent information, think about whether you should call this tool. After obtaining results, cite them in your final answer.";
+		}
 
 		// let toolsToUse = undefined
 
@@ -180,10 +190,41 @@ export async function POST(req: Request) {
 			isBYOK = true;
 		}
 
-		// Get the model instance with the appropriate API key
-		const modelInstance = isFreeModel
-			? modelConfig.apiSdk(undefined)
-			: modelConfig.apiSdk(apiKey);
+		let modelInstance: LanguageModelV1;
+
+		if (modelConfig.providerId === "openai" && searchEnabled) {
+			const provider = apiKey
+				? createOpenAI({ apiKey, compatibility: "strict" })
+				: defaultOpenAI;
+			// biome-ignore lint/suspicious/noExplicitAny: provider dynamic call
+			modelInstance = (provider as any).responses(model as any);
+		} else if (modelConfig.providerId === "google" && searchEnabled) {
+			const keyToUse = isFreeModel ? undefined : apiKey;
+			modelInstance = openproviders(
+				model as never,
+				// biome-ignore lint/suspicious/noExplicitAny: provider settings are provider-specific
+				{ useSearchGrounding: true } as any,
+				keyToUse,
+			);
+		} else {
+			modelInstance = isFreeModel
+				? modelConfig.apiSdk(undefined)
+				: modelConfig.apiSdk(apiKey);
+		}
+
+		let tools: Record<string, unknown> | undefined;
+		let maxSteps: number | undefined;
+		let toolChoice: unknown | undefined;
+
+		if (searchEnabled && modelConfig.providerId === "openai") {
+			tools = {
+				// biome-ignore lint/suspicious/noExplicitAny: provider tooling types are complex
+				web_search_preview: (defaultOpenAI as any).tools.webSearchPreview(),
+			} as Record<string, unknown>;
+			maxSteps = 2;
+			// biome-ignore lint/suspicious/noExplicitAny: toolChoice intentional any cast
+			toolChoice = { type: "tool", toolName: "web_search_preview" } as any;
+		}
 
 		// ----------------- Quota checks -----------------
 		// Ensure user exists and fetch quota
@@ -274,7 +315,12 @@ export async function POST(req: Request) {
 			model: modelInstance,
 			system: effectiveSystemPrompt,
 			messages: filteredMessages,
-			maxSteps: 10,
+			maxSteps: maxSteps ?? 10,
+			// biome-ignore lint/suspicious/noExplicitAny: toolset casting for AI-SDK
+			tools: tools as unknown as any,
+			// Pass toolChoice if we set it
+			// biome-ignore lint/suspicious/noExplicitAny: toolChoice cast
+			...(toolChoice ? { toolChoice: toolChoice as any } : {}),
 			temperature: temperature || 0.8,
 			onError: (err: unknown) => {
 				console.error("🛑 Provider/stream error:", err);
@@ -294,25 +340,26 @@ export async function POST(req: Request) {
 			);
 		}
 
-		// DataStream wrapper for resumable support
-		const dataStream = createDataStream({
-			// `execute` pipes provider chunks into the resumable DataStream.
-			execute(buffer: unknown) {
-				aiStream.mergeIntoDataStream(buffer as never);
-			},
-		});
-
-		const originalResponse = await streamContext.resumableStream(
+		// Return the SDK response that contains all parts (text, tool-calls, sources, …)
+		const dataStream = await streamContext.resumableStream(
 			streamId,
-			() => dataStream,
+			() => {
+				const res = aiStream.toDataStreamResponse();
+				const body = res.body;
+				if (!body) {
+					throw new Error("AI stream response has no body");
+				}
+				const textStream = body.pipeThrough(new TextDecoderStream());
+				return textStream;
+			},
 		);
 
-		if (!originalResponse) {
+		if (!dataStream) {
 			// fallback shouldn't happen but just in case
 			return new Response("Failed to create stream", { status: 500 });
 		}
 
-		return new Response(originalResponse, {
+		return new Response(dataStream, {
 			status: 200,
 			headers: new Headers(),
 		});
