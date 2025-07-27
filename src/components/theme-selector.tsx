@@ -3,6 +3,7 @@
 import { CheckIcon, MoonIcon, RepeatIcon, SunIcon } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
+import { useUser } from "@clerk/nextjs";
 
 import { api } from "@/convex/_generated/api";
 import { useMutation } from "convex/react";
@@ -13,6 +14,7 @@ import { baseColors } from "~/lib/colors";
 import { cn } from "~/lib/utils";
 
 export function ThemeSelector() {
+	const { user } = useUser();
 	const { activeTheme, setActiveTheme } = useThemeConfig();
 	const saveThemePref = useMutation(api.userPreferences.setTheme);
 	const [mounted, setMounted] = useState(false);
@@ -60,7 +62,10 @@ export function ThemeSelector() {
 									key={color.name}
 									onClick={() => {
 										setActiveTheme(color.name);
-										saveThemePref({ theme: color.name }).catch(() => {});
+										// Only save to Convex for logged-in users
+										if (user?.id) {
+											saveThemePref({ theme: color.name }).catch(() => {});
+										}
 									}}
 									className={cn(
 										"justify-start",

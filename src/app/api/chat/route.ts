@@ -1,19 +1,16 @@
 import { api } from "@/convex/_generated/api";
+import { createOpenAI, openai as defaultOpenAI } from "@ai-sdk/openai";
+import type { LanguageModelV1 } from "@ai-sdk/provider";
 import type { Attachment } from "@ai-sdk/ui-utils";
-import { createDataStream } from "ai";
 import { generateId } from "ai";
 import { type Message as MessageAISDK, streamText } from "ai";
 import { ConvexHttpClient } from "convex/browser";
 import { after } from "next/server";
 import { createResumableStreamContext } from "resumable-stream";
-import { FREE_MODELS_IDS, SYSTEM_PROMPT_DEFAULT } from "~/lib/config";
-import { PLANS } from "~/lib/config";
+import { BYOK_MODEL_IDS, SYSTEM_PROMPT_DEFAULT } from "~/lib/config";
 import { getAllModels } from "~/lib/models";
-import { getProviderForModel } from "~/lib/openproviders/provider-map";
-import { modelCost, shouldReset } from "~/lib/subscription";
-import type { LanguageModelV1 } from "@ai-sdk/provider";
 import { openproviders } from "~/lib/openproviders";
-import { createOpenAI, openai as defaultOpenAI } from "@ai-sdk/openai";
+import { getProviderForModel } from "~/lib/openproviders/provider-map";
 
 export const maxDuration = 60;
 export const runtime = "nodejs";
@@ -55,7 +52,8 @@ type ChatRequest = {
 	regenerateMessageId?: string;
 	temperature?: number;
 	searchEnabled?: boolean;
-	captchaToken?: string;
+	// For non-logged users: their API keys from localStorage
+	userApiKeys?: Record<string, string | undefined>;
 };
 
 export async function POST(req: Request) {
@@ -73,8 +71,8 @@ export async function POST(req: Request) {
 			regenerateMessageId,
 			temperature,
 			searchEnabled = false,
-			captchaToken,
-		} = body as ChatRequest & { captchaToken?: string };
+			userApiKeys: localApiKeys = {},
+		} = body as ChatRequest;
 
 		if (!messages || !chatId || !userId) {
 			return new Response(
@@ -83,52 +81,29 @@ export async function POST(req: Request) {
 			);
 		}
 
-		// ---------------- hCaptcha check (anonymous users) ----------------
-		let setCaptchaCookie = false;
-		const cookiesHeader = req.headers.get("cookie") ?? "";
-		const hasCaptchaCookie = /cc_captcha=1/.test(cookiesHeader);
-		if (!isAuthenticated && !hasCaptchaCookie) {
-			const secret = process.env.HCAPTCHA_SECRET_KEY;
-			if (!secret) throw new Error("HCAPTCHA_SECRET_KEY is not configured");
-
-			if (!captchaToken) {
-				return new Response(
-					JSON.stringify({ error: "Captcha token missing", code: "CAPTCHA_REQUIRED" }),
-					{ status: 400 },
-				);
-			}
-
-			const verifyRes = await fetch("https://api.hcaptcha.com/siteverify", {
-				method: "POST",
-				headers: {
-					"Content-Type": "application/x-www-form-urlencoded",
-				},
-				body: `secret=${encodeURIComponent(secret)}&response=${encodeURIComponent(captchaToken)}`,
-			});
-			const verifyJson = (await verifyRes.json()) as { success: boolean };
-			if (!verifyJson.success) {
-				return new Response(
-					JSON.stringify({ error: "Captcha verification failed", code: "CAPTCHA_FAILED" }),
-					{ status: 400 },
-				);
-			}
-			// mark to set cookie
-			setCaptchaCookie = true;
-		}
-		// -------------------------------------------------------------------
-
 		const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL;
 		if (!convexUrl) {
 			throw new Error("NEXT_PUBLIC_CONVEX_URL is not configured");
 		}
 		const convex = new ConvexHttpClient(convexUrl);
 
-		// Check if this is a free model or requires user API key
-		const isFreeModel = FREE_MODELS_IDS.includes(model);
+		// All models now require user API keys (BYOK)
+		const isBYOKModel = BYOK_MODEL_IDS.includes(model);
+
+		if (!isBYOKModel) {
+			return new Response(
+				JSON.stringify({
+					error: `Model ${model} is not supported`,
+					code: "MODEL_NOT_SUPPORTED",
+				}),
+				{ status: 400 },
+			);
+		}
+
 		let userApiKeys: Record<string, string | undefined> = {};
 
-		if (!isFreeModel && isAuthenticated) {
-			// Get user's API keys for premium models
+		if (isAuthenticated) {
+			// Get user's API keys from Convex for logged-in users
 			try {
 				userApiKeys = await convex.action(api.userKeys.getUserKeysForAPI, {
 					userId,
@@ -136,13 +111,10 @@ export async function POST(req: Request) {
 			} catch (error) {
 				console.error("Failed to fetch user API keys:", error);
 			}
+		} else {
+			// Use API keys from request body for non-logged users
+			userApiKeys = localApiKeys;
 		}
-
-		// let agentConfig = null
-
-		// if (agentId) {
-		//   agentConfig = await loadAgent(agentId)
-		// }
 
 		const allModels = await getAllModels();
 		const modelConfig = allModels.find((m) => m.id === model);
@@ -173,58 +145,30 @@ export async function POST(req: Request) {
 			);
 		}
 
-		let effectiveSystemPrompt =
-			// agentConfig?.systemPrompt ||
-			systemPrompt || SYSTEM_PROMPT_DEFAULT;
+		let effectiveSystemPrompt = systemPrompt || SYSTEM_PROMPT_DEFAULT;
 
 		if (searchEnabled && modelConfig.providerId === "openai") {
 			effectiveSystemPrompt +=
 				"\nYou have access to a web search tool named `openai.web_search_preview`. When the user asks about real-time or recent information, think about whether you should call this tool. After obtaining results, cite them in your final answer.";
 		}
 
-		// let toolsToUse = undefined
-
-		// if (agentConfig?.mcpConfig) {
-		//   const { tools } = await loadMCPToolsFromURL(agentConfig.mcpConfig.server)
-		//   toolsToUse = tools
-		// } else if (agentConfig?.tools) {
-		// toolsToUse = agentConfig.tools
-		// if (supabase) {
-		//   await trackSpecialAgentUsage(supabase, userId)
-		// }
-		// }
-
-		// Clean messages when switching between agents with different tool capabilities
-		// const hasTools = !!toolsToUse && Object.keys(toolsToUse).length > 0
-		// const cleanedMessages = cleanMessagesForTools(messages, hasTools)
-
 		let streamError: unknown | null = null;
 
-		// Determine which API key to use
-		let apiKey: string | undefined;
-		let isBYOK = false; // true when user supplies their own premium key
+		// All models require user's API key now
+		const provider = getProviderForModel(model);
+		const userKey = userApiKeys[`${provider}Key`];
 
-		if (isFreeModel) {
-			// Use project API key for free models
-			apiKey = undefined; // This will use default project keys from openproviders
-		} else {
-			// Use user's API key for premium models
-			const provider = getProviderForModel(model);
-			const userKey = userApiKeys[`${provider}Key`];
-
-			if (!userKey) {
-				return new Response(
-					JSON.stringify({
-						error: `This model requires your own ${provider.toUpperCase()} API key. Please add it in Settings.`,
-						code: "API_KEY_REQUIRED",
-					}),
-					{ status: 403 },
-				);
-			}
-
-			apiKey = userKey;
-			isBYOK = true;
+		if (!userKey) {
+			return new Response(
+				JSON.stringify({
+					error: `This model requires your own ${provider.toUpperCase()} API key. Please add it in Settings.`,
+					code: "API_KEY_REQUIRED",
+				}),
+				{ status: 403 },
+			);
 		}
+
+		const apiKey = userKey;
 
 		let modelInstance: LanguageModelV1;
 
@@ -235,17 +179,14 @@ export async function POST(req: Request) {
 			// biome-ignore lint/suspicious/noExplicitAny: provider dynamic call
 			modelInstance = (provider as any).responses(model as any);
 		} else if (modelConfig.providerId === "google" && searchEnabled) {
-			const keyToUse = isFreeModel ? undefined : apiKey;
 			modelInstance = openproviders(
 				model as never,
 				// biome-ignore lint/suspicious/noExplicitAny: provider settings are provider-specific
 				{ useSearchGrounding: true } as any,
-				keyToUse,
+				apiKey,
 			);
 		} else {
-			modelInstance = isFreeModel
-				? modelConfig.apiSdk(undefined)
-				: modelConfig.apiSdk(apiKey);
+			modelInstance = modelConfig.apiSdk(apiKey);
 		}
 
 		let tools: Record<string, unknown> | undefined;
@@ -262,67 +203,7 @@ export async function POST(req: Request) {
 			toolChoice = { type: "tool", toolName: "web_search_preview" } as any;
 		}
 
-		// ----------------- Quota checks -----------------
-		// Ensure user exists and fetch quota
-		const quota = await convex.mutation(api.userQuota.initUser, {
-			userId,
-			plan: isAuthenticated ? "free" : "anonymous",
-		});
-		if (!quota) {
-			throw new Error("Failed to initialize user quota");
-		}
-
-		const now = Date.now();
-		let stdCredits = quota.stdCredits ?? 0;
-		let premiumCredits = quota.premiumCredits ?? 0;
-		let refillAt = quota.refillAt;
-		const planInfo = PLANS[quota.plan as keyof typeof PLANS] ?? PLANS.anonymous;
-		if (planInfo.periodMs && shouldReset(now, refillAt)) {
-			stdCredits = planInfo.total;
-			premiumCredits = planInfo.premium;
-			refillAt = now + planInfo.periodMs;
-			await convex.mutation(api.userQuota.updateQuota, {
-				userId,
-				std: stdCredits,
-				prem: premiumCredits,
-				refillAt,
-			});
-		}
-
-		// Determine cost for requested model
-		const baseCost = modelCost(model);
-		const effectiveCost = {
-			standard: baseCost.standard,
-			premium: isBYOK ? 0 : baseCost.premium,
-		};
-
-		if (
-			stdCredits < effectiveCost.standard ||
-			premiumCredits < effectiveCost.premium
-		) {
-			return new Response(
-				JSON.stringify({
-					error: "Quota exceeded. Please upgrade your plan.",
-					code: "QUOTA_EXCEEDED",
-					remaining: {
-						standard: stdCredits,
-						premium: premiumCredits,
-					},
-				}),
-				{ status: 403 },
-			);
-		}
-
-		// Deduct credits according to adjusted cost
-		stdCredits -= effectiveCost.standard;
-		premiumCredits -= effectiveCost.premium;
-		await convex.mutation(api.userQuota.updateQuota, {
-			userId,
-			std: stdCredits,
-			prem: premiumCredits,
-			refillAt,
-		});
-		// ------------------------------------------------
+		// No quota checks anymore - everyone can use the service freely!
 
 		// Filter out system messages and any messages that have no content or attachments.
 		// Gemini (and some other providers) return an error if a message has an empty "parts" array.
@@ -377,29 +258,22 @@ export async function POST(req: Request) {
 		}
 
 		// Return the SDK response that contains all parts (text, tool-calls, sources, …)
-		const dataStream = await streamContext.resumableStream(
-			streamId,
-			() => {
-				const res = aiStream.toDataStreamResponse();
-				const body = res.body;
-				if (!body) {
-					throw new Error("AI stream response has no body");
-				}
-				const textStream = body.pipeThrough(new TextDecoderStream());
-				return textStream;
-			},
-		);
+		const dataStream = await streamContext.resumableStream(streamId, () => {
+			const res = aiStream.toDataStreamResponse();
+			const body = res.body;
+			if (!body) {
+				throw new Error("AI stream response has no body");
+			}
+			const textStream = body.pipeThrough(new TextDecoderStream());
+			return textStream;
+		});
 
 		if (!dataStream) {
 			// fallback shouldn't happen but just in case
 			return new Response("Failed to create stream", { status: 500 });
 		}
 
-		const headers = new Headers();
-		if (setCaptchaCookie) {
-			headers.append("Set-Cookie", "cc_captcha=1; Path=/; Max-Age=86400; SameSite=Lax");
-		}
-		return new Response(dataStream, { status: 200, headers });
+		return new Response(dataStream, { status: 200 });
 	} catch (err: unknown) {
 		console.error("Error in /api/chat:", err);
 		const error = err as { code?: string; message?: string };
@@ -417,27 +291,4 @@ export async function POST(req: Request) {
 	}
 }
 
-// ---------------- GET handler for resuming streams ----------------
-
-export async function GET(request: Request) {
-	const { searchParams } = new URL(request.url);
-	const chatId = searchParams.get("chatId");
-
-	if (!chatId) return new Response("chatId required", { status: 400 });
-
-	const streams = loadStreams(chatId);
-	if (streams.length === 0) return new Response(null, { status: 204 });
-
-	// `streams.length` is guaranteed to be > 0 here due to early return above.
-	const recent = streams[streams.length - 1] as string;
-
-	const emptyDataStream = createDataStream({ execute: () => {} });
-
-	const resumed = await streamContext.resumableStream(
-		recent,
-		() => emptyDataStream,
-	);
-	if (resumed) return new Response(resumed, { status: 200 });
-
-	return new Response(emptyDataStream, { status: 200 });
-}
+// Stream resumption utilities removed for now - will be fixed in a future update

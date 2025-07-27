@@ -20,30 +20,11 @@ import {
 	TooltipTrigger,
 } from "~/components/ui/tooltip";
 import { useCache } from "~/lib/providers/cache-provider";
-import { useQuota } from "~/lib/providers/quota-provider";
 
 export function TopLeftControls() {
 	const router = useRouter();
 	const { state } = useSidebar();
 	const cache = useCache();
-	const quota = useQuota();
-	const remaining =
-		quota.plan === "pro"
-			? `${quota.stdCredits}/${quota.premiumCredits}`
-			: quota.stdCredits.toString();
-
-	const badge = (
-		<Tooltip>
-			<TooltipTrigger asChild>
-				<span className="inline-flex items-center rounded-md bg-muted/40 px-2 font-medium text-[10px] text-muted-foreground">
-					{remaining}
-				</span>
-			</TooltipTrigger>
-			<TooltipContent side="top" className="px-2 py-1 text-xs">
-				{quota.plan === "pro" ? "Std / Premium credits" : "Remaining chats"}
-			</TooltipContent>
-		</Tooltip>
-	);
 
 	const collapsedBg = state === "collapsed" ? "bg-sidebar" : "";
 	const [openSearch, setOpenSearch] = React.useState(false);
@@ -79,8 +60,6 @@ export function TopLeftControls() {
 							</kbd>
 						</TooltipContent>
 					</Tooltip>
-
-					{badge}
 
 					<AnimatePresence>
 						{state === "collapsed" && (

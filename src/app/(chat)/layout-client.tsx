@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect, type ReactNode } from "react";
-import { AppSidebar } from "~/components/app-sidebar";
-import { TopLeftControls } from "~/components/chat/top-left-controls";
+import { type ReactNode, useEffect } from "react";
+import { AppSidebar } from "~/components/app-sidebar/app-sidebar";
 import { SidebarProvider, useSidebar } from "~/components/ui/sidebar";
 
 export type MinimalUser = {
@@ -25,7 +24,6 @@ export default function ChatLayoutClient({
 
 	return (
 		<SidebarProvider>
-			<TopLeftControls />
 			<AppSidebar initialUser={initialUser} />
 			<MainContentWithInset>{children}</MainContentWithInset>
 		</SidebarProvider>

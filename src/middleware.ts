@@ -1,12 +1,10 @@
-import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
+import { clerkMiddleware } from "@clerk/nextjs/server";
 
-const isProtectedRoute = createRouteMatcher(["/settings(.*)"]);
-
+// No longer protecting any routes - making login completely optional
 export default clerkMiddleware(async (auth, req) => {
-	if (isProtectedRoute(req)) {
-		// Redirect unauthenticated users to Clerk's sign-in page
-		await auth.protect();
-	}
+	// Everything is public now, no authentication required
+	// Users can access all features without logging in
+	// Login provides only additional benefits like persistent storage
 });
 
 export const config = {

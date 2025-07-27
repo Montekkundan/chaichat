@@ -112,6 +112,15 @@ export function CacheProvider({
 		user?.id ? { userId: user.id } : "skip",
 	);
 
+	// For non-authenticated users, fetch public chats
+	const convexPublicChats = useQuery(
+		api.chat.listPublicChats,
+		!user?.id ? {} : "skip",
+	);
+
+	// Combine user chats and public chats
+	const effectiveChats = user?.id ? convexChats : convexPublicChats;
+
 	const createChatMutation = useMutation(api.chat.createChat);
 	const deleteChatMutation = useMutation(api.chat.deleteChat);
 	const updateChatModelMutation = useMutation(api.chat.updateChatModel);
@@ -126,32 +135,33 @@ export function CacheProvider({
 	// Initialize cache from Dexie on mount
 	useEffect(() => {
 		const initializeCache = async () => {
-			if (!user?.id) return;
-
 			setIsLoading(true);
 			try {
-				// Dexie: Load chats
-				const localChats = await db.chats
-					.where("userId")
-					.equals(user.id)
-					.toArray();
-				setChats(localChats);
-
-				// Preload messages for recent chats
-				const recentChats = localChats.slice(0, 5);
-				for (const chat of recentChats) {
-					const messages = await db.messages
-						.where("chatId")
-						.equals(chat._id)
-						.and((msg) => msg.isActive === true || msg.isActive === undefined) // Only active messages
+				if (user?.id) {
+					// For authenticated users: Load chats from Dexie
+					const localChats = await db.chats
+						.where("userId")
+						.equals(user.id)
 						.toArray();
+					setChats(localChats);
 
-					// Sort messages by creation time to ensure correct order
-					const sortedMessages = messages.sort(
-						(a, b) => a._creationTime - b._creationTime,
-					);
-					messagesCache.current.set(chat._id, sortedMessages);
+					// Preload messages for recent chats
+					const recentChats = localChats.slice(0, 5);
+					for (const chat of recentChats) {
+						const messages = await db.messages
+							.where("chatId")
+							.equals(chat._id)
+							.and((msg) => msg.isActive === true || msg.isActive === undefined) // Only active messages
+							.toArray();
+
+						// Sort messages by creation time to ensure correct order
+						const sortedMessages = messages.sort(
+							(a, b) => a._creationTime - b._creationTime,
+						);
+						messagesCache.current.set(chat._id, sortedMessages);
+					}
 				}
+				// For non-authenticated users, we'll rely on the effectiveChats from convex
 			} catch (error) {
 				console.error("Failed to initialize cache:", error);
 			} finally {
@@ -167,15 +177,17 @@ export function CacheProvider({
 	// Sync Convex data with Dexie cache
 	useEffect(() => {
 		const syncWithConvex = async () => {
-			if (!convexChats || !user?.id) return;
+			if (!effectiveChats) return;
 
 			setIsSyncing(true);
 			try {
-				// Update Dexie with fresh Convex data
-				await db.chats.bulkPut(convexChats as Chat[]);
+				if (user?.id) {
+					// For authenticated users: Update Dexie with fresh Convex data
+					await db.chats.bulkPut(effectiveChats as Chat[]);
+				}
 
-				// Update local state
-				setChats(convexChats as Chat[]);
+				// Update local state for both authenticated and non-authenticated users
+				setChats(effectiveChats as Chat[]);
 			} catch (error) {
 				console.error("Failed to sync with Convex:", error);
 			} finally {
@@ -183,10 +195,10 @@ export function CacheProvider({
 			}
 		};
 
-		if (convexChats) {
+		if (effectiveChats) {
 			syncWithConvex();
 		}
-	}, [convexChats, user?.id]);
+	}, [effectiveChats, user?.id]);
 
 	// Hydrate chats quickly from cookie to avoid UI flash
 	// biome-ignore lint/correctness/useExhaustiveDependencies: <explanation>

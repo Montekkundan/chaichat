@@ -1,31 +1,23 @@
-import "~/styles/globals.css";
-
 import { ClerkProvider } from "@clerk/nextjs";
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Inter } from "next/font/google";
 import { cookies } from "next/headers";
-import { ActiveThemeProvider } from "~/components/active-theme";
+import "~/styles/globals.css";
+import "~/styles/themes.css";
 import ConvexClientProvider from "~/components/providers/convex-client-provider";
+import { ErrorBoundary } from "~/components/providers/error-boundary";
+import { Toaster } from "~/components/ui/sonner";
 import { ThemeProvider } from "~/components/providers/theme-provider";
-import { DEFAULT_APP_THEME } from "~/lib/config";
+import { DEFAULT_APP_THEME, APP_NAME, APP_DESCRIPTION, APP_URL, APP_OG_IMAGE } from "~/lib/config";
+import { ActiveThemeProvider } from "~/components/active-theme";
 import { CacheProvider } from "~/lib/providers/cache-provider";
 import { ChatsProvider } from "~/lib/providers/chats-provider";
 import { ModelsProvider } from "~/lib/providers/models-provider";
 import { QuotaProvider } from "~/lib/providers/quota-provider";
-import { PostHogProvider } from "~/components/providers/posthog-provider";
-import { ErrorBoundary } from "~/components/providers/error-boundary";
-import { APP_DESCRIPTION, APP_NAME, APP_OG_IMAGE, APP_URL } from "~/lib/config";
-import { Analytics } from '@vercel/analytics/next';
+import { Analytics } from "@vercel/analytics/react";
+import { UserSessionHandler } from "~/components/user-session-handler";
 
-const geistSans = Geist({
-	variable: "--font-geist-sans",
-	subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-	variable: "--font-geist-mono",
-	subsets: ["latin"],
-});
+const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
 	title: APP_NAME,
@@ -99,38 +91,37 @@ export default async function RootLayout({
 		<ClerkProvider>
 			<html
 				lang="en"
-				className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+				className={`${inter.className} antialiased`}
 				suppressHydrationWarning
 			>
 				<body
 					className={`bg-sidebar theme-${activeThemeValue ?? DEFAULT_APP_THEME}`}
 				>
-					<PostHogProvider>
-						<ErrorBoundary>
-							<ThemeProvider
-								attribute="class"
-								defaultTheme="system"
-								enableSystem
-								disableTransitionOnChange
-							>
-								<ActiveThemeProvider initialTheme={activeThemeValue}>
-									<ConvexClientProvider>
-										<CacheProvider initialChats={initialChats}>
-											<ChatsProvider>
-												<ModelsProvider>
-													<QuotaProvider>
-														{/* <Toaster position="top-center" /> */}
-														{children}
-														<Analytics />
-													</QuotaProvider>
-												</ModelsProvider>
-											</ChatsProvider>
-										</CacheProvider>
-									</ConvexClientProvider>
-								</ActiveThemeProvider>
-							</ThemeProvider>
-						</ErrorBoundary>
-					</PostHogProvider>
+					<ErrorBoundary>
+						<ThemeProvider
+							attribute="class"
+							defaultTheme="system"
+							enableSystem
+							disableTransitionOnChange
+						>
+							<ActiveThemeProvider initialTheme={activeThemeValue}>
+								<ConvexClientProvider>
+									<CacheProvider initialChats={initialChats}>
+										<ChatsProvider>
+											<ModelsProvider>
+												<QuotaProvider>
+													<UserSessionHandler />
+													<Toaster position="top-center" />
+													{children}
+													<Analytics />
+												</QuotaProvider>
+											</ModelsProvider>
+										</ChatsProvider>
+									</CacheProvider>
+								</ConvexClientProvider>
+							</ActiveThemeProvider>
+						</ThemeProvider>
+					</ErrorBoundary>
 				</body>
 			</html>
 		</ClerkProvider>

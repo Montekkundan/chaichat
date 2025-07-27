@@ -295,3 +295,15 @@ export const getPublicChat = query({
     return { chat, messages };
   },
 });
+
+// List public chats for non-authenticated users
+export const listPublicChats = query({
+  args: {},
+  handler: async (ctx) => {
+    return await ctx.db
+      .query("chats")
+      .filter((q) => q.eq(q.field("isPublic"), true))
+      .order("desc")
+      .collect();
+  },
+});

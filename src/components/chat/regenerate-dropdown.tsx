@@ -10,7 +10,6 @@ import {
 	DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
 import { Input } from "~/components/ui/input";
-import { FREE_MODELS_IDS } from "~/lib/config";
 import { PROVIDERS } from "~/lib/providers";
 import { useModels } from "~/lib/providers/models-provider";
 import { cn } from "~/lib/utils";
@@ -34,11 +33,7 @@ export function RegenerateDropdown({
 		.filter((model) =>
 			model.name.toLowerCase().includes(searchQuery.toLowerCase()),
 		)
-		.sort((a, b) => {
-			const aIsFree = FREE_MODELS_IDS.includes(a.id);
-			const bIsFree = FREE_MODELS_IDS.includes(b.id);
-			return aIsFree === bIsFree ? 0 : aIsFree ? -1 : 1;
-		});
+		.sort((a, b) => a.name.localeCompare(b.name));
 
 	const currentModelData = models.find((model) => model.id === currentModel);
 
@@ -105,7 +100,6 @@ export function RegenerateDropdown({
 								const provider = PROVIDERS.find(
 									(provider) => provider.id === model.providerId,
 								);
-								const isPro = !FREE_MODELS_IDS.includes(model.id);
 								const isCurrentModel = model.id === currentModel;
 
 								return (
@@ -124,11 +118,9 @@ export function RegenerateDropdown({
 											)}
 											<span className="truncate text-xs">{model.name}</span>
 										</div>
-										{isPro && (
-											<span className="flex-shrink-0 text-[10px] text-muted-foreground">
-												Pro
-											</span>
-										)}
+										<span className="flex-shrink-0 text-[10px] text-muted-foreground">
+											API Key
+										</span>
 									</DropdownMenuItem>
 								);
 							})

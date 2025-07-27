@@ -13,19 +13,15 @@ export default defineSchema({
   }),
   users: defineTable({
     userId: v.string(),            // Clerk userId
-    // Billing / quota
-    plan: v.optional(v.union(v.literal("anonymous"), v.literal("free"), v.literal("pro"))),
-    stdCredits: v.optional(v.number()),
-    premiumCredits: v.optional(v.number()),
-    refillAt: v.optional(v.number()),
 
-    // BYOK keys
+    // BYOK keys - stored in plaintext
     openaiKey: v.optional(v.string()),
     mistralKey: v.optional(v.string()),
     googleKey: v.optional(v.string()),
     anthropicKey: v.optional(v.string()),
+    xaiKey: v.optional(v.string()),
 
-    // misc prefs
+    // User preferences
     theme: v.optional(v.string()),
     preferredModels: v.optional(v.array(v.string())),
   }),

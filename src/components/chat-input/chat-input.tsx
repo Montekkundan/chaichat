@@ -1,9 +1,9 @@
 "use client";
 import { ArrowUp, Globe, Stop } from "@phosphor-icons/react";
-import { motion } from "framer-motion";
 import { generateReactHelpers } from "@uploadthing/react";
+import { motion } from "framer-motion";
 import { Paperclip } from "lucide-react";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { UploadRouter } from "~/app/api/uploadthing/core";
 import { CookiePreferencesModal } from "~/components/modals/cookie-preferences-modal";
 import { Button } from "~/components/ui/button";
@@ -14,13 +14,16 @@ import {
 	PromptInputTextarea,
 } from "~/components/ui/prompt-input";
 import { toast } from "~/components/ui/toast";
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipTrigger,
+} from "~/components/ui/tooltip";
 import { filterValidFiles } from "~/lib/file-upload/validation";
+import { getBestAvailableModel } from "~/lib/model-utils";
 import { getModelInfo } from "~/lib/models";
-import { useQuota } from "~/lib/providers/quota-provider";
 import { FileList } from "./file-list";
 import { ModelSelector } from "./model-selector";
-import dynamic from "next/dynamic";
-import { createPortal } from "react-dom";
 
 type ChatInputProps = {
 	value: string;
@@ -28,7 +31,6 @@ type ChatInputProps = {
 	onSend: (
 		attachments: import("./file-items").UploadedFile[],
 		isSearchEnabled: boolean,
-		captchaToken?: string,
 	) => void;
 	isSubmitting?: boolean;
 	hasMessages?: boolean;
@@ -46,11 +48,6 @@ type ChatInputProps = {
 	// onSearchToggle?: (enabled: boolean, agentId: string | null) => void
 	position?: "centered" | "bottom";
 };
-
-// biome-ignore lint/suspicious/noExplicitAny: dynamic load of third-party module without types
-const HCaptcha = dynamic<any>(() => import("@hcaptcha/react-hcaptcha"), {
-	ssr: false,
-});
 
 export function ChatInput({
 	value,
@@ -74,7 +71,7 @@ export function ChatInput({
 	const selectModelConfig = getModelInfo(selectedModel);
 	const hasToolSupport = Boolean(selectModelConfig?.tools);
 	const allowWebSearch = ["openai", "google"].includes(
-		selectModelConfig?.providerId ?? ""
+		selectModelConfig?.providerId ?? "",
 	);
 
 	// Helper to check if a string is only whitespace characters
@@ -161,11 +158,35 @@ export function ChatInput({
 		setIsSearchEnabled((prev) => !prev);
 	};
 
-	// hCaptcha handling (anonymous users)
-	const [showCaptcha, setShowCaptcha] = useState(false);
-	const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+	// Track if user has any API keys available
+	const [hasApiKeys, setHasApiKeys] = useState(true); // Default to true to avoid flash
 
-	const siteKey = process.env.NEXT_PUBLIC_HCAPTCHA_SITE_KEY ?? "";
+	useEffect(() => {
+		const checkApiKeys = async () => {
+			try {
+				const bestModel = await getBestAvailableModel(
+					undefined,
+					isUserAuthenticated,
+				);
+				setHasApiKeys(!!bestModel);
+			} catch (error) {
+				console.error("Failed to check API keys:", error);
+				setHasApiKeys(false);
+			}
+		};
+
+		checkApiKeys();
+
+		// Listen for API key changes from the API key manager
+		const handleApiKeysChanged = () => {
+			checkApiKeys();
+		};
+
+		window.addEventListener('apiKeysChanged', handleApiKeysChanged);
+		return () => {
+			window.removeEventListener('apiKeysChanged', handleApiKeysChanged);
+		};
+	}, [isUserAuthenticated]);
 
 	const handleSend = useCallback(async () => {
 		if (isSubmitting || disabled) {
@@ -175,15 +196,6 @@ export function ChatInput({
 		if (status === "streaming") {
 			stop();
 			return;
-		}
-
-		// Anonymous users must solve captcha first (once per day)
-		if (!isUserAuthenticated) {
-			const hasCookie = document.cookie.includes("cc_captcha=1");
-			if (!hasCookie && !captchaToken) {
-				setShowCaptcha(true);
-				return;
-			}
 		}
 
 		// Prepare attachment list (defaults to current files prop)
@@ -217,12 +229,7 @@ export function ChatInput({
 			}
 		}
 
-		onSend(attachmentsToSend, isSearchEnabled, captchaToken ?? undefined);
-
-		// Reset captcha token after successful send
-		if (captchaToken) {
-			setCaptchaToken(null);
-		}
+		onSend(attachmentsToSend, isSearchEnabled);
 	}, [
 		isSubmitting,
 		disabled,
@@ -233,8 +240,6 @@ export function ChatInput({
 		files,
 		onFileUpload,
 		isSearchEnabled,
-		captchaToken,
-		isUserAuthenticated,
 	]);
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: <explanation>
@@ -270,11 +275,9 @@ export function ChatInput({
 	// ---------------- Upload handling -----------------
 	const fileInputRef = useRef<HTMLInputElement>(null);
 	const [showCookieModal, setShowCookieModal] = useState(false);
-	const quota = useQuota();
 
-	// Uploads are disabled either when the user is out of quota or when the selected model doesn't support attachments
-	const fileQuotaExceeded = quota.stdCredits <= 0 && quota.premiumCredits <= 0;
-	const uploadDisabled = fileQuotaExceeded || !modelAllowsAttachments;
+	// Uploads are disabled when the selected model doesn't support attachments
+	const uploadDisabled = !modelAllowsAttachments;
 
 	const handleLocalFileChange = async (
 		e: React.ChangeEvent<HTMLInputElement>,
@@ -350,14 +353,37 @@ export function ChatInput({
 				{modelAllowsAttachments && (
 					<FileList files={files} onFileRemove={handleFileRemove} />
 				)}
-				<PromptInputTextarea
-					placeholder="Ask ChaiChat"
-					onKeyDown={handleKeyDown}
-					onChange={(e) => onValueChange(e.target.value)}
-					className="min-h-[44px] pt-3 pl-4 text-base leading-[1.3] sm:text-base md:text-base"
-					disabled={disabled || isSubmitting}
-					// ref={agentCommand.textareaRef}
-				/>
+				{!hasApiKeys ? (
+					<Tooltip>
+						<TooltipTrigger asChild>
+							<div>
+								<PromptInputTextarea
+									placeholder="Please add API keys to start chatting"
+									onKeyDown={handleKeyDown}
+									onChange={(e) => onValueChange(e.target.value)}
+									className="min-h-[44px] cursor-not-allowed pt-3 pl-4 text-base leading-[1.3] sm:text-base md:text-base"
+									disabled={true}
+									// ref={agentCommand.textareaRef}
+								/>
+							</div>
+						</TooltipTrigger>
+						<TooltipContent side="top">
+							<div className="text-xs">
+								Please add API keys using the "Manage API Keys" button in the
+								sidebar
+							</div>
+						</TooltipContent>
+					</Tooltip>
+				) : (
+					<PromptInputTextarea
+						placeholder="Ask ChaiChat"
+						onKeyDown={handleKeyDown}
+						onChange={(e) => onValueChange(e.target.value)}
+						className="min-h-[44px] pt-3 pl-4 text-base leading-[1.3] sm:text-base md:text-base"
+						disabled={disabled || isSubmitting}
+						// ref={agentCommand.textareaRef}
+					/>
+				)}
 				<PromptInputActions className="mt-5 w-full justify-between px-3 pb-3">
 					<div className="flex items-center gap-2">
 						{/* Upload files */}
@@ -413,7 +439,11 @@ export function ChatInput({
 									<Globe size={18} />
 									<motion.span
 										initial={{ width: 0, opacity: 0 }}
-										animate={isSearchEnabled ? { width: "auto", opacity: 1 } : { width: 0, opacity: 0 }}
+										animate={
+											isSearchEnabled
+												? { width: "auto", opacity: 1 }
+												: { width: 0, opacity: 0 }
+										}
 										transition={{ type: "spring", duration: 0.2 }}
 										className="overflow-hidden whitespace-nowrap text-xs"
 									>
@@ -423,12 +453,21 @@ export function ChatInput({
 							</PromptInputAction>
 						)}
 					</div>
-					<PromptInputAction tooltip={status === "streaming" ? "Stop" : "Send"}>
+					<PromptInputAction
+						tooltip={
+							!hasApiKeys
+								? "Please add API keys"
+								: status === "streaming"
+									? "Stop"
+									: "Send"
+						}
+					>
 						<Button
 							size="sm"
 							className="size-9 rounded-full transition-all duration-300 ease-out"
 							disabled={
 								disabled ||
+								!hasApiKeys ||
 								isUploading ||
 								(isOnlyWhitespace(value) && files.length === 0) ||
 								isSubmitting
@@ -468,36 +507,5 @@ export function ChatInput({
 		</div>
 	);
 
-	return (
-		<>
-			{mainContent}
-			{showCaptcha && !isUserAuthenticated &&
-				createPortal(
-					<div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50">
-						<div className="rounded-md bg-background p-4">
-							{siteKey ? (
-								<HCaptcha
-									sitekey={siteKey}
-									onVerify={(token: string) => {
-										// Store token
-										setCaptchaToken(token);
-										setShowCaptcha(false);
-										setTimeout(() => {
-											handleSend();
-										}, 50);
-									}}
-									onError={() => {
-										setShowCaptcha(false);
-										toast({ title: "Captcha verification failed", status: "error" });
-									}}
-								/>
-							) : (
-								<p className="text-sm text-muted-foreground">Captcha site key not configured.</p>
-							)}
-						</div>
-					</div>,
-					document.body,
-				)}
-		</>
-	);
+	return <>{mainContent}</>;
 }

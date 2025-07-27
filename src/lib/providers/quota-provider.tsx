@@ -1,53 +1,28 @@
 "use client";
 
-import { api } from "@/convex/_generated/api";
-import { useUser } from "@clerk/nextjs";
-import { useMutation, useQuery } from "convex/react";
-import { createContext, useContext, useEffect, useMemo } from "react";
+import { createContext, useContext, useMemo } from "react";
 import type { ReactNode } from "react";
-import { getAnonId } from "~/lib/anon-id";
 
+// Simplified - no more quota tracking since we removed pricing
 interface QuotaInfo {
-	plan: "anonymous" | "free" | "pro";
-	stdCredits: number;
-	premiumCredits: number;
-	refillAt?: number;
+	plan: "free"; // Everyone is on the free plan now
 }
 
-const QuotaContext = createContext<QuotaInfo | null>(null);
+const QuotaContext = createContext<QuotaInfo>({
+	plan: "free",
+});
 
 export function useQuota() {
-	const ctx = useContext(QuotaContext);
-	if (!ctx) throw new Error("useQuota must be used within QuotaProvider");
-	return ctx;
+	return useContext(QuotaContext);
 }
 
 export function QuotaProvider({ children }: { children: ReactNode }) {
-	const { user } = useUser();
-
-	// Decide which identifier to use (Clerk or anonymous)
-	const userId =
-		user?.id ?? (typeof window !== "undefined" ? getAnonId() : undefined);
-
-	const quota = useQuery(api.userQuota.getQuota, userId ? { userId } : "skip");
-
-	const initUser = useMutation(api.userQuota.initUser);
-
-	useEffect(() => {
-		if (!userId) return;
-		initUser({ userId, plan: user?.id ? "free" : "anonymous" });
-	}, [userId, user?.id, initUser]);
-
-	const value = useMemo(() => {
-		if (!quota) {
-			return {
-				plan: (user?.id ? "free" : "anonymous") as "anonymous" | "free" | "pro",
-				stdCredits: 0,
-				premiumCredits: 0,
-			};
-		}
-		return quota as QuotaInfo;
-	}, [quota, user?.id]);
+	const value = useMemo(
+		() => ({
+			plan: "free" as const,
+		}),
+		[],
+	);
 
 	return (
 		<QuotaContext.Provider value={value}>{children}</QuotaContext.Provider>

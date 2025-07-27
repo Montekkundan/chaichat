@@ -1,7 +1,13 @@
 "use client";
 
 import { api } from "@/convex/_generated/api";
-import { CaretDown, Key, MagnifyingGlass, Star } from "@phosphor-icons/react";
+import { useUser } from "@clerk/nextjs";
+import {
+	CaretDown,
+	Key,
+	MagnifyingGlass,
+	Question,
+} from "@phosphor-icons/react";
 import { useAction, useQuery } from "convex/react";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "~/components/ui/button";
@@ -25,7 +31,7 @@ import {
 } from "~/components/ui/tooltip";
 // import { PopoverContentAuth } from "~/components/chat-input/popover-content-auth"
 import { useBreakpoint } from "~/hooks/use-breakpoint";
-import { FREE_MODELS_IDS, PREMIUM_MODEL_IDS } from "~/lib/config";
+import { BYOK_MODEL_IDS } from "~/lib/config";
 import type { ModelConfig } from "~/lib/models/types";
 import { PROVIDERS } from "~/lib/providers";
 import { useModels } from "~/lib/providers/models-provider";
@@ -55,11 +61,12 @@ export function ModelSelector({
 	className,
 	isUserAuthenticated = true,
 }: ModelSelectorProps) {
+	const { user } = useUser();
 	const { models: allModels, isLoading: isLoadingModels } = useModels();
-	const preferred = useQuery(api.userPreferences.getPreferredModels, {}) as
-		| string[]
-		| null
-		| undefined;
+	const preferred = useQuery(
+		api.userPreferences.getPreferredModels, 
+		user?.id ? {} : "skip"
+	) as string[] | null | undefined;
 	const models =
 		preferred && preferred.length > 0
 			? allModels.filter((m) => preferred.includes(m.id))
@@ -70,13 +77,7 @@ export function ModelSelector({
 		(provider) => provider.id === currentModel?.providerId,
 	);
 
-	// Categorize models based on FREE_MODELS_IDS
-	const freeModels = models.filter((model) =>
-		FREE_MODELS_IDS.includes(model.id),
-	);
-	const proModels = models.filter(
-		(model) => !FREE_MODELS_IDS.includes(model.id),
-	);
+	// All models require API keys now - no need to categorize
 
 	const isMobile = useBreakpoint(768);
 
@@ -127,23 +128,56 @@ export function ModelSelector({
 	const [userKeys, setUserKeys] = useState<UserKeys | undefined>(undefined);
 
 	useEffect(() => {
-		(async () => {
-			const result = (await getKeys({})) as UserKeys;
-			setUserKeys(result);
-		})();
-	}, [getKeys]);
+		const fetchKeys = async () => {
+			if (isUserAuthenticated) {
+				// Fetch from Convex for authenticated users
+				const result = (await getKeys({})) as UserKeys;
+				setUserKeys(result);
+			} else {
+				// Fetch from local storage for non-authenticated users
+				try {
+					const { getAllKeys } = await import("~/lib/secure-local-keys");
+					const localKeys = await getAllKeys();
+					const formattedKeys: UserKeys = {
+						openaiKey: localKeys.openaiKey,
+						anthropicKey: localKeys.anthropicKey,
+						googleKey: localKeys.googleKey,
+						mistralKey: localKeys.mistralKey,
+						xaiKey: localKeys.xaiKey,
+					};
+					setUserKeys(formattedKeys);
+				} catch (error) {
+					console.error("Failed to get local keys:", error);
+					setUserKeys({});
+				}
+			}
+		};
+
+		fetchKeys();
+
+		// Listen for API key changes from the API key manager
+		const handleApiKeysChanged = () => {
+			fetchKeys();
+		};
+
+		window.addEventListener('apiKeysChanged', handleApiKeysChanged);
+		return () => {
+			window.removeEventListener('apiKeysChanged', handleApiKeysChanged);
+		};
+	}, [getKeys, isUserAuthenticated]);
 
 	const handleModelSelect = (model: ModelConfig) => {
-		const isPro = !FREE_MODELS_IDS.includes(model.id);
+		// All models now require API keys
+		const requiresApiKey = BYOK_MODEL_IDS.includes(model.id);
 
-		if (isPro && !isUserAuthenticated) {
-			// Show auth dialog for unauthenticated users trying to use pro models
+		if (requiresApiKey && !isUserAuthenticated) {
+			// Show auth dialog for unauthenticated users - they need to add API keys
 			setSelectedProModel(model.id);
 			setIsProDialogOpen(true);
 			return;
 		}
 
-		// For authenticated users or free models, just select the model
+		// Select the model
 		setSelectedModelId(model.id);
 		if (isMobile) {
 			setIsDrawerOpen(false);
@@ -155,9 +189,7 @@ export function ModelSelector({
 	const renderModelItem = (model: ModelConfig) => {
 		const provider = PROVIDERS.find((p) => p.id === model.providerId);
 
-		const isPremium = PREMIUM_MODEL_IDS.includes(model.id);
-		const isFree = FREE_MODELS_IDS.includes(model.id);
-		const isPro = !isFree; // non-free models are considered "Pro"
+		const requiresApiKey = BYOK_MODEL_IDS.includes(model.id); // All models require API keys now
 
 		// Map provider id to the corresponding key field returned by the API
 		const providerKeyMap: Record<string, keyof UserKeys> = {
@@ -175,9 +207,10 @@ export function ModelSelector({
 		const hasUserKey =
 			keyField && userKeys ? Boolean(userKeys[keyField]) : false;
 
-		// Locked if the user is not authenticated for pro OR it's a premium model without a user key
+		// Locked if the user is not authenticated (for any model) OR no user key for the model
 		const locked =
-			(isPro && !isUserAuthenticated) || (isPremium && !hasUserKey);
+			(requiresApiKey && !isUserAuthenticated) ||
+			(requiresApiKey && !hasUserKey);
 
 		return (
 			// biome-ignore lint/a11y/useKeyWithClickEvents: interactive div for list item
@@ -197,11 +230,10 @@ export function ModelSelector({
 					{provider?.icon && <provider.icon className="size-5" />}
 					<span className="text-sm">{model.name}</span>
 				</div>
-				{isPro && (
+				{requiresApiKey && (
 					<div className="flex items-center gap-0.5 rounded-full border border-input bg-accent px-1.5 py-0.5 font-medium text-[10px] text-muted-foreground">
-						<Star className="size-2" />
-						{isPremium && <Key className="size-2" />}
-						<span>Pro</span>
+						<Key className="size-2" />
+						<span>API Key</span>
 					</div>
 				)}
 			</div>
@@ -215,28 +247,51 @@ export function ModelSelector({
 		.filter((model) =>
 			model.name.toLowerCase().includes(searchQuery.toLowerCase()),
 		)
-		.sort((a, b) => {
-			const aIsFree = FREE_MODELS_IDS.includes(a.id);
-			const bIsFree = FREE_MODELS_IDS.includes(b.id);
-			return aIsFree === bIsFree ? 0 : aIsFree ? -1 : 1;
-		});
+		.sort((a, b) => a.name.localeCompare(b.name)); // Simple alphabetical sort
 
 	if (isLoadingModels) {
 		return null;
 	}
 
 	const trigger = (
-		<Button
-			variant="outline"
-			className={cn("justify-between dark:bg-secondary", className)}
-			disabled={isLoadingModels}
-		>
-			<div className="flex items-center gap-2">
-				{currentProvider?.icon && <currentProvider.icon className="size-5" />}
-				<span>{currentModel?.name || "Select model"}</span>
-			</div>
-			<CaretDown className="size-4 opacity-50" />
-		</Button>
+		<div className="flex items-center gap-1">
+			<Button
+				variant="outline"
+				className={cn("justify-between dark:bg-secondary", className)}
+				disabled={isLoadingModels}
+			>
+				<div className="flex items-center gap-2">
+					{currentProvider?.icon && <currentProvider.icon className="size-5" />}
+					<span>{currentModel?.name || "Select model"}</span>
+				</div>
+				<CaretDown className="size-4 opacity-50" />
+			</Button>
+			<Tooltip>
+				<TooltipTrigger asChild>
+					<Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+						<Question className="size-4 text-muted-foreground" />
+					</Button>
+				</TooltipTrigger>
+				<TooltipContent side="top" className="max-w-xs">
+					<div className="space-y-1 text-xs">
+						<div className="font-medium">🔒 API Key Storage</div>
+						{user ? (
+							<>
+								<div>• Keys stored securely in your Convex account</div>
+								<div>• Synced across all your devices</div>
+								<div>• Only accessible to you</div>
+							</>
+						) : (
+							<>
+								<div>• Keys encrypted with AES-256-GCM in your browser</div>
+								<div>• Never leave your device</div>
+								<div>• Sign in to sync across devices</div>
+							</>
+						)}
+					</div>
+				</TooltipContent>
+			</Tooltip>
+		</div>
 	);
 
 	// Handle input change without losing focus

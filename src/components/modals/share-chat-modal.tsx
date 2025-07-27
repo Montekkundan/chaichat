@@ -1,17 +1,17 @@
 "use client";
 
+import { Check, Copy as CopyIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Dialog, DialogContent, DialogTitle } from "~/components/ui/dialog";
 import { toast } from "~/components/ui/toast";
-import { Button } from "../ui/button";
-import { cn } from "~/lib/utils";
 import {
 	Tooltip,
 	TooltipContent,
 	TooltipProvider,
 	TooltipTrigger,
 } from "~/components/ui/tooltip";
-import { Check, Copy as CopyIcon } from "lucide-react";
+import { cn } from "~/lib/utils";
+import { Button } from "../ui/button";
 
 interface ShareChatModalProps {
 	open: boolean;
@@ -41,7 +41,7 @@ function CopyButton({ text }: { text: string }) {
 					<Button
 						variant="outline"
 						size="icon"
-						className="disabled:opacity-100 relative"
+						className="relative disabled:opacity-100"
 						onClick={handleCopy}
 						aria-label={copied ? "Copied" : "Copy to clipboard"}
 						disabled={copied}
@@ -52,7 +52,12 @@ function CopyButton({ text }: { text: string }) {
 								copied ? "scale-100 opacity-100" : "scale-0 opacity-0",
 							)}
 						>
-							<Check className="stroke-emerald-500" size={16} strokeWidth={2} aria-hidden="true" />
+							<Check
+								className="stroke-emerald-500"
+								size={16}
+								strokeWidth={2}
+								aria-hidden="true"
+							/>
 						</div>
 						<div
 							className={cn(
@@ -64,7 +69,9 @@ function CopyButton({ text }: { text: string }) {
 						</div>
 					</Button>
 				</TooltipTrigger>
-				<TooltipContent className="px-2 py-1 text-xs">Click to copy</TooltipContent>
+				<TooltipContent className="px-2 py-1 text-xs">
+					Click to copy
+				</TooltipContent>
 			</Tooltip>
 		</TooltipProvider>
 	);
@@ -118,7 +125,7 @@ export function ShareChatModal({
 						</p>
 						{publicState && (
 							<div className="flex items-center gap-2 rounded-md bg-background px-3 py-2 text-sm">
-								<span className="truncate flex-1">{`${window.location.origin}/p/${chatId}`}</span>
+								<span className="flex-1 truncate">{`${window.location.origin}/p/${chatId}`}</span>
 								<CopyButton text={`${window.location.origin}/p/${chatId}`} />
 							</div>
 						)}

@@ -75,9 +75,9 @@ export const MessageAssistant = React.memo(function MessageAssistant({
 				)
 				.flatMap((part) =>
 					part.type === "tool-invocation" &&
-						part.toolInvocation?.state === "result" &&
-						part.toolInvocation?.toolName === "imageSearch" &&
-						part.toolInvocation?.result?.content?.[0]?.type === "images"
+					part.toolInvocation?.state === "result" &&
+					part.toolInvocation?.toolName === "imageSearch" &&
+					part.toolInvocation?.result?.content?.[0]?.type === "images"
 						? (part.toolInvocation?.result?.content?.[0]?.results ?? [])
 						: [],
 				) ?? [],
@@ -166,7 +166,11 @@ export const MessageAssistant = React.memo(function MessageAssistant({
 							</MessageAction>
 
 							{onBranch && (
-								<MessageAction tooltip="Branch chat" side="bottom" delayDuration={0}>
+								<MessageAction
+									tooltip="Branch chat"
+									side="bottom"
+									delayDuration={0}
+								>
 									<button
 										className="flex size-7.5 items-center justify-center rounded-full bg-transparent text-muted-foreground transition hover:bg-accent/60 hover:text-foreground"
 										aria-label="Branch chat"
@@ -179,10 +183,16 @@ export const MessageAssistant = React.memo(function MessageAssistant({
 							)}
 
 							{onRegenerate && (
-								<MessageAction tooltip="Regenerate" side="bottom" delayDuration={0}>
+								<MessageAction
+									tooltip="Regenerate"
+									side="bottom"
+									delayDuration={0}
+								>
 									<RegenerateDropdown
 										currentModel={activeModel || ""}
-										onRegenerate={(selectedModel: string) => onRegenerate(selectedModel)}
+										onRegenerate={(selectedModel: string) =>
+											onRegenerate(selectedModel)
+										}
 									>
 										<div className="flex items-center">
 											<button

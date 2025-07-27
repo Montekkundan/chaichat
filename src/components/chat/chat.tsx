@@ -4,7 +4,6 @@ import { useUser } from "@clerk/nextjs";
 import type { User } from "@clerk/nextjs/server";
 import { Settings2, SunMoon } from "lucide-react";
 import { useTheme } from "next-themes";
-import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ChatInput } from "~/components/chat-input/chat-input";
@@ -12,7 +11,8 @@ import type { UploadedFile } from "~/components/chat-input/file-items";
 import { useChatHandlers } from "~/components/chat-input/use-chat-handlers";
 import { Conversation } from "~/components/chat/conversation";
 import { useMessages } from "~/lib/providers/messages-provider";
-import { useQuota } from "~/lib/providers/quota-provider";
+import { SettingsDialog } from "~/components/settings-dialog";
+
 import { useSidebar } from "../ui/sidebar";
 
 type ChatProps = { initialName?: string };
@@ -24,6 +24,7 @@ export default function Chat({ initialName }: ChatProps = {}) {
 	const [isCreatingChat, setIsCreatingChat] = useState(false);
 	const [hasNavigated, setHasNavigated] = useState(false);
 	const [attachments, setAttachments] = useState<UploadedFile[]>([]);
+	const [settingsOpen, setSettingsOpen] = useState(false);
 
 	const {
 		messages,
@@ -35,15 +36,15 @@ export default function Chat({ initialName }: ChatProps = {}) {
 		setSelectedModel,
 		sendMessage,
 		createNewChat,
-		changeModel,
-		regenerateMessage,
+		regenerate,
 		stop,
 		quotaExceeded,
 		rateLimited,
-		branchChat,
 	} = useMessages();
 
 	const chatIdString = Array.isArray(chatId) ? chatId[0] : chatId;
+	
+
 
 	useEffect(() => {
 		if (chatIdString && !hasNavigated) {
@@ -62,7 +63,7 @@ export default function Chat({ initialName }: ChatProps = {}) {
 			messages,
 			setMessages: () => {}, // Not needed with provider
 			setInput,
-			setSelectedModel: changeModel,
+			setSelectedModel,
 			selectedModel,
 			chatId: chatIdString || null,
 			user: user as unknown as User | null,
@@ -83,7 +84,6 @@ export default function Chat({ initialName }: ChatProps = {}) {
 	const handleSend = async (
 		attachmentFiles: UploadedFile[] = [],
 		searchEnabled = false,
-		captchaToken?: string,
 	) => {
 		if (!input.trim() && attachmentFiles.length === 0) return;
 
@@ -117,7 +117,7 @@ export default function Chat({ initialName }: ChatProps = {}) {
 
 		// Send message in existing chat (async, but UI already cleared)
 		try {
-			sendMessage(messageToSend, attToSend, searchEnabled, captchaToken);
+			sendMessage(messageToSend, attToSend, searchEnabled);
 		} catch (err) {
 			console.error("Send message failed:", err);
 			// On failure restore content so user can retry
@@ -127,10 +127,8 @@ export default function Chat({ initialName }: ChatProps = {}) {
 	};
 
 	const handleBranch = async (idx: number) => {
-		const newId = await branchChat(idx);
-		if (newId) {
-			router.push(`/chat/${newId}`);
-		}
+		// TODO: Implement branch functionality if needed
+		console.log("Branch not implemented yet");
 	};
 
 	const isLoading = isSubmitting || isCreatingChat || status === "streaming";
@@ -144,8 +142,7 @@ export default function Chat({ initialName }: ChatProps = {}) {
 		<>
 			<div className="pointer-events-none absolute bottom-0 z-10 w-full px-2">
 				<div className="relative mx-auto flex w-full max-w-3xl flex-col text-center">
-					{/* Anonymous quota banner */}
-					{!user?.id && <AnonQuotaBanner />}
+					{/* Removed anonymous quota banner - no longer using tiers */}
 					<div className="pointer-events-none">
 						<div className="pointer-events-auto">
 							<div className="rounded-t-3xl p-2 pb-0 backdrop-blur-lg ">
@@ -219,14 +216,15 @@ export default function Chat({ initialName }: ChatProps = {}) {
 				</div>
 				<div className="fixed top-2 right-2 z-20 max-sm:hidden">
 					<div className="flex flex-row items-center gap-0.5 rounded-md rounded-bl-xl bg-gradient-noise-top p-1 text-muted-foreground transition-all">
-						<Link
-							aria-label="Go to settings"
-							href="/settings/customization"
+						<button
+							type="button"
+							aria-label="Open settings"
+							onClick={() => setSettingsOpen(true)}
 							className="inline-flex size-8 items-center justify-center rounded-md rounded-bl-xl hover:bg-muted/40 hover:text-foreground"
 							data-discover="true"
 						>
 							<Settings2 className="size-4" />
-						</Link>
+						</button>
 						<button
 							type="button"
 							aria-label="Toggle theme"
@@ -256,28 +254,20 @@ export default function Chat({ initialName }: ChatProps = {}) {
 							onDelete={handleDelete}
 							onEdit={handleEdit}
 							onReload={handleReload}
-							onRegenerate={regenerateMessage}
+							onRegenerate={(messageIndex: number, model: string) => {
+								const message = messages[messageIndex];
+								if (message?.id) {
+									regenerate(message.id, model);
+								}
+							}}
 							onBranch={handleBranch}
 						/>
 					)}
 				</div>
 			</div>
+			<SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
 		</>
 	);
 }
 
-// Banner shown to anonymous visitors indicating remaining credits
-function AnonQuotaBanner() {
-	const quota = useQuota();
-	if (quota.plan !== "anonymous") return null;
-	const remaining = quota.stdCredits ?? 0;
-	return (
-		<div className="pointer-events-auto mb-2 rounded-md bg-muted/50 px-4 py-1 text-muted-foreground text-sm backdrop-blur-lg">
-			{remaining} free messages left.{" "}
-			<Link href="/login" className="underline">
-				Sign in
-			</Link>{" "}
-			for more.
-		</div>
-	);
-}
+// Removed AnonQuotaBanner - no longer using tier system

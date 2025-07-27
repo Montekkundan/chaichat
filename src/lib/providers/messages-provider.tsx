@@ -1,11 +1,11 @@
 "use client";
 
-import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { type Message as MessageAISDK, useChat } from "@ai-sdk/react";
 import { useUser } from "@clerk/nextjs";
 import { useConvex } from "convex/react";
 import {
+	type ReactNode,
 	createContext,
 	startTransition,
 	useCallback,
@@ -16,35 +16,44 @@ import {
 } from "react";
 import type { UploadedFile } from "~/components/chat-input/file-items";
 import { toast } from "~/components/ui/toast";
-import { getAnonId } from "~/lib/anon-id";
 import { SYSTEM_PROMPT_DEFAULT } from "~/lib/config";
-import { API_ROUTE_CHAT } from "~/lib/routes";
-import { useCache } from "./cache-provider";
-import { OPTIMISTIC_PREFIX } from "./cache-provider";
+import { getBestAvailableModel } from "~/lib/model-utils";
+import {
+	getAllKeys,
+	migrateFromPlaintextStorage,
+} from "~/lib/secure-local-keys";
+import { OPTIMISTIC_PREFIX, useCache } from "./cache-provider";
+import { localChatStorage, type LocalMessage } from "~/lib/local-chat-storage";
+import type { Message } from "~/db";
+import { userSessionManager } from "~/lib/user-session-manager";
+
+// Extended message type with Convex-specific properties
+type ExtendedMessage = MessageAISDK & {
+	convexId?: string;
+	parentMessageId?: string;
+};
 
 interface MessagesContextType {
-	messages: MessageAISDK[];
+	messages: ExtendedMessage[];
 	input: string;
 	setInput: (input: string) => void;
-	status: "streaming" | "ready" | "submitted" | "error";
-	error: Error | undefined;
+	sendMessage: (
+		message: string,
+		attachments?: UploadedFile[],
+		search?: boolean,
+	) => void;
 	isSubmitting: boolean;
 	selectedModel: string;
 	setSelectedModel: (model: string) => void;
-	sendMessage: (message: string, attachments?: UploadedFile[], search?: boolean, captchaToken?: string) => void;
-	createNewChat: (initialMessage: string, model: string) => Promise<string>;
-	changeModel: (model: string) => Promise<void>;
-	regenerateMessage: (messageIndex: number, newModel?: string) => Promise<void>;
-	stop: () => void;
-	reload: () => void;
+	status: "ready" | "streaming" | "submitted" | "error";
 	quotaExceeded: boolean;
 	rateLimited: boolean;
-	branchChat: (index: number) => Promise<string | null>;
+	createNewChat: (initialMessage: string, model: string) => Promise<string>;
+	regenerate: (messageId: string, model: string) => void;
+	stop: () => void;
 }
 
-const MessagesContext = createContext<MessagesContextType | undefined>(
-	undefined,
-);
+const MessagesContext = createContext<MessagesContextType | null>(null);
 
 export function useMessages() {
 	const context = useContext(MessagesContext);
@@ -55,8 +64,8 @@ export function useMessages() {
 }
 
 interface MessagesProviderProps {
-	children: React.ReactNode;
-	chatId?: string;
+	children: ReactNode;
+	chatId?: string | null;
 	initialModel?: string;
 }
 
@@ -65,16 +74,50 @@ export function MessagesProvider({
 	chatId,
 	initialModel = "gpt-4o",
 }: MessagesProviderProps) {
+	
+
 	const { user } = useUser();
 	const cache = useCache();
 	const convex = useConvex();
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const [selectedModel, setSelectedModel] = useState(initialModel);
-	const [cachedMessages, setCachedMessages] = useState<MessageAISDK[]>([]);
+	const [cachedMessages, setCachedMessages] = useState<ExtendedMessage[]>([]);
 	const [quotaExceeded, setQuotaExceeded] = useState(false);
 	const [rateLimited, setRateLimited] = useState(false);
-	const currentUserId =
-		user?.id ?? (typeof window !== "undefined" ? getAnonId() : "");
+	const currentUserId = user?.id ?? userSessionManager.getStorageUserId();
+
+	// Run migration on first load for non-logged users
+	useEffect(() => {
+		if (!user?.id && typeof window !== "undefined") {
+			migrateFromPlaintextStorage().catch(console.error);
+		}
+	}, [user?.id]);
+
+	// Track if we've initialized the model to avoid re-running
+	const modelInitialized = useRef(false);
+
+	// Initialize model based on available API keys
+	useEffect(() => {
+		const initializeModel = async () => {
+			try {
+				const bestModel = await getBestAvailableModel(undefined, !!user?.id);
+				if (bestModel && bestModel !== selectedModel) {
+					setSelectedModel(bestModel);
+				} else if (!bestModel) {
+					// No API keys available, don't set any model
+					setSelectedModel("");
+				}
+				modelInitialized.current = true;
+			} catch (error) {
+				console.error("Failed to initialize model:", error);
+			}
+		};
+
+		// Only run this on first load, not for existing chats
+		if (!chatId && !modelInitialized.current) {
+			initializeModel();
+		}
+	}, [user?.id, chatId, selectedModel]);
 
 	// Track regeneration context - use useRef to persist across re-renders
 	const regenerationContext = useRef<{
@@ -110,17 +153,45 @@ export function MessagesProvider({
 			}
 
 			try {
-				const messages = await cache.getMessages(chatId);
-				const aiSdkMessages = messages.map((m) => ({
-					id: m._id,
-					role: m.role,
-					content: m.content,
-					model: m.model,
-					convexId: m._id,
-					_creationTime: m._creationTime,
-					createdAt: new Date(m.createdAt),
-					experimental_attachments: m.attachments ?? [],
-				})) as MessageAISDK[];
+				let messages: LocalMessage[] | Message[];
+				if (!user?.id) {
+					// For non-logged users, load from local storage
+					messages = await localChatStorage.getMessages(chatId);
+				} else {
+					// For logged users, load from both cache and local storage
+					const [cacheMessages, localMessages] = await Promise.all([
+						cache.getMessages(chatId),
+						localChatStorage.getMessages(chatId, currentUserId)
+					]);
+					
+					// Merge messages, prioritizing cache messages
+					const messageMap = new Map();
+					
+					// Add local messages first
+					for (const msg of localMessages) {
+						messageMap.set(msg._id, msg);
+					}
+					
+					// Override with cache messages (they're more up-to-date)
+					for (const msg of cacheMessages) {
+						messageMap.set(msg._id, msg);
+					}
+					
+					messages = Array.from(messageMap.values()).sort((a, b) => a.createdAt - b.createdAt);
+				}
+
+				const aiSdkMessages = messages.map((m) => {
+					return {
+						id: m._id,
+						role: m.role,
+						content: m.content,
+						model: m.model,
+						convexId: m._id,
+						_creationTime: m._creationTime,
+						createdAt: new Date(m.createdAt),
+						experimental_attachments: m.attachments ?? [],
+					};
+				}) as ExtendedMessage[];
 
 				setCachedMessages(aiSdkMessages);
 			} catch (error) {
@@ -129,7 +200,7 @@ export function MessagesProvider({
 		};
 
 		loadMessages();
-	}, [chatId, cache]);
+	}, [chatId, cache, currentUserId, user?.id]);
 
 	const {
 		messages,
@@ -143,60 +214,97 @@ export function MessagesProvider({
 		setInput,
 		append,
 	} = useChat({
-		api: API_ROUTE_CHAT,
-		initialMessages: cachedMessages,
+		// TODO: this assumes free-tier always streams properly; may need revision
+		api: "/api/chat",
 		onFinish: async (message, { finishReason, usage }) => {
-			if (!chatId || !currentUserId) return;
+			console.log("✅ Message finished:", {
+				messageId: message.id,
+				finishReason,
+				usage,
+			});
 
-			// Save pending user message first if it exists
+			// Save user message if it was delayed
 			if (pendingUserMessage.current) {
 				try {
-					const convexMessageId = await cache.addMessage({
-						chatId,
-						userId: currentUserId,
-						role: "user",
-						content: pendingUserMessage.current.content,
-						attachments: pendingUserMessage.current.attachments,
-						model: selectedModelRef.current,
-						createdAt: Date.now(),
-					});
+					if (!user?.id) {
+						// For non-logged users, use local storage
+						const localMessageId = await localChatStorage.addMessage(
+							chatId as string,
+							"user",
+							pendingUserMessage.current.content,
+							selectedModelRef.current,
+							pendingUserMessage.current.attachments
+						);
 
-					// Update the user message with convex ID
-					startTransition(() =>
-						setMessages((currentMessages) =>
-							currentMessages.map((msg) =>
-								msg.id === pendingUserMessage.current?.messageId
-									? { ...msg, convexId: convexMessageId }
-									: msg,
-							),
-						),
-					);
+						// Update the AI-SDK message with the local message id
+						startTransition(() => {
+							setMessages((currentMessages) =>
+								currentMessages.map((msg) =>
+									msg.id === pendingUserMessage.current?.messageId
+										? {
+												...msg,
+												convexId: localMessageId,
+												model: selectedModelRef.current,
+											}
+										: msg,
+								),
+							);
+						});
+					} else {
+						// For logged users, save to both cache and local storage
+						const [convexMessageId, localMessageId] = await Promise.all([
+							cache.addMessage({
+								chatId: chatId as string,
+								userId: currentUserId,
+								role: "user",
+								content: pendingUserMessage.current.content,
+								model: selectedModelRef.current,
+								attachments: pendingUserMessage.current.attachments,
+								createdAt: Date.now(),
+							}),
+							localChatStorage.addMessage(
+								chatId as string,
+								"user",
+								pendingUserMessage.current.content,
+								selectedModelRef.current,
+								pendingUserMessage.current.attachments,
+								currentUserId
+							)
+						]);
 
-					pendingUserMessage.current = null;
+						// Update the AI-SDK message with the convex message id (primary)
+						startTransition(() => {
+							setMessages((currentMessages) =>
+								currentMessages.map((msg) =>
+									msg.id === pendingUserMessage.current?.messageId
+										? {
+												...msg,
+												convexId: convexMessageId,
+												model: selectedModelRef.current,
+											}
+										: msg,
+								),
+							);
+						});
+					}
 				} catch (error) {
-					console.error("Failed to save user message:", error);
+					console.error("Failed to save pending user message:", error);
+				} finally {
+					pendingUserMessage.current = null;
 				}
 			}
 
 			// Save assistant message to cache
 			if (message.role === "assistant") {
 				try {
-					if (regenerationContext.current) {
-						// For regenerated messages, mark original as version 1 and save new version
-						await cache.markAsOriginalVersion(
-							regenerationContext.current.parentMessageId,
+					if (!user?.id) {
+						// For non-logged users, use local storage
+						const localMessageId = await localChatStorage.addMessage(
+							chatId as string,
+							"assistant",
+							message.content,
+							selectedModelRef.current
 						);
-
-						const convexMessageId = await cache.addMessage({
-							chatId,
-							userId: currentUserId,
-							role: "assistant",
-							content: message.content,
-							model: selectedModelRef.current,
-							parentMessageId: regenerationContext.current.parentMessageId,
-							version: regenerationContext.current.version,
-							createdAt: Date.now(),
-						});
 
 						startTransition(() =>
 							setMessages((currentMessages) =>
@@ -204,39 +312,92 @@ export function MessagesProvider({
 									msg.id === message.id
 										? {
 												...msg,
-												convexId: convexMessageId,
+												convexId: localMessageId,
 												model: selectedModelRef.current,
 											}
 										: msg,
 								),
 							),
 						);
-
-						regenerationContext.current = null;
 					} else {
-						// For regular messages (not regenerated)
-						const convexMessageId = await cache.addMessage({
-							chatId,
-							userId: currentUserId,
-							role: "assistant",
-							content: message.content,
-							model: selectedModelRef.current,
-							createdAt: Date.now(),
-						});
+						// For logged users, save to both cache and local storage
+						if (regenerationContext.current) {
+							// For regenerated messages, mark original as version 1 and save new version
+							await cache.markAsOriginalVersion(
+								regenerationContext.current.parentMessageId,
+							);
 
-						startTransition(() =>
-							setMessages((currentMessages) =>
-								currentMessages.map((msg) =>
-									msg.id === message.id
-										? {
-												...msg,
-												convexId: convexMessageId,
-												model: selectedModelRef.current,
-											}
-										: msg,
+							const [convexMessageId, localMessageId] = await Promise.all([
+								cache.addMessage({
+									chatId: chatId as string,
+									userId: currentUserId,
+									role: "assistant",
+									content: message.content,
+									model: selectedModelRef.current,
+									parentMessageId: regenerationContext.current.parentMessageId,
+									version: regenerationContext.current.version,
+									createdAt: Date.now(),
+								}),
+								localChatStorage.addMessage(
+									chatId as string,
+									"assistant",
+									message.content,
+									selectedModelRef.current,
+									undefined,
+									currentUserId
+								)
+							]);
+
+							startTransition(() =>
+								setMessages((currentMessages) =>
+									currentMessages.map((msg) =>
+										msg.id === message.id
+											? {
+													...msg,
+													convexId: convexMessageId,
+													model: selectedModelRef.current,
+												}
+											: msg,
+									),
 								),
-							),
-						);
+							);
+
+							regenerationContext.current = null;
+						} else {
+							// For regular messages (not regenerated)
+							const [convexMessageId, localMessageId] = await Promise.all([
+								cache.addMessage({
+									chatId: chatId as string,
+									userId: currentUserId,
+									role: "assistant",
+									content: message.content,
+									model: selectedModelRef.current,
+									createdAt: Date.now(),
+								}),
+								localChatStorage.addMessage(
+									chatId as string,
+									"assistant",
+									message.content,
+									selectedModelRef.current,
+									undefined,
+									currentUserId
+								)
+							]);
+
+							startTransition(() =>
+								setMessages((currentMessages) =>
+									currentMessages.map((msg) =>
+										msg.id === message.id
+											? {
+													...msg,
+													convexId: convexMessageId,
+													model: selectedModelRef.current,
+												}
+											: msg,
+									),
+								),
+							);
+						}
 					}
 				} catch (error) {
 					console.error("Failed to save assistant message:", error);
@@ -343,6 +504,7 @@ export function MessagesProvider({
 	}, [cachedMessages, messages.length, setMessages]);
 
 	// ----- Resume streaming on refresh for optimistic chats -----
+	// Note: Stream resumption temporarily disabled due to API changes
 	// biome-ignore lint/correctness/useExhaustiveDependencies: setMessages is stable from useChat
 	useEffect(() => {
 		if (!chatId) return;
@@ -353,95 +515,49 @@ export function MessagesProvider({
 		const lastMsg = messages[messages.length - 1];
 		if (!lastMsg || lastMsg.role !== "user") return;
 
-		// Prevent duplicate resume attempts
-		let cancelled = false;
-
-		const assistantId: string = `live-${Date.now()}`;
-		startTransition(() =>
-			setMessages((curr) => [
-				...curr,
-				{
-					id: assistantId,
-					role: "assistant",
-					content: "",
-					createdAt: Date.now(),
-				} as unknown as MessageAISDK,
-			]),
-		);
-		function appendChunk(chunk: string) {
-			if (cancelled) return;
-			startTransition(() =>
-				setMessages((curr) =>
-					curr.map((m) => {
-						if (m.id === assistantId) {
-							const existing =
-								(m as MessageAISDK & { content?: string }).content ?? "";
-							return { ...m, content: existing + chunk } as typeof m;
-						}
-						return m;
-					}),
-				),
-			);
-		}
-		function done() {
-			if (cancelled) return;
-			// Persist final assistant message
-			const finalContent = String(
-				(
-					messages.find((m) => m.id === assistantId) as MessageAISDK & {
-						content?: string;
-					}
-				)?.content ?? "",
-			);
-			void cache
-				.addMessage({
-					chatId: chatId as string,
-					userId: currentUserId ?? "system",
-					role: "assistant",
-					content: finalContent,
-					model: String(selectedModelRef.current || "gpt-4o"),
-					createdAt: Date.now(),
-				})
-				.catch(() => {});
-		}
-
-		resumeAssistantStream({
-			chatId,
-			appendAssistantChunk: appendChunk,
-			onDone: done,
-		});
-
-		return () => {
-			cancelled = true;
-		};
+		// Note: Stream resumption functionality removed for now - will be fixed in future update
+		console.log("Stream resumption temporarily disabled");
 	}, [chatId, messages, cache, currentUserId]);
 
 	const createNewChat = useCallback(
 		async (initialMessage: string, model: string): Promise<string> => {
-			if (!currentUserId) throw new Error("User not authenticated");
+			if (!currentUserId) {
+				throw new Error("No user ID available");
+			}
+			
+			if (!user?.id) {
+				// For non-logged users, use local storage
+				try {
+					const chatName = initialMessage.slice(0, 50);
+					const newChatId = await localChatStorage.createChat(chatName, model);
+					return newChatId;
+				} catch (error) {
+					console.error("Failed to create local chat:", error);
+					throw error;
+				}
+			}
 
+			// For logged users, create in both cache and local storage
 			try {
 				const chatName = initialMessage.slice(0, 50);
-				const newChatId = await cache.createChat(
-					chatName,
-					model,
-					currentUserId,
-				);
-				return newChatId;
+				const [convexChatId, localChatId] = await Promise.all([
+					cache.createChat(chatName, model, currentUserId),
+					localChatStorage.createChat(chatName, model, undefined, currentUserId)
+				]);
+				return convexChatId; // Return convex ID as primary
 			} catch (error) {
 				console.error("Failed to create chat:", error);
 				throw error;
 			}
 		},
-		[currentUserId, cache],
+		[currentUserId, cache, user?.id],
 	);
 
 	const sendMessage = useCallback(
-		(
+		async (
 			message: string,
 			attachments: UploadedFile[] = [],
 			search = false,
-			captchaToken?: string,
 		) => {
 			if (!currentUserId || !chatId) return;
 			if (isSubmitting) return;
@@ -449,40 +565,83 @@ export function MessagesProvider({
 			setIsSubmitting(true);
 
 			try {
-				// 1) Persist immediately so the message survives refresh.
-				void cache
-					.addMessage({
-						chatId,
-						userId: currentUserId,
-						role: "user",
-						content: message,
-						model: selectedModelRef.current,
-						attachments,
-						createdAt: Date.now(),
-					})
-					.then((convexId) => {
-						// Update the AI-SDK message with the real/optimistic id so any
-						// later operations (e.g. regenerate) have access to it.
-						startTransition(() => {
-							setMessages((current) =>
-								current.map((msg) => {
-									if (
-										msg.role === "user" &&
-										msg.content === message &&
-										// Message was appended just now; it won't have a convexId yet
-										// biome-ignore lint/suspicious/noExplicitAny: convexId is an extension not present in the base Message type
-										!(msg as any).convexId
-									) {
-										return { ...msg, convexId } as typeof msg;
-									}
-									return msg;
-								}),
-							);
+				if (!user?.id) {
+					// For non-logged users, use local storage
+					void localChatStorage
+						.addMessage(
+							chatId,
+							"user",
+							message,
+							selectedModelRef.current,
+							attachments
+						)
+						.then((localMessageId) => {
+							// Update the AI-SDK message with the local message id
+							startTransition(() => {
+								setMessages((current) =>
+									current.map((msg) => {
+										if (
+											msg.role === "user" &&
+											msg.content === message &&
+											// Message was appended just now; it won't have a convexId yet
+											!(msg as ExtendedMessage).convexId
+										) {
+											return { ...msg, convexId: localMessageId } as ExtendedMessage;
+										}
+										return msg;
+									}),
+								);
+							});
+						})
+						.catch((err) => {
+							console.error("Failed to persist user message to local storage:", err);
 						});
-					})
-					.catch((err) => {
-						console.error("Failed to persist user message early:", err);
-					});
+				} else {
+					// For logged users, save to both cache and local storage
+					Promise.all([
+						cache.addMessage({
+							chatId,
+							userId: currentUserId,
+							role: "user",
+							content: message,
+							model: selectedModelRef.current,
+							attachments,
+							createdAt: Date.now(),
+						}),
+						localChatStorage.addMessage(
+							chatId,
+							"user",
+							message,
+							selectedModelRef.current,
+							attachments,
+							currentUserId
+						)
+					])
+						.then(([convexId, localId]) => {
+							// Update the AI-SDK message with the convex message id (primary)
+							startTransition(() => {
+								setMessages((current) =>
+									current.map((msg) => {
+										if (
+											msg.role === "user" &&
+											msg.content === message &&
+											// Message was appended just now; it won't have a convexId yet
+											!(msg as ExtendedMessage).convexId
+										) {
+											return { ...msg, convexId } as ExtendedMessage;
+										}
+										return msg;
+									}),
+								);
+							});
+						})
+						.catch((err) => {
+							console.error("Failed to persist user message:", err);
+						});
+				}
+
+				// Get local API keys for non-logged users (async)
+				const localKeys = user?.id ? {} : await getAllKeys();
 
 				// 2) Trigger the AI SDK streaming request.
 				void append(
@@ -494,13 +653,16 @@ export function MessagesProvider({
 					},
 					{
 						body: {
-							chatId: chatId as Id<"chats">,
+							// For local users, don't cast as Convex ID since it's not a Convex ID
+							chatId: currentUserId === 'local_user' ? chatId : chatId as Id<"chats">,
 							userId: currentUserId,
 							model: selectedModelRef.current,
 							isAuthenticated: !!user?.id,
 							systemPrompt: SYSTEM_PROMPT_DEFAULT,
 							searchEnabled: search,
-							...(captchaToken ? { captchaToken } : {}),
+							...(Object.keys(localKeys).length > 0
+								? { userApiKeys: localKeys }
+								: {}),
 						},
 					},
 				).catch((err) => {
@@ -556,208 +718,68 @@ export function MessagesProvider({
 		sendMessage,
 	]);
 
-	const changeModel = useCallback(
-		async (newModel: string) => {
-			setSelectedModel(newModel);
-			selectedModelRef.current = newModel;
+	const regenerate = useCallback(
+		(messageId: string, model: string) => {
+			if (!currentUserId || !chatId) return;
 
-			// If we have a chat, update it in the cache
-			if (chatId && currentUserId) {
-				try {
-					await cache.updateChatModel(chatId, newModel);
-				} catch (error) {
-					console.error("Failed to update chat model:", error);
-				}
+			setSelectedModel(model);
+
+			const messageToRegenerate = messages.find(
+				(m) =>
+					m.id === messageId || (m as ExtendedMessage).convexId === messageId,
+			);
+			if (!messageToRegenerate) {
+				console.error("Message to regenerate not found:", messageId);
+				return;
 			}
-		},
-		[chatId, currentUserId, cache],
-	);
 
-	const regenerateMessage = useCallback(
-		async (messageIndex: number, newModel?: string) => {
-			if (!currentUserId || !chatId || messageIndex < 0) return;
-			if (isSubmitting) return;
-
-			setIsSubmitting(true);
-
-			try {
-				const assistantMessage = messages[messageIndex];
-
-				if (!assistantMessage || assistantMessage.role !== "assistant") {
-					console.error("Could not find assistant message to regenerate");
-					return;
-				}
-
-				const convexId = (
-					assistantMessage as MessageAISDK & { convexId?: string }
-				).convexId;
-
-				// Only proceed if we have a valid Convex ID (not an optimistic AI SDK ID)
-				if (
-					!convexId ||
-					convexId.startsWith("msg-") ||
-					convexId.startsWith("temp-") ||
-					convexId.startsWith(OPTIMISTIC_PREFIX)
-				) {
-					console.error(
-						"No valid Convex ID found for message - cannot regenerate",
-					);
-					return;
-				}
-
-				const userMessage = messages[messageIndex - 1];
-				if (!userMessage || userMessage.role !== "user") {
-					console.error("Could not find user message to regenerate from");
-					return;
-				}
-
-				const modelToUse = newModel || selectedModelRef.current;
-				if (newModel && newModel !== selectedModelRef.current) {
-					await changeModel(newModel);
-				}
-
-				// Get the root parent message ID (for version chaining)
-				let rootParentId = convexId;
-
-				// Check if this message already has a parent (it's already a regenerated version)
-				try {
-					const currentMessage = await convex.query(
-						api.chat.getMessageVersions,
-						{
-							messageId: convexId as Id<"messages">,
-						},
-					);
-
-					if (currentMessage && currentMessage.length > 0) {
-						// Find the root parent (the one without a parentMessageId)
-						const rootMessage = currentMessage.find(
-							(msg) => !msg.parentMessageId,
-						);
-						if (rootMessage) {
-							rootParentId = rootMessage._id;
-						}
-					}
-				} catch (error) {
-					console.error("Failed to get message versions:", error);
-					// Continue with the current message as root parent
-				}
-
-				// Get the next version number from Convex using the root parent
-				const nextVersion = await convex.query(api.chat.getNextVersionNumber, {
-					parentMessageId: rootParentId as Id<"messages">,
-				});
-
-				// If this is the first regeneration (nextVersion is 2), mark the original as version 1
-				if (nextVersion === 2) {
-					await convex.mutation(api.chat.markAsOriginalVersion, {
-						messageId: rootParentId as Id<"messages">,
-					});
-				}
-
-				regenerationContext.current = {
-					parentMessageId: rootParentId,
-					version: nextVersion,
-				};
-
-				// Remove the original user + assistant messages locally before regeneration starts
-				const originalUserId = userMessage.id as string;
-				const originalAssistantId = assistantMessage.id as string;
-
-				const messagesToKeep = messages.filter(
-					(m) => m.id !== originalUserId && m.id !== originalAssistantId,
-				);
-
-				startTransition(() => setMessages(messagesToKeep));
-
-				// after appended, ensure the originals stay removed.
-				await append(
-					{
-						role: "user",
-						content: userMessage.content,
-					},
-					{
-						body: {
-							chatId: chatId as Id<"chats">,
-							userId: currentUserId,
-							model: modelToUse,
-							isAuthenticated: !!user?.id,
-							systemPrompt: SYSTEM_PROMPT_DEFAULT,
-						},
-					},
-				);
-
-				startTransition(() =>
-					setMessages((curr) =>
-						curr.filter(
-							(m) => m.id !== originalUserId && m.id !== originalAssistantId,
-						),
-					),
-				);
-			} catch (error) {
-				console.error("Failed to regenerate message:", error);
-				regenerationContext.current = null;
-				toast({
-					title: "Failed to regenerate message",
-					status: "error",
-				});
-			} finally {
-				setIsSubmitting(false);
+			if (messageToRegenerate.role !== "assistant") {
+				console.error("Can only regenerate assistant messages");
+				return;
 			}
-		},
-		[
-			currentUserId,
-			chatId,
-			messages,
-			setMessages,
-			append,
-			changeModel,
-			isSubmitting,
-			convex,
-			user?.id,
-		],
-	);
 
-	const branchChat = useCallback(
-		async (uptoIndex: number): Promise<string | null> => {
-			if (!currentUserId) return null;
-			const name =
-				messages.find((m) => m.role === "user")?.content.slice(0, 30) ||
-				"Branched chat";
-			try {
-				const newChatId = await cache.createChat(
-					name,
-					selectedModelRef.current,
-					currentUserId,
-					chatId,
-				);
-
-				// excluding system and inactive versions
-				const msgsToCopy = messages.slice(0, uptoIndex + 1).filter(
-					(m) =>
-						m.role === "user" ||
-						// biome-ignore lint/suspicious/noExplicitAny: messages typed loosely from AI SDK
-						(m.role === "assistant" && ((m as any).isActive ?? true)),
-				);
-				for (const msg of msgsToCopy) {
-					await cache.addMessage({
-						chatId: newChatId,
-						userId: msg.role === "user" ? currentUserId : "system", // keep same
-						role: msg.role as "user" | "assistant" | "system",
-						content: msg.content,
-						// biome-ignore lint/suspicious/noExplicitAny: message model may be stored loosely
-						model: (msg as any).model || selectedModelRef.current,
-						// biome-ignore lint/suspicious/noExplicitAny: experimental attachments are optional legacy field
-						attachments: (msg as any).experimental_attachments || [],
-						createdAt: Date.now(),
-					});
-				}
-				return newChatId;
-			} catch (e) {
-				console.error("branchChat failed", e);
-				return null;
+			// Find the user message that prompted this assistant response
+			const messageIndex = messages.findIndex(
+				(m) =>
+					m.id === messageId || (m as ExtendedMessage).convexId === messageId,
+			);
+			if (messageIndex === -1 || messageIndex === 0) {
+				console.error("Cannot find user message for regeneration");
+				return;
 			}
+
+			const userMessage = messages[messageIndex - 1];
+			if (!userMessage || userMessage.role !== "user") {
+				console.error("Previous message is not a user message");
+				return;
+			}
+
+			// Remove the assistant message and all messages after it
+			const messagesToKeep = messages.slice(0, messageIndex);
+			setMessages(messagesToKeep);
+
+			// Set regeneration context
+			const convexId =
+				(messageToRegenerate as ExtendedMessage).convexId || messageId;
+			const existingVersions = messages.filter(
+				(m) =>
+					(m as ExtendedMessage).convexId === convexId ||
+					(m as ExtendedMessage).parentMessageId === convexId,
+			);
+			const nextVersion = existingVersions.length + 1;
+
+			regenerationContext.current = {
+				parentMessageId: convexId,
+				version: nextVersion,
+			};
+
+			// Trigger regeneration by resending the user message
+			const attachments = userMessage.experimental_attachments || [];
+			setTimeout(() => {
+				sendMessage(userMessage.content, attachments as UploadedFile[], false);
+			}, 100);
 		},
-		[currentUserId, cache, messages, chatId],
+		[currentUserId, chatId, messages, setMessages, sendMessage],
 	);
 
 	return (
@@ -766,56 +788,19 @@ export function MessagesProvider({
 				messages,
 				input,
 				setInput,
-				status,
-				error,
+				sendMessage,
 				isSubmitting,
 				selectedModel,
 				setSelectedModel,
-				sendMessage,
-				createNewChat,
-				changeModel,
-				regenerateMessage,
-				stop,
-				reload,
+				status,
 				quotaExceeded,
 				rateLimited,
-				branchChat,
+				createNewChat,
+				regenerate,
+				stop,
 			}}
 		>
 			{children}
 		</MessagesContext.Provider>
 	);
-}
-
-// TODO: ⚠️ Resumable stream logic is still buggy; needs major fixes soon.
-async function resumeAssistantStream({
-	chatId,
-	appendAssistantChunk,
-	onDone,
-}: {
-	chatId: string;
-	appendAssistantChunk: (chunk: string) => void;
-	onDone: () => void;
-}) {
-	try {
-		const res = await fetch(`/api/chat?chatId=${encodeURIComponent(chatId)}`);
-		if (!res.ok || !res.body) {
-			onDone();
-			return;
-		}
-		const reader = res.body.getReader();
-		const decoder = new TextDecoder();
-		let done = false;
-		while (!done) {
-			const { value, done: readerDone } = await reader.read();
-			done = readerDone;
-			if (value) {
-				appendAssistantChunk(decoder.decode(value));
-			}
-		}
-	} catch (err) {
-		console.error("Failed to resume stream", err);
-	} finally {
-		onDone();
-	}
 }

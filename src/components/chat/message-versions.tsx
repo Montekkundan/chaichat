@@ -7,7 +7,6 @@ import { useMutation, useQuery } from "convex/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "~/components/ui/button";
 import { OPTIMISTIC_PREFIX } from "~/lib/providers/cache-provider";
-import { useCache } from "~/lib/providers/cache-provider";
 import { cn } from "~/lib/utils";
 import { MessageContentSkeleton } from "./message-content-skeleton";
 
@@ -29,13 +28,13 @@ export function MessageVersions({
 	const [isLoadingVersion, setIsLoadingVersion] = useState(false);
 	const loggedIds = useRef(new Set<string>());
 
-	// Only use convexId if it exists and is a valid Convex ID
-	// AI SDK generates IDs like "msg-..." which are not valid Convex IDs
 	const actualConvexId =
 		convexId &&
 		!convexId.startsWith("msg-") &&
 		!convexId.startsWith("temp-") &&
-		!convexId.startsWith(OPTIMISTIC_PREFIX)
+		!convexId.startsWith(OPTIMISTIC_PREFIX) &&
+		!convexId.startsWith("local_msg_") &&
+		!convexId.startsWith("msg_")
 			? convexId
 			: undefined;
 
@@ -49,12 +48,21 @@ export function MessageVersions({
 				);
 				loggedIds.current.add(messageId);
 			}
+			if (messageId?.startsWith("local_msg_") && !loggedIds.current.has(messageId)) {
+				console.warn(
+					"MessageVersions: Received local message ID, skipping version query:",
+					messageId,
+				);
+				loggedIds.current.add(messageId);
+			}
 			if (
 				convexId &&
 				(convexId.startsWith("msg-") ||
-					convexId.startsWith("temp-") ||
-					convexId.startsWith(OPTIMISTIC_PREFIX)) &&
-				!loggedIds.current.has(convexId)
+									convexId.startsWith("temp-") ||
+				convexId.startsWith(OPTIMISTIC_PREFIX) ||
+				convexId.startsWith("local_msg_") ||
+				convexId.startsWith("msg_")) &&
+			!loggedIds.current.has(convexId)
 			) {
 				console.warn(
 					"MessageVersions: Received invalid convexId, skipping version query:",

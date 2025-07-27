@@ -1,99 +1,25 @@
 import { mutation, query, action } from "./_generated/server";
 import { v } from "convex/values";
 
-// --- AWS KMS INTEGRATION ----------------------------------------------------
-// Convex has AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_REGION, KMS_KEY_ID
+// Simplified API key storage for logged-in users only
+// Keys are stored in plaintext since we removed expensive AWS KMS
+// For non-logged users, keys will be stored in localStorage/sessionStorage
 
-import {
-  KMSClient,
-  EncryptCommand,
-  DecryptCommand,
-} from "@aws-sdk/client-kms";
-
-const awsRegion = process.env.AWS_REGION;
-const kmsKeyId = process.env.KMS_KEY_ID;
-const awsAccessKeyId = process.env.AWS_ACCESS_KEY_ID;
-const awsSecretAccessKey = process.env.AWS_SECRET_ACCESS_KEY;
-
-if (!awsRegion || !kmsKeyId || !awsAccessKeyId || !awsSecretAccessKey) {
-  throw new Error(
-    "AWS KMS env vars missing – ensure AWS_REGION, KMS_KEY_ID, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY are set in Convex deployment",
-  );
-}
-
-const kmsClient = new KMSClient({
-  region: awsRegion,
-  credentials: {
-    accessKeyId: awsAccessKeyId,
-    secretAccessKey: awsSecretAccessKey,
-  },
-});
-
-const textEncoder = new TextEncoder();
-const textDecoder = new TextDecoder();
-
-function uint8ToBase64(bytes: Uint8Array): string {
-  let binary = "";
-  for (let i = 0; i < bytes.length; i++) {
-    binary += String.fromCharCode(bytes[i]!);
-  }
-  if (typeof btoa !== "undefined") {
-    return btoa(binary);
-  }
-  // Fallback: custom base64 encoder
-  return Buffer.from(bytes).toString("base64");
-}
-
-function base64ToUint8(b64: string): Uint8Array {
-  if (typeof atob !== "undefined") {
-    const binary = atob(b64);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) {
-      bytes[i] = binary.charCodeAt(i);
-    }
-    return bytes;
-  }
-  // Fallback using Buffer if available
-  return new Uint8Array(Buffer.from(b64, "base64"));
-}
-
-async function kmsEncrypt(plaintext: string): Promise<string> {
-  if (!plaintext) return "";
-  const res = await kmsClient.send(
-    new EncryptCommand({
-      KeyId: kmsKeyId,
-      Plaintext: textEncoder.encode(plaintext),
-    }),
-  );
-  if (!res.CiphertextBlob) throw new Error("KMS encryption failed");
-  return uint8ToBase64(res.CiphertextBlob as Uint8Array);
-}
-
-async function kmsDecrypt(ciphertextB64: string): Promise<string> {
-  if (!ciphertextB64) return "";
-  const res = await kmsClient.send(
-    new DecryptCommand({
-      CiphertextBlob: base64ToUint8(ciphertextB64),
-    }),
-  );
-  if (!res.Plaintext) throw new Error("KMS decryption failed");
-  return textDecoder.decode(res.Plaintext as Uint8Array);
-}
-
-export const storeEncryptedKey = mutation({
+export const storeKey = mutation({
   args: {
     provider: v.union(
       v.literal("openai"),
       v.literal("anthropic"),
       v.literal("google"),
-      v.literal("mistral")
+      v.literal("mistral"),
+      v.literal("xai")
     ),
-    encryptedKey: v.string(),
+    apiKey: v.string(),
   },
-  handler: async (ctx, { provider, encryptedKey }) => {
+  handler: async (ctx, { provider, apiKey }) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) {
-      throw new Error("Not authenticated");
+      throw new Error("Not authenticated - use local storage for non-logged users");
     }
 
     const userId = identity.subject;
@@ -107,13 +33,13 @@ export const storeEncryptedKey = mutation({
     if (existingUser) {
       // Update existing user
       await ctx.db.patch(existingUser._id, {
-        [`${provider}Key`]: encryptedKey,
+        [`${provider}Key`]: apiKey,
       });
     } else {
       // Create new user record
       await ctx.db.insert("users", {
         userId,
-        [`${provider}Key`]: encryptedKey,
+        [`${provider}Key`]: apiKey,
       });
     }
   },
@@ -129,32 +55,12 @@ export const getUserDoc = query({
   },
 });
 
-// Action exposed to clients: performs encryption then writes using internal mutation
-export const saveKey = action({
-  args: {
-    provider: v.union(
-      v.literal("openai"),
-      v.literal("anthropic"),
-      v.literal("google"),
-      v.literal("mistral")
-    ),
-    apiKey: v.string(),
-  },
-  handler: async (ctx, { provider, apiKey }) => {
-    const encryptedKey = await kmsEncrypt(apiKey);
-    await ctx.runMutation("userKeys:storeEncryptedKey" as any, {
-      provider,
-      encryptedKey,
-    });
-  },
-});
-
 export const getKeys = action({
   args: {},
   handler: async (ctx) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) {
-      return {};
+      return {}; // Non-logged users should use localStorage
     }
 
     const userId = identity.subject;
@@ -164,12 +70,13 @@ export const getKeys = action({
       return {};
     }
 
-    // Decrypt each key 
+    // Return keys directly (no decryption needed)
     return {
-      openaiKey: user.openaiKey ? await kmsDecrypt(user.openaiKey) : undefined,
-      anthropicKey: user.anthropicKey ? await kmsDecrypt(user.anthropicKey) : undefined,
-      googleKey: user.googleKey ? await kmsDecrypt(user.googleKey) : undefined,
-      mistralKey: user.mistralKey ? await kmsDecrypt(user.mistralKey) : undefined,
+      openaiKey: user.openaiKey,
+      anthropicKey: user.anthropicKey,
+      googleKey: user.googleKey,
+      mistralKey: user.mistralKey,
+      xaiKey: user.xaiKey,
     };
   },
 });
@@ -180,7 +87,8 @@ export const removeKey = mutation({
       v.literal("openai"),
       v.literal("anthropic"),
       v.literal("google"),
-      v.literal("mistral")
+      v.literal("mistral"),
+      v.literal("xai")
     ),
   },
   handler: async (ctx, { provider }) => {
@@ -203,7 +111,7 @@ export const removeKey = mutation({
   },
 });
 
-// Server-side:get decrypted keys for API calls
+// Server-side: get keys for API calls (for logged-in users)
 export const getUserKeysForAPI = action({
   args: { userId: v.string() },
   handler: async (ctx, { userId }) => {
@@ -214,10 +122,11 @@ export const getUserKeysForAPI = action({
     }
 
     return {
-      openaiKey: user.openaiKey ? await kmsDecrypt(user.openaiKey) : undefined,
-      anthropicKey: user.anthropicKey ? await kmsDecrypt(user.anthropicKey) : undefined,
-      googleKey: user.googleKey ? await kmsDecrypt(user.googleKey) : undefined,
-      mistralKey: user.mistralKey ? await kmsDecrypt(user.mistralKey) : undefined,
+      openaiKey: user.openaiKey,
+      anthropicKey: user.anthropicKey,
+      googleKey: user.googleKey,
+      mistralKey: user.mistralKey,
+      xaiKey: user.xaiKey,
     };
   },
 }); 
