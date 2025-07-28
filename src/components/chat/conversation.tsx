@@ -31,7 +31,7 @@ export function Conversation({
 	onReload,
 	onBranch,
 }: ConversationProps) {
-	const containerRef = useRef<HTMLDivElement>(null)
+	const containerRef = useRef<HTMLDivElement>(null);
 	const initialMessageCount = useRef(messages.length);
 
 	if (status === "ready" && messages.length > initialMessageCount.current) {
@@ -74,7 +74,7 @@ export function Conversation({
 				<div className="mask-b-from-4% mask-b-to-100% flex h-app-header w-full bg-background lg:hidden" />
 			</div>
 
-			<ChatContainerRoot className="relative w-full h-full">
+			<ChatContainerRoot className="relative h-full w-full">
 				<ChatContainerContent
 					className="flex w-full flex-col items-center pt-20 pb-40"
 					style={{
@@ -113,13 +113,13 @@ export function Conversation({
 						(sortedMessages.length === 0 ||
 							(sortedMessages.length > 0 &&
 								sortedMessages[sortedMessages.length - 1]?.role ===
-								"user")) && (
+									"user")) && (
 							<div className="group flex min-h-scroll-anchor w-full max-w-3xl flex-col items-start gap-2 px-6 pb-2">
 								<Loader />
 							</div>
 						)}
 				</ChatContainerContent>
-				<div className="absolute left-1/2 bottom-34 transform -translate-x-1/2">
+				<div className="-translate-x-1/2 absolute bottom-34 left-1/2 transform">
 					<ScrollButton className="shadow-sm" />
 				</div>
 			</ChatContainerRoot>

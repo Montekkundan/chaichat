@@ -30,7 +30,9 @@ export class ErrorBoundary extends Component<Props, State> {
 			return (
 				<div className="flex min-h-screen items-center justify-center">
 					<div className="text-center">
-						<h2 className="mb-4 text-2xl font-bold">Oops, there was an error!</h2>
+						<h2 className="mb-4 font-bold text-2xl">
+							Oops, there was an error!
+						</h2>
 						<button
 							type="button"
 							className="rounded bg-blue-500 px-4 py-2 text-white hover:bg-blue-600"

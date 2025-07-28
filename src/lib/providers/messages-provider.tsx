@@ -16,16 +16,16 @@ import {
 } from "react";
 import type { UploadedFile } from "~/components/chat-input/file-items";
 import { toast } from "~/components/ui/toast";
+import type { Message } from "~/db";
 import { SYSTEM_PROMPT_DEFAULT } from "~/lib/config";
+import { type LocalMessage, localChatStorage } from "~/lib/local-chat-storage";
 import { getBestAvailableModel } from "~/lib/model-utils";
 import {
 	getAllKeys,
 	migrateFromPlaintextStorage,
 } from "~/lib/secure-local-keys";
-import { OPTIMISTIC_PREFIX, useCache } from "./cache-provider";
-import { localChatStorage, type LocalMessage } from "~/lib/local-chat-storage";
-import type { Message } from "~/db";
 import { userSessionManager } from "~/lib/user-session-manager";
+import { OPTIMISTIC_PREFIX, useCache } from "./cache-provider";
 
 // Extended message type with Convex-specific properties
 type ExtendedMessage = MessageAISDK & {
@@ -74,8 +74,6 @@ export function MessagesProvider({
 	chatId,
 	initialModel = "gpt-4o",
 }: MessagesProviderProps) {
-	
-
 	const { user } = useUser();
 	const cache = useCache();
 	const convex = useConvex();
@@ -161,23 +159,25 @@ export function MessagesProvider({
 					// For logged users, load from both cache and local storage
 					const [cacheMessages, localMessages] = await Promise.all([
 						cache.getMessages(chatId),
-						localChatStorage.getMessages(chatId, currentUserId)
+						localChatStorage.getMessages(chatId, currentUserId),
 					]);
-					
+
 					// Merge messages, prioritizing cache messages
 					const messageMap = new Map();
-					
+
 					// Add local messages first
 					for (const msg of localMessages) {
 						messageMap.set(msg._id, msg);
 					}
-					
+
 					// Override with cache messages (they're more up-to-date)
 					for (const msg of cacheMessages) {
 						messageMap.set(msg._id, msg);
 					}
-					
-					messages = Array.from(messageMap.values()).sort((a, b) => a.createdAt - b.createdAt);
+
+					messages = Array.from(messageMap.values()).sort(
+						(a, b) => a.createdAt - b.createdAt,
+					);
 				}
 
 				const aiSdkMessages = messages.map((m) => {
@@ -233,7 +233,7 @@ export function MessagesProvider({
 							"user",
 							pendingUserMessage.current.content,
 							selectedModelRef.current,
-							pendingUserMessage.current.attachments
+							pendingUserMessage.current.attachments,
 						);
 
 						// Update the AI-SDK message with the local message id
@@ -268,8 +268,8 @@ export function MessagesProvider({
 								pendingUserMessage.current.content,
 								selectedModelRef.current,
 								pendingUserMessage.current.attachments,
-								currentUserId
-							)
+								currentUserId,
+							),
 						]);
 
 						// Update the AI-SDK message with the convex message id (primary)
@@ -303,7 +303,7 @@ export function MessagesProvider({
 							chatId as string,
 							"assistant",
 							message.content,
-							selectedModelRef.current
+							selectedModelRef.current,
 						);
 
 						startTransition(() =>
@@ -321,10 +321,16 @@ export function MessagesProvider({
 						);
 					} else {
 						// For logged users, save to both cache and local storage
-						console.log("onFinish - regenerationContext:", regenerationContext.current);
-						
+						console.log(
+							"onFinish - regenerationContext:",
+							regenerationContext.current,
+						);
+
 						if (regenerationContext.current) {
-							console.log("Processing regenerated message with context:", regenerationContext.current);
+							console.log(
+								"Processing regenerated message with context:",
+								regenerationContext.current,
+							);
 							// For regenerated messages, mark original as version 1 and save new version
 							await cache.markAsOriginalVersion(
 								regenerationContext.current.parentMessageId,
@@ -347,11 +353,14 @@ export function MessagesProvider({
 									message.content,
 									selectedModelRef.current,
 									undefined,
-									currentUserId
-								)
+									currentUserId,
+								),
 							]);
 
-							console.log("Created regenerated message with convexId:", convexMessageId);
+							console.log(
+								"Created regenerated message with convexId:",
+								convexMessageId,
+							);
 
 							startTransition(() =>
 								setMessages((currentMessages) =>
@@ -361,7 +370,8 @@ export function MessagesProvider({
 													...msg,
 													convexId: convexMessageId,
 													model: selectedModelRef.current,
-													parentMessageId: regenerationContext.current?.parentMessageId,
+													parentMessageId:
+														regenerationContext.current?.parentMessageId,
 													version: regenerationContext.current?.version,
 												}
 											: msg,
@@ -388,8 +398,8 @@ export function MessagesProvider({
 									message.content,
 									selectedModelRef.current,
 									undefined,
-									currentUserId
-								)
+									currentUserId,
+								),
 							]);
 
 							startTransition(() =>
@@ -532,7 +542,7 @@ export function MessagesProvider({
 			if (!currentUserId) {
 				throw new Error("No user ID available");
 			}
-			
+
 			if (!user?.id) {
 				// For non-logged users, use local storage
 				try {
@@ -550,7 +560,12 @@ export function MessagesProvider({
 				const chatName = initialMessage.slice(0, 50);
 				const [convexChatId, localChatId] = await Promise.all([
 					cache.createChat(chatName, model, currentUserId),
-					localChatStorage.createChat(chatName, model, undefined, currentUserId)
+					localChatStorage.createChat(
+						chatName,
+						model,
+						undefined,
+						currentUserId,
+					),
 				]);
 				return convexChatId; // Return convex ID as primary
 			} catch (error) {
@@ -581,7 +596,7 @@ export function MessagesProvider({
 							"user",
 							message,
 							selectedModelRef.current,
-							attachments
+							attachments,
 						)
 						.then((localMessageId) => {
 							// Update the AI-SDK message with the local message id
@@ -594,7 +609,10 @@ export function MessagesProvider({
 											// Message was appended just now; it won't have a convexId yet
 											!(msg as ExtendedMessage).convexId
 										) {
-											return { ...msg, convexId: localMessageId } as ExtendedMessage;
+											return {
+												...msg,
+												convexId: localMessageId,
+											} as ExtendedMessage;
 										}
 										return msg;
 									}),
@@ -602,7 +620,10 @@ export function MessagesProvider({
 							});
 						})
 						.catch((err) => {
-							console.error("Failed to persist user message to local storage:", err);
+							console.error(
+								"Failed to persist user message to local storage:",
+								err,
+							);
 						});
 				} else {
 					// For logged users, save to both cache and local storage
@@ -622,8 +643,8 @@ export function MessagesProvider({
 							message,
 							selectedModelRef.current,
 							attachments,
-							currentUserId
-						)
+							currentUserId,
+						),
 					])
 						.then(([convexId, localId]) => {
 							// Update the AI-SDK message with the convex message id (primary)
@@ -648,8 +669,8 @@ export function MessagesProvider({
 						});
 				}
 
-							// Get local API keys for non-logged users
-			const localKeys = user?.id ? {} : await getAllKeys();
+				// Get local API keys for non-logged users
+				const localKeys = user?.id ? {} : await getAllKeys();
 
 				// 2) Trigger the AI SDK streaming request.
 				// 2) Trigger the AI SDK streaming request.
@@ -663,7 +684,10 @@ export function MessagesProvider({
 					{
 						body: {
 							// For local users, don't cast as Convex ID since it's not a Convex ID
-							chatId: currentUserId === 'local_user' ? chatId : chatId as Id<"chats">,
+							chatId:
+								currentUserId === "local_user"
+									? chatId
+									: (chatId as Id<"chats">),
 							userId: currentUserId,
 							model: selectedModelRef.current,
 							isAuthenticated: !!user?.id,
@@ -734,22 +758,18 @@ export function MessagesProvider({
 			setSelectedModel(model);
 
 			// Find the assistant message to regenerate
-			const messageToRegenerate = messages.find(
-				(m) => {
-					const extendedMsg = m as ExtendedMessage;
-					return m.id === messageId || extendedMsg.convexId === messageId;
-				}
-			);
+			const messageToRegenerate = messages.find((m) => {
+				const extendedMsg = m as ExtendedMessage;
+				return m.id === messageId || extendedMsg.convexId === messageId;
+			});
 			if (!messageToRegenerate) return;
 			if (messageToRegenerate.role !== "assistant") return;
 
 			// Find the user message that prompted this assistant response
-			const messageIndex = messages.findIndex(
-				(m) => {
-					const extendedMsg = m as ExtendedMessage;
-					return m.id === messageId || extendedMsg.convexId === messageId;
-				}
-			);
+			const messageIndex = messages.findIndex((m) => {
+				const extendedMsg = m as ExtendedMessage;
+				return m.id === messageId || extendedMsg.convexId === messageId;
+			});
 			if (messageIndex === -1 || messageIndex === 0) return;
 			const userMessage = messages[messageIndex - 1];
 			if (!userMessage || userMessage.role !== "user") return;
@@ -757,7 +777,11 @@ export function MessagesProvider({
 			// Mark the current assistant message as inactive
 			const updatedMessages = messages.map((msg) => {
 				const extendedMsg = msg as ExtendedMessage;
-				if (extendedMsg.convexId === (messageToRegenerate as ExtendedMessage).convexId || msg.id === messageId) {
+				if (
+					extendedMsg.convexId ===
+						(messageToRegenerate as ExtendedMessage).convexId ||
+					msg.id === messageId
+				) {
 					return { ...msg, isActive: false };
 				}
 				return msg;
@@ -765,13 +789,16 @@ export function MessagesProvider({
 			setMessages(updatedMessages);
 
 			// Find existing versions to determine next version number
-			const convexId = (messageToRegenerate as ExtendedMessage).convexId || messageToRegenerate.id;
-			const existingVersions = messages.filter(
-				(m) => {
-					const extendedMsg = m as ExtendedMessage;
-					return extendedMsg.convexId === convexId || extendedMsg.parentMessageId === convexId;
-				}
-			);
+			const convexId =
+				(messageToRegenerate as ExtendedMessage).convexId ||
+				messageToRegenerate.id;
+			const existingVersions = messages.filter((m) => {
+				const extendedMsg = m as ExtendedMessage;
+				return (
+					extendedMsg.convexId === convexId ||
+					extendedMsg.parentMessageId === convexId
+				);
+			});
 			const nextVersion = existingVersions.length + 1;
 
 			// Set regeneration context for versioning
@@ -785,24 +812,29 @@ export function MessagesProvider({
 			const attachments = userMessage.experimental_attachments || [];
 			const localKeys = user?.id ? {} : await getAllKeys();
 			// Build the message context up to and including the user message
-			const contextMessages = messages.slice(0, messageIndex + 1).map((msg) => ({
-				role: msg.role,
-				content: msg.content,
-				experimental_attachments: msg.experimental_attachments,
-			}));
+			const contextMessages = messages
+				.slice(0, messageIndex + 1)
+				.map((msg) => ({
+					role: msg.role,
+					content: msg.content,
+					experimental_attachments: msg.experimental_attachments,
+				}));
 			// Call the API endpoint directly
 			const response = await fetch("/api/chat", {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify({
 					messages: contextMessages,
-					chatId: currentUserId === 'local_user' ? chatId : chatId as Id<"chats">,
+					chatId:
+						currentUserId === "local_user" ? chatId : (chatId as Id<"chats">),
 					userId: currentUserId,
 					model,
 					isAuthenticated: !!user?.id,
 					systemPrompt: SYSTEM_PROMPT_DEFAULT,
 					searchEnabled: false,
-					...(Object.keys(localKeys).length > 0 ? { userApiKeys: localKeys } : {}),
+					...(Object.keys(localKeys).length > 0
+						? { userApiKeys: localKeys }
+						: {}),
 				}),
 			});
 			if (!response.ok) {
@@ -818,17 +850,19 @@ export function MessagesProvider({
 				const { done, value } = await reader.read();
 				if (done) break;
 				const chunk = decoder.decode(value);
-				const lines = chunk.split('\n');
+				const lines = chunk.split("\n");
 				for (const line of lines) {
-					if (line.startsWith('data: ')) {
+					if (line.startsWith("data: ")) {
 						const data = line.slice(6);
-						if (data === '[DONE]') break;
+						if (data === "[DONE]") break;
 						try {
 							const parsed = JSON.parse(data);
-							if (parsed.type === 'text-delta') {
+							if (parsed.type === "text-delta") {
 								newAssistantMessage += parsed.textDelta;
 							}
-						} catch (e) { /* ignore */ }
+						} catch (e) {
+							/* ignore */
+						}
 					}
 				}
 			}
@@ -840,7 +874,7 @@ export function MessagesProvider({
 					id: `msg_${now}_${Math.random().toString(36).slice(2, 10)}`,
 					chatId,
 					userId: currentUserId,
-					role: 'assistant' as const,
+					role: "assistant" as const,
 					content: newAssistantMessage,
 					model,
 					parentMessageId: convexId,
@@ -852,9 +886,14 @@ export function MessagesProvider({
 				};
 				await cache.addMessage(newMsg);
 				// For UI, createdAt should be a Date
-				setMessages((prev) => [...prev, { ...newMsg, createdAt: new Date(now) }]);
+				setMessages((prev) => [
+					...prev,
+					{ ...newMsg, createdAt: new Date(now) },
+				]);
 			}
-		}, [currentUserId, chatId, messages, setMessages, cache, user?.id]);
+		},
+		[currentUserId, chatId, messages, setMessages, cache, user?.id],
+	);
 
 	return (
 		<MessagesContext.Provider

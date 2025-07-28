@@ -2,21 +2,23 @@
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { useUser } from "@clerk/nextjs";
+import { HouseLine } from "@phosphor-icons/react";
 import { useMutation } from "convex/react";
 import {
-	MessageSquare,
-	Plus,
+	BookOpen,
 	// Settings,
 	Bot,
-	SquareTerminal,
-	BookOpen,
-	Settings2,
 	Frame,
+	MessageSquare,
+	Plus,
+	Settings2,
+	SquareTerminal,
 	// User,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { DeleteChatModal } from "~/components/modals/delete-chat-modal";
 import { ShareChatModal } from "~/components/modals/share-chat-modal";
 import {
 	Sidebar,
@@ -29,12 +31,10 @@ import {
 } from "~/components/ui/sidebar";
 import { toast } from "~/components/ui/toast";
 import { useCache } from "~/lib/providers/cache-provider";
-import { DeleteChatModal } from "~/components/modals/delete-chat-modal";
-// import { NavMain } from "./nav-main";
-import { NavTop } from "./nav-top";
 import { Separator } from "../ui/separator";
 import { HistorySection } from "./history-section";
-import { HouseLine } from "@phosphor-icons/react";
+// import { NavMain } from "./nav-main";
+import { NavTop } from "./nav-top";
 
 export function AppSidebar({
 	initialUser,
@@ -49,7 +49,6 @@ export function AppSidebar({
 	};
 	collapsible?: "offcanvas" | "icon" | "none";
 } & React.ComponentProps<typeof Sidebar>) {
-
 	const { user } = useUser();
 	const router = useRouter();
 	const cache = useCache();
@@ -141,97 +140,96 @@ export function AppSidebar({
 			// },
 		],
 		navMain: [
-		  {
-			title: "Playground",
-			url: "#",
-			icon: SquareTerminal,
-			isActive: true,
-			items: [
-			  {
-				title: "Starred",
+			{
+				title: "Playground",
 				url: "#",
-			  },
-			  {
+				icon: SquareTerminal,
+				isActive: true,
+				items: [
+					{
+						title: "Starred",
+						url: "#",
+					},
+					{
+						title: "Settings",
+						url: "#",
+					},
+				],
+			},
+			{
+				title: "Models",
+				url: "#",
+				icon: Bot,
+				items: [
+					{
+						title: "Genesis",
+						url: "#",
+					},
+					{
+						title: "Explorer",
+						url: "#",
+					},
+					{
+						title: "Quantum",
+						url: "#",
+					},
+				],
+			},
+			{
+				title: "Documentation",
+				url: "#",
+				icon: BookOpen,
+				items: [
+					{
+						title: "Introduction",
+						url: "#",
+					},
+					{
+						title: "Get Started",
+						url: "#",
+					},
+					{
+						title: "Tutorials",
+						url: "#",
+					},
+					// {
+					//   title: "Changelog",
+					//   url: "#",
+					// },
+				],
+			},
+			{
 				title: "Settings",
 				url: "#",
-			  },
-			],
-		  },
-		  {
-			title: "Models",
-			url: "#",
-			icon: Bot,
-			items: [
-			  {
-				title: "Genesis",
-				url: "#",
-			  },
-			  {
-				title: "Explorer",
-				url: "#",
-			  },
-			  {
-				title: "Quantum",
-				url: "#",
-			  },
-			],
-		  },
-		  {
-			title: "Documentation",
-			url: "#",
-			icon: BookOpen,
-			items: [
-			  {
-				title: "Introduction",
-				url: "#",
-			  },
-			  {
-				title: "Get Started",
-				url: "#",
-			  },
-			  {
-				title: "Tutorials",
-				url: "#",
-			  },
-			  // {
-			  //   title: "Changelog",
-			  //   url: "#",
-			  // },
-			],
-		  },
-		  {
-			title: "Settings",
-			url: "#",
-			icon: Settings2,
-			items: [
-			  {
-				title: "General",
-				url: "#",
-			  },
-			  {
-				title: "Team",
-				url: "#",
-			  },
-			  {
-				title: "Billing",
-				url: "#",
-			  },
-			  {
-				title: "Limits",
-				url: "#",
-			  },
-			],
-		  },
+				icon: Settings2,
+				items: [
+					{
+						title: "General",
+						url: "#",
+					},
+					{
+						title: "Team",
+						url: "#",
+					},
+					{
+						title: "Billing",
+						url: "#",
+					},
+					{
+						title: "Limits",
+						url: "#",
+					},
+				],
+			},
 		],
 		projects: [
-		  {
-			name: "Architecture",
-			url: "#",
-			icon: Frame,
-		  }
+			{
+				name: "Architecture",
+				url: "#",
+				icon: Frame,
+			},
 		],
 	};
-
 
 	return (
 		<Sidebar collapsible={collapsible || "icon"} {...props}>
@@ -241,7 +239,7 @@ export function AppSidebar({
 						<SidebarMenuButton asChild>
 							<Link href="/">
 								<MessageSquare className="h-6 w-6" />
-								<span className="text-xl font-semibold">ChaiChat</span>
+								<span className="font-semibold text-xl">ChaiChat</span>
 							</Link>
 						</SidebarMenuButton>
 					</SidebarMenuItem>
@@ -250,12 +248,12 @@ export function AppSidebar({
 
 			<SidebarContent>
 				<NavTop items={data.navTop} />
-				<Separator className="!w-[90%] mx-auto"/>
+				<Separator className="!w-[90%] mx-auto" />
 				{/* <NavProjects projects={data.projects} />
 				<Separator className="!w-[90%] mx-auto"/> */}
 				{/* <NavMain items={data.navMain} />
 				<Separator className="!w-[90%] mx-auto"/> */}
-				<HistorySection/>
+				<HistorySection />
 			</SidebarContent>
 
 			{/* <SidebarFooter>

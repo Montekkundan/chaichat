@@ -44,7 +44,7 @@ function MainContentWithInset({ children }: { children: ReactNode }) {
 			</div>
 			{/* Decorative top-right wave overlay */}
 			<div
-				className={`absolute inset-x-3 w-full top-0 z-10 box-content overflow-hidden border-b border-b-[0.5px] bg-sidebar/80 blur-fallback:bg-sidebar backdrop-blur-md transition-[transform,border] ease-snappy max-sm:hidden sm:h-3.5 ${collapsed ? "-translate-y-[15px] border-transparent" : "border-chat-border"}`}
+				className={`absolute inset-x-3 top-0 z-10 box-content w-full overflow-hidden border-b border-b-[0.5px] bg-sidebar/80 blur-fallback:bg-sidebar backdrop-blur-md transition-[transform,border] ease-snappy max-sm:hidden sm:h-3.5 ${collapsed ? "-translate-y-[15px] border-transparent" : "border-chat-border"}`}
 			>
 				<div className="absolute top-0 left-0 blur-fallback:hidden h-full w-8 bg-gradient-to-r from-sidebar to-transparent" />
 				<div className="absolute top-0 right-24 blur-fallback:hidden h-full w-8 bg-gradient-to-l from-sidebar to-transparent" />

@@ -182,9 +182,9 @@ export function ChatInput({
 			checkApiKeys();
 		};
 
-		window.addEventListener('apiKeysChanged', handleApiKeysChanged);
+		window.addEventListener("apiKeysChanged", handleApiKeysChanged);
 		return () => {
-			window.removeEventListener('apiKeysChanged', handleApiKeysChanged);
+			window.removeEventListener("apiKeysChanged", handleApiKeysChanged);
 		};
 	}, [isUserAuthenticated]);
 

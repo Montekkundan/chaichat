@@ -675,7 +675,7 @@ export function CacheProvider({
 			};
 
 			const currentMessages = messagesCache.current.get(targetChatId) || [];
-			
+
 			// If regenerated assistant reply, optimistically deactivate previous versions in cache
 			if (messageData.parentMessageId) {
 				const parentId = messageData.parentMessageId;
@@ -701,7 +701,7 @@ export function CacheProvider({
 					/* ignore */
 				}
 			}
-			
+
 			// Add the new message at the end (it should have the latest timestamp)
 			const newMessages = [...currentMessages, optimisticMessage];
 			// Sort to ensure proper order, but new messages should naturally be at the end

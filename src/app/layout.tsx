@@ -3,18 +3,18 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import { cookies } from "next/headers";
 import "~/styles/globals.css";
+import { Analytics } from "@vercel/analytics/react";
 import ConvexClientProvider from "~/components/providers/convex-client-provider";
 import { ErrorBoundary } from "~/components/providers/error-boundary";
-import { Toaster } from "~/components/ui/sonner";
 import { ThemeProvider } from "~/components/providers/theme-provider";
-import { APP_NAME, APP_DESCRIPTION, APP_URL, APP_OG_IMAGE } from "~/lib/config";
+import { ThemeScript } from "~/components/theme-script";
+import { Toaster } from "~/components/ui/sonner";
+import { UserSessionHandler } from "~/components/user-session-handler";
+import { APP_DESCRIPTION, APP_NAME, APP_OG_IMAGE, APP_URL } from "~/lib/config";
 import { CacheProvider } from "~/lib/providers/cache-provider";
 import { ChatsProvider } from "~/lib/providers/chats-provider";
 import { ModelsProvider } from "~/lib/providers/models-provider";
 import { QuotaProvider } from "~/lib/providers/quota-provider";
-import { Analytics } from "@vercel/analytics/react";
-import { UserSessionHandler } from "~/components/user-session-handler";
-import { ThemeScript } from "~/components/theme-script";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -95,9 +95,7 @@ export default async function RootLayout({
 				<head>
 					<ThemeScript />
 				</head>
-				<body
-					className="bg-sidebar"
-				>
+				<body className="bg-sidebar">
 					<ErrorBoundary>
 						<ThemeProvider
 							attribute="class"
@@ -106,19 +104,19 @@ export default async function RootLayout({
 							disableTransitionOnChange
 						>
 							<ConvexClientProvider>
-									<CacheProvider initialChats={initialChats}>
-										<ChatsProvider>
-											<ModelsProvider>
-												<QuotaProvider>
-													<UserSessionHandler />
-													<Toaster position="top-center" />
-													{children}
-													<Analytics />
-												</QuotaProvider>
-											</ModelsProvider>
-										</ChatsProvider>
-									</CacheProvider>
-								</ConvexClientProvider>
+								<CacheProvider initialChats={initialChats}>
+									<ChatsProvider>
+										<ModelsProvider>
+											<QuotaProvider>
+												<UserSessionHandler />
+												<Toaster position="top-center" />
+												{children}
+												<Analytics />
+											</QuotaProvider>
+										</ModelsProvider>
+									</ChatsProvider>
+								</CacheProvider>
+							</ConvexClientProvider>
 						</ThemeProvider>
 					</ErrorBoundary>
 				</body>

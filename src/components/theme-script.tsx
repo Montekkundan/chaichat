@@ -1,8 +1,9 @@
 export function ThemeScript() {
-  return (
-    <script
-      dangerouslySetInnerHTML={{
-        __html: `
+	return (
+		<script
+			// biome-ignore lint/security/noDangerouslySetInnerHtml: This is a controlled script injection for theme initialization
+			dangerouslySetInnerHTML={{
+				__html: `
           const DEFAULT_FONT_WEIGHTS = ["400"];
 
           function extractFontFamily(fontFamilyValue) {
@@ -96,8 +97,8 @@ export function ThemeScript() {
             }
           })();
         `,
-      }}
-      suppressHydrationWarning
-    />
-  );
+			}}
+			suppressHydrationWarning
+		/>
+	);
 }

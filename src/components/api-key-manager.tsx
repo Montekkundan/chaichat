@@ -2,7 +2,8 @@
 
 import { useUser } from "@clerk/nextjs";
 import { Eye, EyeSlash, Key, X } from "@phosphor-icons/react";
-import { useMutation, useAction } from "convex/react";
+import { useAction, useMutation } from "convex/react";
+import { useConvex } from "convex/react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { api } from "~/../convex/_generated/api";
@@ -17,13 +18,28 @@ import {
 	setLocalKey,
 	setSessionKey,
 } from "~/lib/secure-local-keys";
-import { useConvex } from "convex/react";
 
 const PROVIDERS: { id: ProviderId; name: string; placeholder: string }[] = [
-	{ id: "openai", name: "OpenAI", placeholder: "sk-... (from OpenAI dashboard)" },
-	{ id: "anthropic", name: "Anthropic", placeholder: "sk-ant-... (from Anthropic console)" },
-	{ id: "google", name: "Google", placeholder: "AI... (from Google AI Studio)" },
-	{ id: "mistral", name: "Mistral", placeholder: "mst-... (from Mistral platform)" },
+	{
+		id: "openai",
+		name: "OpenAI",
+		placeholder: "sk-... (from OpenAI dashboard)",
+	},
+	{
+		id: "anthropic",
+		name: "Anthropic",
+		placeholder: "sk-ant-... (from Anthropic console)",
+	},
+	{
+		id: "google",
+		name: "Google",
+		placeholder: "AI... (from Google AI Studio)",
+	},
+	{
+		id: "mistral",
+		name: "Mistral",
+		placeholder: "mst-... (from Mistral platform)",
+	},
 	{ id: "xai", name: "xAI/Grok", placeholder: "xai-... (from xAI console)" },
 ];
 
@@ -89,7 +105,7 @@ export function ApiKeyManager() {
 	// Notify other components when keys change
 	useEffect(() => {
 		// Dispatch a custom event to notify other components
-		window.dispatchEvent(new CustomEvent('apiKeysChanged', { detail: keys }));
+		window.dispatchEvent(new CustomEvent("apiKeysChanged", { detail: keys }));
 	}, [keys]);
 
 	const handleSaveKey = async (provider: ProviderId, key: string) => {
@@ -170,20 +186,20 @@ export function ApiKeyManager() {
 	}
 
 	return (
-		<div className="rounded-lg border bg-card p-6 relative z-50">
-			<div className="mb-4 relative z-50">
+		<div className="relative z-50 rounded-lg border bg-card p-6">
+			<div className="relative z-50 mb-4">
 				<div className="mb-2 flex items-center gap-2">
 					<Key className="size-5" />
 					<h2 className="font-semibold text-xl">API Key Management</h2>
 				</div>
-				<p className="text-sm mb-3 text-foreground relative z-50">
+				<p className="relative z-50 mb-3 text-foreground text-sm">
 					{isLoggedIn
 						? "Your API keys are stored securely in your account and synced across devices."
 						: "Your API keys are encrypted and stored locally in your browser for privacy."}
 				</p>
 
 				{!isLoggedIn && (
-					<div className="mt-3 rounded-lg bg-muted/50 p-3 relative z-50">
+					<div className="relative z-50 mt-3 rounded-lg bg-muted/50 p-3">
 						<div className="mb-2 flex items-center gap-2">
 							<input
 								type="checkbox"
@@ -204,13 +220,13 @@ export function ApiKeyManager() {
 				)}
 			</div>
 
-			<div className="space-y-3 relative z-50">
+			<div className="relative z-50 space-y-3">
 				{PROVIDERS.map((provider) => {
 					const currentKey = keys[provider.id] || "";
 					const isVisible = showKeys[provider.id] || false;
 
 					return (
-						<div key={provider.id} className="space-y-2 relative z-50">
+						<div key={provider.id} className="relative z-50 space-y-2">
 							<Label htmlFor={provider.id} className="font-medium text-sm">
 								{provider.name} API Key
 							</Label>
@@ -227,16 +243,21 @@ export function ApiKeyManager() {
 												...prev,
 												[provider.id]: newValue,
 											}));
-											
+
 											const trimmedValue = newValue.trim();
 											if (trimmedValue && trimmedValue !== currentKey) {
-												const isValidKey = PROVIDERS.find(p => p.id === provider.id)?.placeholder.includes(trimmedValue.substring(0, 3)) ||
-													trimmedValue.startsWith('sk-') || 
-													trimmedValue.startsWith('sk-ant-') || 
-													trimmedValue.startsWith('AI') || 
-													trimmedValue.startsWith('mst-') || 
-													trimmedValue.startsWith('xai-');
-												
+												const isValidKey =
+													PROVIDERS.find(
+														(p) => p.id === provider.id,
+													)?.placeholder.includes(
+														trimmedValue.substring(0, 3),
+													) ||
+													trimmedValue.startsWith("sk-") ||
+													trimmedValue.startsWith("sk-ant-") ||
+													trimmedValue.startsWith("AI") ||
+													trimmedValue.startsWith("mst-") ||
+													trimmedValue.startsWith("xai-");
+
 												if (isValidKey) {
 													// Small delay to avoid saving while user is still typing
 													setTimeout(() => {
@@ -291,7 +312,7 @@ export function ApiKeyManager() {
 				})}
 			</div>
 
-			<div className="mt-4 rounded-lg bg-muted/30 p-3 relative z-50">
+			<div className="relative z-50 mt-4 rounded-lg bg-muted/30 p-3">
 				<h3 className="mb-2 font-medium text-sm">🔒 Security & Privacy</h3>
 				<ul className="space-y-1 text-muted-foreground text-xs">
 					{isLoggedIn ? (

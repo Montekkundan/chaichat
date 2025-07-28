@@ -2,12 +2,7 @@
 
 import { api } from "@/convex/_generated/api";
 import { useUser } from "@clerk/nextjs";
-import {
-	CaretDown,
-	Key,
-	MagnifyingGlass,
-	Question,
-} from "@phosphor-icons/react";
+import { CaretDown, Key, MagnifyingGlass } from "@phosphor-icons/react";
 import { useAction, useQuery } from "convex/react";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "~/components/ui/button";
@@ -64,8 +59,8 @@ export function ModelSelector({
 	const { user } = useUser();
 	const { models: allModels, isLoading: isLoadingModels } = useModels();
 	const preferred = useQuery(
-		api.userPreferences.getPreferredModels, 
-		user?.id ? {} : "skip"
+		api.userPreferences.getPreferredModels,
+		user?.id ? {} : "skip",
 	) as string[] | null | undefined;
 	const models =
 		preferred && preferred.length > 0
@@ -160,9 +155,9 @@ export function ModelSelector({
 			fetchKeys();
 		};
 
-		window.addEventListener('apiKeysChanged', handleApiKeysChanged);
+		window.addEventListener("apiKeysChanged", handleApiKeysChanged);
 		return () => {
-			window.removeEventListener('apiKeysChanged', handleApiKeysChanged);
+			window.removeEventListener("apiKeysChanged", handleApiKeysChanged);
 		};
 	}, [getKeys, isUserAuthenticated]);
 

@@ -3,7 +3,7 @@
 import { ThemeProvider as NextThemesProvider } from "next-themes";
 import type * as React from "react";
 import { useEffect } from "react";
-import { getStoredTweakcnTheme, applyTweakcnTheme } from "~/lib/tweakcn-theme";
+import { applyTweakcnTheme, getStoredTweakcnTheme } from "~/lib/tweakcn-theme";
 
 export function ThemeProvider({
 	children,
@@ -17,14 +17,14 @@ export function ThemeProvider({
 			const storedTheme = getStoredTweakcnTheme();
 			if (storedTheme) {
 				// Check current DOM state for dark mode
-				const isDarkMode = document.documentElement.classList.contains('dark');
-				const newMode = isDarkMode ? 'dark' : 'light';
-				
+				const isDarkMode = document.documentElement.classList.contains("dark");
+				const newMode = isDarkMode ? "dark" : "light";
+
 				// Only update if the mode actually changed
 				if (storedTheme.currentMode !== newMode) {
 					const syncedTheme = {
 						...storedTheme,
-						currentMode: newMode as 'dark' | 'light'
+						currentMode: newMode as "dark" | "light",
 					};
 					// Use bypassThrottle for instant mode changes
 					applyTweakcnTheme(syncedTheme, true);
@@ -37,19 +37,22 @@ export function ThemeProvider({
 
 		// Listen for class changes on the html element (next-themes updates)
 		const observer = new MutationObserver((mutations) => {
-			mutations.forEach((mutation) => {
-				if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
+			for (const mutation of mutations) {
+				if (
+					mutation.type === "attributes" &&
+					mutation.attributeName === "class"
+				) {
 					// Debounce the sync to avoid rapid-fire updates
 					clearTimeout(timeoutId);
 					timeoutId = setTimeout(syncTweakcnTheme, 50);
 				}
-			});
+			}
 		});
 
 		// Observe class changes on html element
 		observer.observe(document.documentElement, {
 			attributes: true,
-			attributeFilter: ['class']
+			attributeFilter: ["class"],
 		});
 
 		return () => {
