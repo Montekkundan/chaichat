@@ -23,6 +23,7 @@
     "@clerk/nextjs": "^6.21.0",
     "@opentelemetry/api": "^1.9.0",
     "@phosphor-icons/react": "^2.1.10",
+    "@radix-ui/react-accordion": "^1.2.11",
     "@radix-ui/react-avatar": "^1.1.10",
     "@radix-ui/react-collapsible": "^1.1.11",
     "@radix-ui/react-dialog": "^1.1.14",
@@ -48,6 +49,9 @@
     "dexie": "^4.0.11",
     "flags": "^4.0.1",
     "framer-motion": "^12.16.0",
+    "fumadocs-core": "^15.6.6",
+    "fumadocs-mdx": "^11.7.1",
+    "fumadocs-ui": "^15.6.6",
     "lucide-react": "^0.513.0",
     "marked": "^15.0.12",
     "motion": "^12.18.1",
@@ -66,7 +70,7 @@
     "uploadthing": "^7.7.2",
     "use-stick-to-bottom": "^1.1.1",
     "vaul": "^1.1.2",
-    "zod": "^3.24.2"
+    "zod": "^4.0.10"
   },
   "devDependencies": {
     "@biomejs/biome": "1.9.4",

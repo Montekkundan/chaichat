@@ -9,6 +9,7 @@ import { ScrollButton } from "~/components/prompt-kit/scroll-button";
 type MessageWithModel = Omit<MessageType, "role"> & {
 	role: "user" | "assistant" | "system" | "data";
 	model?: string;
+	convexId?: string;
 };
 import { useRef } from "react";
 import { Message } from "./message";
@@ -19,7 +20,6 @@ type ConversationProps = {
 	onDelete: (id: string) => void;
 	onEdit: (id: string, newText: string) => void;
 	onReload: () => void;
-	onRegenerate?: (messageIndex: number, model: string) => void;
 	onBranch?: (messageIndex: number) => void;
 };
 
@@ -29,18 +29,15 @@ export function Conversation({
 	onDelete,
 	onEdit,
 	onReload,
-	onRegenerate,
 	onBranch,
 }: ConversationProps) {
+	const containerRef = useRef<HTMLDivElement>(null)
 	const initialMessageCount = useRef(messages.length);
 
-	// Update the ref when messages change to track new messages properly
 	if (status === "ready" && messages.length > initialMessageCount.current) {
 		initialMessageCount.current = messages.length;
 	}
 
-	// Keep only active assistant messages (or those without isActive flag)
-	// Non-assistant roles are always kept.
 	const activeMessages = messages.filter((m) => {
 		if (m.role !== "assistant") return true;
 		// biome-ignore lint/suspicious/noExplicitAny: runtime field
@@ -71,14 +68,15 @@ export function Conversation({
 		return <div className="h-full w-full" />;
 
 	return (
-		<div className="relative flex h-full w-full flex-col items-center overflow-y-auto overflow-x-hidden">
+		<div ref={containerRef} className="relative flex h-full w-full flex-col">
 			<div className="pointer-events-none absolute top-0 right-0 left-0 z-10 mx-auto flex w-full flex-col justify-center">
 				<div className="flex h-app-header w-full bg-background lg:hidden lg:h-0" />
 				<div className="mask-b-from-4% mask-b-to-100% flex h-app-header w-full bg-background lg:hidden" />
 			</div>
-			<ChatContainerRoot className="relative w-full">
+
+			<ChatContainerRoot className="relative w-full h-full">
 				<ChatContainerContent
-					className="flex w-full flex-col items-center pt-20 pb-4"
+					className="flex w-full flex-col items-center pt-20 pb-40"
 					style={{
 						scrollbarGutter: "stable both-edges",
 						scrollbarWidth: "none",
@@ -101,16 +99,11 @@ export function Conversation({
 								onDelete={onDelete}
 								onEdit={onEdit}
 								onReload={onReload}
-								onRegenerate={
-									onRegenerate
-										? (model: string) => onRegenerate(index, model)
-										: undefined
-								}
 								onBranch={onBranch ? () => onBranch(index) : undefined}
 								hasScrollAnchor={hasScrollAnchor}
 								parts={message.parts}
 								status={status}
-								model={message.model}
+								model={(message as MessageWithModel).model}
 							>
 								{message.content}
 							</Message>
@@ -120,18 +113,15 @@ export function Conversation({
 						(sortedMessages.length === 0 ||
 							(sortedMessages.length > 0 &&
 								sortedMessages[sortedMessages.length - 1]?.role ===
-									"user")) && (
+								"user")) && (
 							<div className="group flex min-h-scroll-anchor w-full max-w-3xl flex-col items-start gap-2 px-6 pb-2">
 								<Loader />
 							</div>
 						)}
-					<div
-						id="scroll-anchor"
-						className="absolute bottom-0 flex w-full max-w-3xl flex-1 items-end justify-end gap-4 px-6 pb-2"
-					>
-						<ScrollButton className="absolute top-[-50px] right-[30px]" />
-					</div>
 				</ChatContainerContent>
+				<div className="absolute left-1/2 bottom-34 transform -translate-x-1/2">
+					<ScrollButton className="shadow-sm" />
+				</div>
 			</ChatContainerRoot>
 		</div>
 	);

@@ -321,7 +321,10 @@ export function MessagesProvider({
 						);
 					} else {
 						// For logged users, save to both cache and local storage
+						console.log("onFinish - regenerationContext:", regenerationContext.current);
+						
 						if (regenerationContext.current) {
+							console.log("Processing regenerated message with context:", regenerationContext.current);
 							// For regenerated messages, mark original as version 1 and save new version
 							await cache.markAsOriginalVersion(
 								regenerationContext.current.parentMessageId,
@@ -348,6 +351,8 @@ export function MessagesProvider({
 								)
 							]);
 
+							console.log("Created regenerated message with convexId:", convexMessageId);
+
 							startTransition(() =>
 								setMessages((currentMessages) =>
 									currentMessages.map((msg) =>
@@ -356,6 +361,8 @@ export function MessagesProvider({
 													...msg,
 													convexId: convexMessageId,
 													model: selectedModelRef.current,
+													parentMessageId: regenerationContext.current?.parentMessageId,
+													version: regenerationContext.current?.version,
 												}
 											: msg,
 									),
@@ -364,6 +371,7 @@ export function MessagesProvider({
 
 							regenerationContext.current = null;
 						} else {
+							console.log("Processing regular message (not regenerated)");
 							// For regular messages (not regenerated)
 							const [convexMessageId, localMessageId] = await Promise.all([
 								cache.addMessage({
@@ -640,9 +648,10 @@ export function MessagesProvider({
 						});
 				}
 
-				// Get local API keys for non-logged users (async)
-				const localKeys = user?.id ? {} : await getAllKeys();
+							// Get local API keys for non-logged users
+			const localKeys = user?.id ? {} : await getAllKeys();
 
+				// 2) Trigger the AI SDK streaming request.
 				// 2) Trigger the AI SDK streaming request.
 				void append(
 					{
@@ -719,68 +728,133 @@ export function MessagesProvider({
 	]);
 
 	const regenerate = useCallback(
-		(messageId: string, model: string) => {
+		async (messageId: string, model: string) => {
 			if (!currentUserId || !chatId) return;
 
 			setSelectedModel(model);
 
+			// Find the assistant message to regenerate
 			const messageToRegenerate = messages.find(
-				(m) =>
-					m.id === messageId || (m as ExtendedMessage).convexId === messageId,
+				(m) => {
+					const extendedMsg = m as ExtendedMessage;
+					return m.id === messageId || extendedMsg.convexId === messageId;
+				}
 			);
-			if (!messageToRegenerate) {
-				console.error("Message to regenerate not found:", messageId);
-				return;
-			}
-
-			if (messageToRegenerate.role !== "assistant") {
-				console.error("Can only regenerate assistant messages");
-				return;
-			}
+			if (!messageToRegenerate) return;
+			if (messageToRegenerate.role !== "assistant") return;
 
 			// Find the user message that prompted this assistant response
 			const messageIndex = messages.findIndex(
-				(m) =>
-					m.id === messageId || (m as ExtendedMessage).convexId === messageId,
+				(m) => {
+					const extendedMsg = m as ExtendedMessage;
+					return m.id === messageId || extendedMsg.convexId === messageId;
+				}
 			);
-			if (messageIndex === -1 || messageIndex === 0) {
-				console.error("Cannot find user message for regeneration");
-				return;
-			}
-
+			if (messageIndex === -1 || messageIndex === 0) return;
 			const userMessage = messages[messageIndex - 1];
-			if (!userMessage || userMessage.role !== "user") {
-				console.error("Previous message is not a user message");
-				return;
-			}
+			if (!userMessage || userMessage.role !== "user") return;
 
-			// Remove the assistant message and all messages after it
-			const messagesToKeep = messages.slice(0, messageIndex);
-			setMessages(messagesToKeep);
+			// Mark the current assistant message as inactive
+			const updatedMessages = messages.map((msg) => {
+				const extendedMsg = msg as ExtendedMessage;
+				if (extendedMsg.convexId === (messageToRegenerate as ExtendedMessage).convexId || msg.id === messageId) {
+					return { ...msg, isActive: false };
+				}
+				return msg;
+			});
+			setMessages(updatedMessages);
 
-			// Set regeneration context
-			const convexId =
-				(messageToRegenerate as ExtendedMessage).convexId || messageId;
+			// Find existing versions to determine next version number
+			const convexId = (messageToRegenerate as ExtendedMessage).convexId || messageToRegenerate.id;
 			const existingVersions = messages.filter(
-				(m) =>
-					(m as ExtendedMessage).convexId === convexId ||
-					(m as ExtendedMessage).parentMessageId === convexId,
+				(m) => {
+					const extendedMsg = m as ExtendedMessage;
+					return extendedMsg.convexId === convexId || extendedMsg.parentMessageId === convexId;
+				}
 			);
 			const nextVersion = existingVersions.length + 1;
 
+			// Set regeneration context for versioning
 			regenerationContext.current = {
 				parentMessageId: convexId,
 				version: nextVersion,
 			};
 
-			// Trigger regeneration by resending the user message
+			// Instead of calling sendMessage (which creates a new user message),
+			// directly call the AI API to generate a new assistant message version
 			const attachments = userMessage.experimental_attachments || [];
-			setTimeout(() => {
-				sendMessage(userMessage.content, attachments as UploadedFile[], false);
-			}, 100);
-		},
-		[currentUserId, chatId, messages, setMessages, sendMessage],
-	);
+			const localKeys = user?.id ? {} : await getAllKeys();
+			// Build the message context up to and including the user message
+			const contextMessages = messages.slice(0, messageIndex + 1).map((msg) => ({
+				role: msg.role,
+				content: msg.content,
+				experimental_attachments: msg.experimental_attachments,
+			}));
+			// Call the API endpoint directly
+			const response = await fetch("/api/chat", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					messages: contextMessages,
+					chatId: currentUserId === 'local_user' ? chatId : chatId as Id<"chats">,
+					userId: currentUserId,
+					model,
+					isAuthenticated: !!user?.id,
+					systemPrompt: SYSTEM_PROMPT_DEFAULT,
+					searchEnabled: false,
+					...(Object.keys(localKeys).length > 0 ? { userApiKeys: localKeys } : {}),
+				}),
+			});
+			if (!response.ok) {
+				toast({ title: "Failed to regenerate response", status: "error" });
+				return;
+			}
+			// Read the streaming response and collect the assistant message
+			const reader = response.body?.getReader();
+			if (!reader) return;
+			let newAssistantMessage = "";
+			const decoder = new TextDecoder();
+			while (true) {
+				const { done, value } = await reader.read();
+				if (done) break;
+				const chunk = decoder.decode(value);
+				const lines = chunk.split('\n');
+				for (const line of lines) {
+					if (line.startsWith('data: ')) {
+						const data = line.slice(6);
+						if (data === '[DONE]') break;
+						try {
+							const parsed = JSON.parse(data);
+							if (parsed.type === 'text-delta') {
+								newAssistantMessage += parsed.textDelta;
+							}
+						} catch (e) { /* ignore */ }
+					}
+				}
+			}
+			if (newAssistantMessage) {
+				// Save the new assistant message as a new version
+				const now = Date.now();
+				const newMsg = {
+					_id: `msg_${now}_${Math.random().toString(36).slice(2, 10)}`,
+					id: `msg_${now}_${Math.random().toString(36).slice(2, 10)}`,
+					chatId,
+					userId: currentUserId,
+					role: 'assistant' as const,
+					content: newAssistantMessage,
+					model,
+					parentMessageId: convexId,
+					version: nextVersion,
+					isActive: true,
+					createdAt: now,
+					_creationTime: now,
+					attachments: [],
+				};
+				await cache.addMessage(newMsg);
+				// For UI, createdAt should be a Date
+				setMessages((prev) => [...prev, { ...newMsg, createdAt: new Date(now) }]);
+			}
+		}, [currentUserId, chatId, messages, setMessages, cache, user?.id]);
 
 	return (
 		<MessagesContext.Provider

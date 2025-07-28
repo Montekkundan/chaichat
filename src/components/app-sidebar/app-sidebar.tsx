@@ -38,6 +38,7 @@ import { HouseLine } from "@phosphor-icons/react";
 
 export function AppSidebar({
 	initialUser,
+	collapsible,
 	...props
 }: {
 	initialUser?: {
@@ -46,6 +47,7 @@ export function AppSidebar({
 		firstName?: string | null;
 		imageUrl?: string;
 	};
+	collapsible?: "offcanvas" | "icon" | "none";
 } & React.ComponentProps<typeof Sidebar>) {
 
 	const { user } = useUser();
@@ -120,7 +122,7 @@ export function AppSidebar({
 		navTop: [
 			{
 				title: "New Request",
-				icon: Plus,
+				icon: <Plus size={16} />,
 				onClick: handleNewChat,
 			},
 			// {
@@ -191,10 +193,10 @@ export function AppSidebar({
 				title: "Tutorials",
 				url: "#",
 			  },
-			  {
-				title: "Changelog",
-				url: "#",
-			  },
+			  // {
+			  //   title: "Changelog",
+			  //   url: "#",
+			  // },
 			],
 		  },
 		  {
@@ -232,7 +234,7 @@ export function AppSidebar({
 
 
 	return (
-		<Sidebar collapsible="icon" {...props}>
+		<Sidebar collapsible={collapsible || "icon"} {...props}>
 			<SidebarHeader>
 				<SidebarMenu>
 					<SidebarMenuItem>

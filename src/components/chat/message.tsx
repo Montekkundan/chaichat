@@ -14,7 +14,6 @@ type MessageProps = {
 	onDelete: (id: string) => void;
 	onEdit: (id: string, newText: string) => void;
 	onReload: () => void;
-	onRegenerate?: (model: string) => void;
 	onBranch?: () => void;
 	hasScrollAnchor?: boolean;
 	parts?: MessageType["parts"];
@@ -32,7 +31,6 @@ export function Message({
 	onDelete,
 	onEdit,
 	onReload,
-	onRegenerate,
 	onBranch,
 	hasScrollAnchor,
 	parts,
@@ -75,7 +73,6 @@ export function Message({
 				copied={copied}
 				copyToClipboard={copyToClipboard}
 				onReload={onReload}
-				onRegenerate={onRegenerate}
 				onBranch={onBranch}
 				isLast={isLast}
 				hasScrollAnchor={hasScrollAnchor}

@@ -38,7 +38,7 @@ export function LayoutChat({ children }: { children: React.ReactNode }) {
 							strokeLinecap="round"
 							vectorEffect="non-scaling-stroke"
 							d="M0,0c5.9,0,10.7,4.8,10.7,10.7v10.7c0,5.9,4.8,10.7,10.7,10.7H128V0"
-							stroke="hsl(var(--chat-border))"
+							stroke="var(--border)"
 						/>
 					</svg>
 				</div>

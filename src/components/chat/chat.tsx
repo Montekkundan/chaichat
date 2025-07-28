@@ -36,7 +36,6 @@ export default function Chat({ initialName }: ChatProps = {}) {
 		setSelectedModel,
 		sendMessage,
 		createNewChat,
-		regenerate,
 		stop,
 		quotaExceeded,
 		rateLimited,
@@ -168,7 +167,6 @@ export default function Chat({ initialName }: ChatProps = {}) {
 			</div>
 			<div
 				className="absolute inset-0 overflow-y-scroll sm:pt-3.5"
-				style={{ paddingBottom: "144px", scrollbarGutter: "stable both-edges" }}
 			>
 				<div
 					className="fixed top-0 right-0 z-20 h-16 w-28 max-sm:hidden"
@@ -238,14 +236,16 @@ export default function Chat({ initialName }: ChatProps = {}) {
 						</button>
 					</div>
 				</div>
-				<div className="mx-auto flex w-full max-w-3xl flex-col space-y-12 px-4 pt-safe-offset-10 pb-10">
+				{/* <div className="mx-auto flex w-full max-w-3xl flex-col space-y-12 px-4 pt-safe-offset-10 pb-10"> */}
 					{showOnboarding ? (
+						<div className="mx-auto flex w-full max-w-3xl flex-col space-y-12 px-4 pt-safe-offset-10 pb-10">
 						<div className="flex h-[calc(100vh-20rem)] items-start justify-center">
 							<div className="fade-in-50 zoom-in-95 w-full animate-in space-y-6 px-2 pt-[calc(max(15vh,2.5rem))] duration-300 sm:px-8">
 								<h2 className="font-semibold text-3xl">
 									How can I help you {user?.firstName ?? initialName ?? ""}?
 								</h2>
 							</div>
+						</div>
 						</div>
 					) : (
 						<Conversation
@@ -254,17 +254,11 @@ export default function Chat({ initialName }: ChatProps = {}) {
 							onDelete={handleDelete}
 							onEdit={handleEdit}
 							onReload={handleReload}
-							onRegenerate={(messageIndex: number, model: string) => {
-								const message = messages[messageIndex];
-								if (message?.id) {
-									regenerate(message.id, model);
-								}
-							}}
 							onBranch={handleBranch}
 						/>
 					)}
 				</div>
-			</div>
+			{/* </div> */}
 			<SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
 		</>
 	);

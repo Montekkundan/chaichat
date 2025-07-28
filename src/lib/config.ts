@@ -17,8 +17,6 @@ export const APP_URL =
 	process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 export const APP_OG_IMAGE = "/images/og.png";
 
-// Recommended models to show user
-export const RECOMMENDED_MODEL_IDS = ["gpt-4o", "gemini-2.0-flash-001"];
 
 // All models require user's own API keys (BYOK - Bring Your Own Key)
 export const BYOK_MODEL_IDS = [

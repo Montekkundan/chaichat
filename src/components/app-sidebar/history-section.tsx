@@ -1,6 +1,6 @@
 "use client"
 
-import { History, MessageSquare, GitBranch, Share2, X } from "lucide-react"
+import { History, Share2, X, ChevronRight } from "lucide-react"
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
@@ -14,6 +14,9 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
 } from "~/components/ui/sidebar"
 import {
   Dialog,
@@ -25,6 +28,7 @@ import {
 } from "~/components/ui/dialog"
 import { Button } from "~/components/ui/button"
 import { HistoryDialog } from "./history-dialog"
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "../ui/collapsible"
 
 export function HistorySection() {
   const { user } = useUser();
@@ -39,45 +43,39 @@ export function HistorySection() {
   useEffect(() => {
     const loadRecentChats = async () => {
       if (!user) {
-        // For non-logged users, load from local storage
         const storageUserId = userSessionManager.getStorageUserId();
         const chats = await localChatStorage.getRecentChats(3, storageUserId);
         const count = await localChatStorage.getChatCount(storageUserId);
         setRecentChats(chats);
         setChatCount(count);
       } else {
-        // For logged users, load from both cache and local storage
         const [cacheChats, localChats] = await Promise.all([
           Promise.resolve(cache.chats.slice(0, 3)),
           localChatStorage.getRecentChats(3, user.id)
         ]);
-        
-        // Merge chats, prioritizing cache chats (they're more up-to-date)
+
         const chatMap = new Map();
-        
-        // Add local chats first
+
         for (const chat of localChats) {
           chatMap.set(chat._id, chat);
         }
-        
-        // Override with cache chats
+
         for (const chat of cacheChats) {
           chatMap.set(chat._id, {
             ...chat,
             id: chat._id,
           });
         }
-        
+
         const mergedChats = Array.from(chatMap.values()).sort((a, b) => b.createdAt - a.createdAt);
         setRecentChats(mergedChats.slice(0, 3));
-        setChatCount(cache.chats.length); // Use cache count as primary
+        setChatCount(cache.chats.length);
       }
     };
 
     loadRecentChats();
-    
-    // Set up faster refresh for both logged and non-logged users
-    const interval = setInterval(loadRecentChats, 500); // Refresh every 500ms for faster updates
+
+    const interval = setInterval(loadRecentChats, 500);
     return () => clearInterval(interval);
   }, [user, cache.chats]);
 
@@ -92,21 +90,18 @@ export function HistorySection() {
     try {
       if (!user) {
         await localChatStorage.deleteChat(chatToDelete);
-        // Reload chats
         const storageUserId = userSessionManager.getStorageUserId();
         const chats = await localChatStorage.getRecentChats(3, storageUserId);
         const count = await localChatStorage.getChatCount(storageUserId);
         setRecentChats(chats);
         setChatCount(count);
       } else {
-        // For logged users, delete from both cache and local storage
         await Promise.all([
           cache.deleteChat(chatToDelete),
           localChatStorage.deleteChat(chatToDelete)
         ]);
       }
-      
-      // Navigate to home page
+
       router.push("/");
     } catch (error) {
       console.error("Failed to delete chat:", error);
@@ -126,81 +121,78 @@ export function HistorySection() {
       <SidebarGroup>
         <SidebarGroupLabel>History ({chatCount})</SidebarGroupLabel>
         <SidebarMenu>
-          {chatCount === 0 ? (
+          <Collapsible
+            key="History"
+            asChild
+            defaultOpen={true}
+            className="group/collapsible"
+          >
             <SidebarMenuItem>
-              <div className="px-3 py-2 text-sm text-muted-foreground">
-                No chats yet
-              </div>
+              <CollapsibleTrigger asChild>
+                <SidebarMenuButton tooltip="History">
+                  <History className="h-4 w-4" />
+                  <span>History</span>
+                  <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+                </SidebarMenuButton>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <SidebarMenuSub>
+                  {recentChats.map((subItem) => (
+                    <SidebarMenuSubItem key={subItem.id} className="group/chat">
+                      <SidebarMenuSubButton asChild>
+                        <Link href={`/chat/${subItem.id}`}>
+                          <span>{subItem.name}</span>
+                        </Link>
+                      </SidebarMenuSubButton>
+                      <div className="absolute right-2 top-1/2 -translate-y-1/2 hidden group-hover/chat:flex items-center gap-1">
+                        <button
+                          type="button"
+                          className="flex h-6 w-6 items-center justify-center rounded-sm text-muted-foreground hover:bg-muted hover:text-foreground"
+                          onClick={(e) => {
+                            e.preventDefault();
+                          }}
+                          aria-label="Share chat"
+                        >
+                          <Share2 className="h-3 w-3" />
+                        </button>
+                        <button
+                          type="button"
+                          className="flex h-6 w-6 items-center justify-center rounded-sm text-muted-foreground hover:bg-destructive hover:text-destructive-foreground"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            handleDeleteClick(subItem.id);
+                          }}
+                          aria-label="Delete chat"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    </SidebarMenuSubItem>
+                  ))}
+                  {chatCount > 0 && (
+                    <SidebarMenuItem>
+                      <SidebarMenuButton
+                        onClick={() => setIsDialogOpen(true)}
+                        className="text-muted-foreground hover:text-foreground"
+                      >
+                        <History className="h-4 w-4" />
+                        <span>See all ({chatCount})</span>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  )}
+                </SidebarMenuSub>
+              </CollapsibleContent>
             </SidebarMenuItem>
-          ) : (
-            <>
-              {recentChats.map((chat) => (
-                <SidebarMenuItem key={chat.id} className="group/chat">
-                  <SidebarMenuButton asChild>
-                    <Link href={`/chat/${chat.id}`} className="flex items-center gap-2">
-                      {chat.parentChatId ? (
-                        <GitBranch className="h-4 w-4" />
-                      ) : (
-                        <MessageSquare className="h-4 w-4" />
-                      )}
-                      <span className="flex-1 truncate">{chat.name}</span>
-                      {chat.isPublic && (
-                        <span className="text-muted-foreground text-xs">Public</span>
-                      )}
-                    </Link>
-                  </SidebarMenuButton>
-
-                  {/* Action buttons */}
-                  <div className="absolute right-2 top-1/2 -translate-y-1/2 hidden group-hover/chat:flex items-center gap-1">
-                    <button
-                      type="button"
-                      className="flex h-6 w-6 items-center justify-center rounded-sm text-muted-foreground hover:bg-muted hover:text-foreground"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        // Handle share functionality
-                      }}
-                      aria-label="Share chat"
-                    >
-                      <Share2 className="h-3 w-3" />
-                    </button>
-                    <button
-                      type="button"
-                      className="flex h-6 w-6 items-center justify-center rounded-sm text-muted-foreground hover:bg-destructive hover:text-destructive-foreground"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        handleDeleteClick(chat.id);
-                      }}
-                      aria-label="Delete chat"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </div>
-                </SidebarMenuItem>
-              ))}
-              
-              {chatCount > 3 && (
-                <SidebarMenuItem>
-                  <SidebarMenuButton 
-                    onClick={() => setIsDialogOpen(true)}
-                    className="text-muted-foreground hover:text-foreground"
-                  >
-                    <History className="h-4 w-4" />
-                    <span>See all ({chatCount})</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              )}
-            </>
-          )}
+          </Collapsible>
         </SidebarMenu>
       </SidebarGroup>
 
-      <HistoryDialog 
-        open={isDialogOpen} 
+      <HistoryDialog
+        open={isDialogOpen}
         onOpenChange={setIsDialogOpen}
         isLoggedIn={!!user}
       />
 
-      {/* Delete Confirmation Dialog */}
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <DialogContent>
           <DialogHeader>

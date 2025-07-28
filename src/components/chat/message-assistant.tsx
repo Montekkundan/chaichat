@@ -1,6 +1,6 @@
 import type { Message as MessageAISDK } from "@ai-sdk/react";
-import { ArrowClockwise, Check, Copy, GitBranch } from "@phosphor-icons/react";
-import React, { useMemo, useState, useCallback } from "react";
+import { Check, Copy, GitBranch } from "@phosphor-icons/react";
+import React, { useMemo } from "react";
 import {
 	Message,
 	MessageAction,
@@ -9,9 +9,7 @@ import {
 } from "~/components/prompt-kit/message";
 import { cn } from "~/lib/utils";
 import { getSources } from "./get-sources";
-import { MessageVersions } from "./message-versions";
 import { Reasoning } from "./reasoning";
-import { RegenerateDropdown } from "./regenerate-dropdown";
 import { SearchImages } from "./search-images";
 import { SourcesList } from "./sources-list";
 import { ToolInvocation } from "./tool-invocation";
@@ -25,7 +23,6 @@ type MessageAssistantProps = {
 	copied?: boolean;
 	copyToClipboard?: () => void;
 	onReload?: () => void;
-	onRegenerate?: (model: string) => void;
 	onBranch?: () => void;
 	parts?: MessageAISDK["parts"];
 	status?: "streaming" | "ready" | "submitted" | "error";
@@ -41,7 +38,6 @@ export const MessageAssistant = React.memo(function MessageAssistant({
 	copied,
 	copyToClipboard,
 	onReload,
-	onRegenerate,
 	onBranch,
 	parts,
 	status,
@@ -99,12 +95,6 @@ export const MessageAssistant = React.memo(function MessageAssistant({
 		[children],
 	);
 
-	const [activeModel, setActiveModel] = useState(model);
-
-	const handleVersionChange = useCallback((m?: string) => {
-		if (m) setActiveModel(m);
-	}, []);
-
 	return (
 		<Message
 			className={cn(
@@ -126,17 +116,7 @@ export const MessageAssistant = React.memo(function MessageAssistant({
 					<SearchImages results={searchImageResults} />
 				)}
 
-				{id && !contentNullOrEmpty ? (
-					<MessageVersions
-						messageId={id}
-						convexId={convexId}
-						onVersionChange={handleVersionChange}
-					>
-						{messageContent}
-					</MessageVersions>
-				) : !contentNullOrEmpty ? (
-					messageContent
-				) : null}
+				{!contentNullOrEmpty ? messageContent : null}
 
 				{sources && sources.length > 0 && <SourcesList sources={sources} />}
 
@@ -179,36 +159,6 @@ export const MessageAssistant = React.memo(function MessageAssistant({
 									>
 										<GitBranch className="size-4" />
 									</button>
-								</MessageAction>
-							)}
-
-							{onRegenerate && (
-								<MessageAction
-									tooltip="Regenerate"
-									side="bottom"
-									delayDuration={0}
-								>
-									<RegenerateDropdown
-										currentModel={activeModel || ""}
-										onRegenerate={(selectedModel: string) =>
-											onRegenerate(selectedModel)
-										}
-									>
-										<div className="flex items-center">
-											<button
-												className="flex size-7.5 items-center justify-center rounded-full bg-transparent text-muted-foreground transition hover:bg-accent/60 hover:text-foreground"
-												aria-label="Regenerate"
-												type="button"
-											>
-												<ArrowClockwise className="size-4" />
-											</button>
-											{activeModel && (
-												<span className="ml-2 text-muted-foreground text-xs">
-													{activeModel}
-												</span>
-											)}
-										</div>
-									</RegenerateDropdown>
 								</MessageAction>
 							)}
 						</MessageActions>
