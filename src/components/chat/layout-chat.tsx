@@ -11,7 +11,7 @@ export function LayoutChat({ children }: { children: React.ReactNode }) {
 			<div className="fixed top-0 right-0 max-sm:hidden">
 				<div
 					className={`group -mb-8 pointer-events-none absolute top-3.5 z-10 h-32 w-full origin-top transition-all ease-snappy${collapsed ? " -translate-y-3.5 scale-y-0" : ""}`}
-					style={{ boxShadow: "10px -10px 8px 2px var(--gradient-noise-top)" }}
+					style={{ boxShadow: "10px -10px 8px 2px var(--sidebar)" }}
 				>
 					<svg
 						className="-right-8 absolute h-9 origin-top-left skew-x-[30deg] overflow-visible"
@@ -20,7 +20,7 @@ export function LayoutChat({ children }: { children: React.ReactNode }) {
 						role="presentation"
 					>
 						<line
-							stroke="var(--gradient-noise-top)"
+							stroke="var(--sidebar)"
 							strokeWidth={2}
 							shapeRendering="optimizeQuality"
 							vectorEffect="non-scaling-stroke"
@@ -32,7 +32,7 @@ export function LayoutChat({ children }: { children: React.ReactNode }) {
 						/>
 						<path
 							className="translate-y-[0.5px]"
-							fill="var(--gradient-noise-top)"
+							fill="var(--sidebar)"
 							shapeRendering="optimizeQuality"
 							strokeWidth={1}
 							strokeLinecap="round"

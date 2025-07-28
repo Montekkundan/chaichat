@@ -257,7 +257,7 @@ export function ModelSelector({
 		<div className="flex items-center gap-1">
 			<Button
 				variant="outline"
-				className={cn("justify-between dark:bg-secondary", className)}
+				className={cn("justify-between", className)}
 				disabled={isLoadingModels}
 			>
 				<div className="flex items-center gap-2">
@@ -266,31 +266,6 @@ export function ModelSelector({
 				</div>
 				<CaretDown className="size-4 opacity-50" />
 			</Button>
-			<Tooltip>
-				<TooltipTrigger asChild>
-					<Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-						<Question className="size-4 text-muted-foreground" />
-					</Button>
-				</TooltipTrigger>
-				<TooltipContent side="top" className="max-w-xs">
-					<div className="space-y-1 text-xs">
-						<div className="font-medium">🔒 API Key Storage</div>
-						{user ? (
-							<>
-								<div>• Keys stored securely in your Convex account</div>
-								<div>• Synced across all your devices</div>
-								<div>• Only accessible to you</div>
-							</>
-						) : (
-							<>
-								<div>• Keys encrypted with AES-256-GCM in your browser</div>
-								<div>• Never leave your device</div>
-								<div>• Sign in to sync across devices</div>
-							</>
-						)}
-					</div>
-				</TooltipContent>
-			</Tooltip>
 		</div>
 	);
 

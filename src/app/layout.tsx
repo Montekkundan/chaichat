@@ -3,19 +3,18 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import { cookies } from "next/headers";
 import "~/styles/globals.css";
-import "~/styles/themes.css";
 import ConvexClientProvider from "~/components/providers/convex-client-provider";
 import { ErrorBoundary } from "~/components/providers/error-boundary";
 import { Toaster } from "~/components/ui/sonner";
 import { ThemeProvider } from "~/components/providers/theme-provider";
-import { DEFAULT_APP_THEME, APP_NAME, APP_DESCRIPTION, APP_URL, APP_OG_IMAGE } from "~/lib/config";
-import { ActiveThemeProvider } from "~/components/active-theme";
+import { APP_NAME, APP_DESCRIPTION, APP_URL, APP_OG_IMAGE } from "~/lib/config";
 import { CacheProvider } from "~/lib/providers/cache-provider";
 import { ChatsProvider } from "~/lib/providers/chats-provider";
 import { ModelsProvider } from "~/lib/providers/models-provider";
 import { QuotaProvider } from "~/lib/providers/quota-provider";
 import { Analytics } from "@vercel/analytics/react";
 import { UserSessionHandler } from "~/components/user-session-handler";
+import { ThemeScript } from "~/components/theme-script";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -49,7 +48,6 @@ export default async function RootLayout({
 	children,
 }: Readonly<{ children: React.ReactNode }>) {
 	const cookieStore = await cookies();
-	const activeThemeValue = cookieStore.get("active_theme")?.value;
 
 	type BasicChat = {
 		_id: string;
@@ -94,8 +92,11 @@ export default async function RootLayout({
 				className={`${inter.className} antialiased`}
 				suppressHydrationWarning
 			>
+				<head>
+					<ThemeScript />
+				</head>
 				<body
-					className={`bg-sidebar theme-${activeThemeValue ?? DEFAULT_APP_THEME}`}
+					className="bg-sidebar"
 				>
 					<ErrorBoundary>
 						<ThemeProvider
@@ -104,8 +105,7 @@ export default async function RootLayout({
 							enableSystem
 							disableTransitionOnChange
 						>
-							<ActiveThemeProvider initialTheme={activeThemeValue}>
-								<ConvexClientProvider>
+							<ConvexClientProvider>
 									<CacheProvider initialChats={initialChats}>
 										<ChatsProvider>
 											<ModelsProvider>
@@ -119,7 +119,6 @@ export default async function RootLayout({
 										</ChatsProvider>
 									</CacheProvider>
 								</ConvexClientProvider>
-							</ActiveThemeProvider>
 						</ThemeProvider>
 					</ErrorBoundary>
 				</body>

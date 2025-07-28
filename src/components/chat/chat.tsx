@@ -170,14 +170,13 @@ export default function Chat({ initialName }: ChatProps = {}) {
 			>
 				<div
 					className="fixed top-0 right-0 z-20 h-16 w-28 max-sm:hidden"
-					style={{ clipPath: "inset(0px 12px 0px 0px)" }}
 				>
 					<div
 						className={`group -mb-8 pointer-events-none absolute top-3.5 z-10 h-32 w-full origin-top transition-all ease-snappy${
 							collapsed ? " -translate-y-3.5 scale-y-0" : ""
 						}`}
 						style={{
-							boxShadow: "10px -10px 8px 2px var(--gradient-noise-top)",
+							boxShadow: "10px -10px 8px 2px var(--sidebar)",
 						}}
 					>
 						<svg
@@ -187,7 +186,7 @@ export default function Chat({ initialName }: ChatProps = {}) {
 							role="presentation"
 						>
 							<line
-								stroke="var(--gradient-noise-top)"
+								stroke="var(--sidebar)"
 								strokeWidth="2px"
 								shapeRendering="optimizeQuality"
 								vectorEffect="non-scaling-stroke"
@@ -201,7 +200,7 @@ export default function Chat({ initialName }: ChatProps = {}) {
 							<path
 								stroke="var(--chat-border)"
 								className="translate-y-[0.5px]"
-								fill="var(--gradient-noise-top)"
+								fill="var(--sidebar)"
 								shapeRendering="optimizeQuality"
 								strokeWidth="1px"
 								strokeLinecap="round"
@@ -213,7 +212,7 @@ export default function Chat({ initialName }: ChatProps = {}) {
 					</div>
 				</div>
 				<div className="fixed top-2 right-2 z-20 max-sm:hidden">
-					<div className="flex flex-row items-center gap-0.5 rounded-md rounded-bl-xl bg-gradient-noise-top p-1 text-muted-foreground transition-all">
+					<div className="flex flex-row items-center gap-0.5 rounded-md rounded-bl-xl bg-sidebar p-1 text-muted-foreground transition-all">
 						<button
 							type="button"
 							aria-label="Open settings"

@@ -7,6 +7,32 @@ import {
   AccordionTrigger,
 } from "~/components/ui/accordion"
 import { cn } from "~/lib/utils"
+import Image from "next/image"
+import { Tweet } from "react-tweet"
+
+interface CustomTweetProps {
+  id: string
+}
+
+const CustomTweet = async ({ id }: CustomTweetProps) => {
+  return (
+    <div className="dark mx-auto grid w-full max-w-[500px] place-items-center">
+      <Tweet
+        id={id}
+        components={{
+          AvatarImg: (props: { src: string; alt: string; width: number; height: number }) => (
+            <Image
+              src={props.src}
+              alt={props.alt}
+              width={props.width}
+              height={props.height}
+            />
+          )
+        }}
+      />
+    </div>
+  )
+}
 
 function getMDXComponents(components?: MDXComponents): MDXComponents {
   return {
@@ -26,6 +52,18 @@ function getMDXComponents(components?: MDXComponents): MDXComponents {
         {...props}
       />
     ),
+    YouTube: ({ videoId, className, ...props }: { videoId: string; className?: string }) => (
+      <div className={cn("relative w-full aspect-video rounded-md border overflow-hidden", className)} {...props}>
+        <iframe
+          src={`https://www.youtube.com/embed/${videoId}`}
+          title="YouTube video player"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+          allowFullScreen
+          className="absolute inset-0 w-full h-full"
+        />
+      </div>
+    ),
+    CustomTweet,
     Accordion,
     AccordionItem,
     AccordionTrigger,

@@ -5,10 +5,6 @@ export const MODEL_DEFAULT = "gpt-4o";
 
 export const MESSAGE_MAX_LENGTH = 4000;
 
-// Default theme applied to new users (must match one in themes.css)
-// default themes goes to globals.css
-export const DEFAULT_APP_THEME = "default";
-
 // --- App SEO / metadata ---
 export const APP_NAME = "ChaiChat";
 export const APP_DESCRIPTION =
