@@ -2,7 +2,7 @@
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { useUser } from "@clerk/nextjs";
-import { HouseLine } from "@phosphor-icons/react";
+import { FilesIcon, HouseLineIcon } from "@phosphor-icons/react";
 import { useMutation } from "convex/react";
 import {
 	BookOpen,
@@ -23,6 +23,7 @@ import { ShareChatModal } from "~/components/modals/share-chat-modal";
 import {
 	Sidebar,
 	SidebarContent,
+	SidebarFooter,
 	// SidebarFooter,
 	SidebarHeader,
 	SidebarMenu,
@@ -130,8 +131,8 @@ export function AppSidebar({
 			// },
 			{
 				title: "Home",
-				icon: <HouseLine size={16} />,
-				activeIcon: <HouseLine size={16} weight="duotone" />,
+				icon: <HouseLineIcon size={16} />,
+				activeIcon: <HouseLineIcon size={16} weight="duotone" />,
 				onClick: () => router.push("/"),
 			},
 			// {
@@ -256,19 +257,19 @@ export function AppSidebar({
 				<HistorySection />
 			</SidebarContent>
 
-			{/* <SidebarFooter>
+			<SidebarFooter>
 
-						<SidebarMenu>
-							<SidebarMenuItem>
-								<SidebarMenuButton asChild>
-									<Link href="/settings">
-										<Settings className="h-4 w-4" />
-										<span>Settings</span>
-									</Link>
-								</SidebarMenuButton>
-							</SidebarMenuItem>
+				<SidebarMenu>
+					<SidebarMenuItem>
+						<SidebarMenuButton asChild>
+							<Link href="/changelog">
+								<FilesIcon size={32} />
+								<span>Changelog</span>
+							</Link>
+						</SidebarMenuButton>
+					</SidebarMenuItem>
 
-							{effectiveUser ? (
+					{/* {effectiveUser ? (
 								<SidebarMenuItem>
 									<SidebarMenuButton asChild>
 										<Link href="/settings" className="flex items-center gap-3">
@@ -294,10 +295,10 @@ export function AppSidebar({
 									</Link>
 								</SidebarMenuButton>
 							</SidebarMenuItem>
-							)}
-						</SidebarMenu>
-			</SidebarFooter> 
-			*/}
+							)} */}
+				</SidebarMenu>
+			</SidebarFooter>
+
 
 			<DeleteChatModal
 				open={deleteModalOpen}

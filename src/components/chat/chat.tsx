@@ -2,8 +2,7 @@
 
 import { useUser } from "@clerk/nextjs";
 import type { User } from "@clerk/nextjs/server";
-import { Settings2, SunMoon } from "lucide-react";
-import { useTheme } from "next-themes";
+import { Gear } from "@phosphor-icons/react";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ChatInput } from "~/components/chat-input/chat-input";
@@ -11,6 +10,7 @@ import type { UploadedFile } from "~/components/chat-input/file-items";
 import { useChatHandlers } from "~/components/chat-input/use-chat-handlers";
 import { Conversation } from "~/components/chat/conversation";
 import { SettingsDialog } from "~/components/settings-dialog";
+import { ThemeToggle } from "~/components/ui/theme-toggle";
 import { useMessages } from "~/lib/providers/messages-provider";
 
 import { useSidebar } from "../ui/sidebar";
@@ -130,8 +130,6 @@ export default function Chat({ initialName }: ChatProps = {}) {
 
 	const isLoading = isSubmitting || isCreatingChat || status === "streaming";
 
-	const { resolvedTheme, setTheme } = useTheme();
-
 	const { state } = useSidebar();
 	const collapsed = state === "collapsed";
 
@@ -214,19 +212,12 @@ export default function Chat({ initialName }: ChatProps = {}) {
 							className="inline-flex size-8 items-center justify-center rounded-md rounded-bl-xl hover:bg-muted/40 hover:text-foreground"
 							data-discover="true"
 						>
-							<Settings2 className="size-4" />
+							<Gear className="size-4" />
 						</button>
-						<button
-							type="button"
-							aria-label="Toggle theme"
-							className="group relative inline-flex size-8 items-center justify-center rounded-md hover:bg-muted/40 hover:text-foreground"
-							onClick={() =>
-								setTheme(resolvedTheme === "dark" ? "light" : "dark")
-							}
-						>
-							<SunMoon className="absolute size-4" />
-							<span className="sr-only">Toggle theme</span>
-						</button>
+						<ThemeToggle 
+							className="size-8 hover:bg-muted/40 hover:text-foreground rounded-md" 
+							iconSize={16}
+						/>
 					</div>
 				</div>
 				{/* <div className="mx-auto flex w-full max-w-3xl flex-col space-y-12 px-4 pt-safe-offset-10 pb-10"> */}

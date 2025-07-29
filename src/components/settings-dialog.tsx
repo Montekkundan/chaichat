@@ -1,6 +1,7 @@
 "use client";
 
-import { ExternalLink, Key, Paintbrush, RotateCcw } from "lucide-react";
+import { ExternalLink, Key, RotateCcw } from "lucide-react";
+import { GearIcon } from "@phosphor-icons/react";
 import * as React from "react";
 
 import { useTheme } from "next-themes";
@@ -37,7 +38,7 @@ import {
 const data = {
 	nav: [
 		{ name: "API Keys", icon: Key, id: "api-keys" },
-		{ name: "Appearance", icon: Paintbrush, id: "appearance" },
+		{ name: "Appearance", icon: GearIcon, id: "appearance" },
 	],
 };
 
