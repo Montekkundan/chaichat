@@ -1,4 +1,4 @@
-import type { Message as MessageAISDK } from "ai";
+import type { UIMessage as MessageAISDK } from "ai";
 
 /**
  * Clean messages when switching between agents with different tool capabilities.
@@ -27,84 +27,69 @@ export function cleanMessagesForTools(
 			if (message.role === "assistant") {
 				const cleanedMessage: MessageAISDK = { ...message };
 
-				// Remove tool invocations if present
-				if (message.toolInvocations && message.toolInvocations.length > 0) {
-					// biome-ignore lint/performance/noDelete: <explanation>
-					delete cleanedMessage.toolInvocations;
-				}
-
-				// Clean content if it's an array (remove tool-call parts)
-				if (Array.isArray(message.content)) {
-					const filteredContent = (
-						message.content as Array<{ type?: string; text?: string }>
-					).filter((part: { type?: string }) => {
+				// Clean parts array (remove tool-related parts)
+				if (message.parts && Array.isArray(message.parts)) {
+					const filteredParts = message.parts.filter((part: any) => {
 						if (part && typeof part === "object" && part.type) {
-							// Remove tool-call, tool-result, and tool-invocation parts
+							// Remove tool-related parts using v5 patterns
 							const isToolPart =
 								part.type === "tool-call" ||
 								part.type === "tool-result" ||
-								part.type === "tool-invocation";
+								part.type === "dynamic-tool" ||
+								part.type.startsWith("tool-"); // v5 tool parts use pattern "tool-{toolName}"
 							return !isToolPart;
 						}
 						return true;
 					});
 
-					// Extract text content
-					const textParts = filteredContent.filter(
-						(part: { type?: string }) =>
-							part && typeof part === "object" && part.type === "text",
+					// Extract text parts
+					const textParts = filteredParts.filter(
+						(part: any) => part && part.type === "text",
 					);
 
 					if (textParts.length > 0) {
-						// Combine text parts into a single string
-						const textContent = textParts
-							.map((part: { text?: string }) => part.text || "")
-							.join("\n")
-							.trim();
-						cleanedMessage.content = textContent || "[Assistant response]";
-					} else if (filteredContent.length === 0) {
-						// If no content remains after filtering, provide fallback
-						cleanedMessage.content = "[Assistant response]";
+						// Keep only text parts
+						cleanedMessage.parts = textParts;
+					} else if (filteredParts.length === 0) {
+						// If no content remains after filtering, provide fallback text part
+						cleanedMessage.parts = [
+							{ type: "text", text: "[Assistant response]" },
+						];
 					} else {
-						// Keep the filtered content as string if possible
-						cleanedMessage.content = "[Assistant response]";
+						// Keep the filtered parts
+						cleanedMessage.parts = filteredParts;
 					}
-				}
-
-				// If the message has no meaningful content after cleaning, provide fallback
-				if (
-					!cleanedMessage.content ||
-					(typeof cleanedMessage.content === "string" &&
-						cleanedMessage.content.trim() === "")
-				) {
-					cleanedMessage.content = "[Assistant response]";
+				} else {
+					// Ensure there's at least a text part
+					cleanedMessage.parts = [
+						{ type: "text", text: "[Assistant response]" },
+					];
 				}
 
 				return cleanedMessage;
 			}
 
-			// For user messages, clean any tool-related content from array content
-			if (message.role === "user" && Array.isArray(message.content)) {
-				const filteredContent = (
-					message.content as Array<{ type?: string }>
-				).filter((part: { type?: string }) => {
+			// For user messages, clean any tool-related content from parts array
+			if (message.role === "user" && message.parts && Array.isArray(message.parts)) {
+				const filteredParts = message.parts.filter((part: any) => {
 					if (part && typeof part === "object" && part.type) {
 						const isToolPart =
 							part.type === "tool-call" ||
 							part.type === "tool-result" ||
-							part.type === "tool-invocation";
+							part.type === "dynamic-tool" ||
+							part.type.startsWith("tool-");
 						return !isToolPart;
 					}
 					return true;
 				});
 
-				if (
-					filteredContent.length !== (message.content as Array<unknown>).length
-				) {
+				if (filteredParts.length !== message.parts.length) {
 					return {
 						...message,
-						content:
-							filteredContent.length > 0 ? filteredContent : "User message",
+						parts:
+							filteredParts.length > 0 
+								? filteredParts 
+								: [{ type: "text", text: "User message" }],
 					};
 				}
 			}
@@ -121,17 +106,16 @@ export function cleanMessagesForTools(
  */
 export function messageHasToolContent(message: MessageAISDK): boolean {
 	return !!(
-		message.toolInvocations?.length ||
 		(message as { role: string }).role === "tool" ||
-		(Array.isArray(message.content) &&
-			(message.content as Array<{ type?: string }>).some(
-				(part: { type?: string }) =>
-					part &&
-					typeof part === "object" &&
-					part.type &&
-					(part.type === "tool-call" ||
-						part.type === "tool-result" ||
-						part.type === "tool-invocation"),
+		(message.parts && Array.isArray(message.parts) &&
+			message.parts.some((part: any) =>
+				part &&
+				typeof part === "object" &&
+				part.type &&
+				(part.type === "tool-call" ||
+					part.type === "tool-result" ||
+					part.type === "dynamic-tool" ||
+					part.type.startsWith("tool-")),
 			))
 	);
 }

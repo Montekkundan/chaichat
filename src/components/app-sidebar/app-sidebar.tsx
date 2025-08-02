@@ -136,6 +136,11 @@ export function AppSidebar({
 				onClick: () => router.push("/"),
 			},
 			// {
+			// 	title: "Playground",
+			// 	icon: <SquareTerminal size={16} />,
+			// 	onClick: () => router.push("/playground"),
+			// },
+			// {
 			// 	title: "Tasks",
 			// 	icon: List,
 			// },

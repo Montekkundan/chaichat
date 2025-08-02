@@ -2,15 +2,12 @@
 
 import { useUser } from "@clerk/nextjs";
 import type { User } from "@clerk/nextjs/server";
-import { Gear } from "@phosphor-icons/react";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ChatInput } from "~/components/chat-input/chat-input";
 import type { UploadedFile } from "~/components/chat-input/file-items";
 import { useChatHandlers } from "~/components/chat-input/use-chat-handlers";
 import { Conversation } from "~/components/chat/conversation";
-import { SettingsDialog } from "~/components/settings-dialog";
-import { ThemeToggle } from "~/components/ui/theme-toggle";
 import { useMessages } from "~/lib/providers/messages-provider";
 
 import { useSidebar } from "../ui/sidebar";
@@ -24,7 +21,6 @@ export default function Chat({ initialName }: ChatProps = {}) {
 	const [isCreatingChat, setIsCreatingChat] = useState(false);
 	const [hasNavigated, setHasNavigated] = useState(false);
 	const [attachments, setAttachments] = useState<UploadedFile[]>([]);
-	const [settingsOpen, setSettingsOpen] = useState(false);
 
 	const {
 		messages,
@@ -137,7 +133,6 @@ export default function Chat({ initialName }: ChatProps = {}) {
 		<>
 			<div className="pointer-events-none absolute bottom-0 z-10 w-full px-2">
 				<div className="relative mx-auto flex w-full max-w-3xl flex-col text-center">
-					{/* Removed anonymous quota banner - no longer using tiers */}
 					<div className="pointer-events-none">
 						<div className="pointer-events-auto">
 							<div className="rounded-t-3xl p-2 pb-0 backdrop-blur-lg ">
@@ -203,24 +198,6 @@ export default function Chat({ initialName }: ChatProps = {}) {
 						</svg>
 					</div>
 				</div>
-				<div className="fixed top-2 right-2 z-20 max-sm:hidden">
-					<div className="flex flex-row items-center gap-0.5 rounded-md rounded-bl-xl bg-sidebar p-1 text-muted-foreground transition-all">
-						<button
-							type="button"
-							aria-label="Open settings"
-							onClick={() => setSettingsOpen(true)}
-							className="inline-flex size-8 items-center justify-center rounded-md rounded-bl-xl hover:bg-muted/40 hover:text-foreground"
-							data-discover="true"
-						>
-							<Gear className="size-4" />
-						</button>
-						<ThemeToggle 
-							className="size-8 hover:bg-muted/40 hover:text-foreground rounded-md" 
-							iconSize={16}
-						/>
-					</div>
-				</div>
-				{/* <div className="mx-auto flex w-full max-w-3xl flex-col space-y-12 px-4 pt-safe-offset-10 pb-10"> */}
 				{showOnboarding ? (
 					<div className="mx-auto flex w-full max-w-3xl flex-col space-y-12 px-4 pt-safe-offset-10 pb-10">
 						<div className="flex h-[calc(100vh-20rem)] items-start justify-center">
@@ -242,10 +219,6 @@ export default function Chat({ initialName }: ChatProps = {}) {
 					/>
 				)}
 			</div>
-			{/* </div> */}
-			<SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
 		</>
 	);
 }
-
-// Removed AnonQuotaBanner - no longer using tier system

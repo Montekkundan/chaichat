@@ -1,12 +1,12 @@
-import type { Message } from "@ai-sdk/react";
+import type { UIMessage } from "@ai-sdk/react";
 import type { User } from "@clerk/nextjs/server";
 import { useCallback } from "react";
 import { useChatDraft } from "~/hooks/use-chat-draft";
 
 type UseChatHandlersProps = {
-	messages: Message[];
+	messages: UIMessage[];
 	setMessages: (
-		messages: Message[] | ((messages: Message[]) => Message[]),
+		messages: UIMessage[] | ((messages: UIMessage[]) => UIMessage[]),
 	) => void;
 	setInput: (input: string) => void;
 	setSelectedModel: (model: string) => void;
@@ -62,7 +62,9 @@ export function useChatHandlers({
 		(id: string, newText: string) => {
 			setMessages(
 				messages.map((message) =>
-					message.id === id ? { ...message, content: newText } : message,
+					message.id === id 
+						? { ...message, parts: [{ type: "text", text: newText }] } 
+						: message,
 				),
 			);
 		},

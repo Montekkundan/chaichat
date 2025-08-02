@@ -5,7 +5,7 @@ import { Markdown } from "~/components/prompt-kit/markdown";
 import { cn } from "~/lib/utils";
 
 type ReasoningProps = {
-	reasoning: string;
+	reasoningText: string;
 };
 
 const TRANSITION = {
@@ -14,7 +14,7 @@ const TRANSITION = {
 	bounce: 0,
 };
 
-export function Reasoning({ reasoning }: ReasoningProps) {
+export function Reasoning({ reasoningText }: ReasoningProps) {
 	const [isExpanded, setIsExpanded] = useState(true);
 
 	return (
@@ -43,7 +43,7 @@ export function Reasoning({ reasoning }: ReasoningProps) {
 						transition={TRANSITION}
 					>
 						<div className="flex flex-col border-muted-foreground/20 border-l pl-4 text-muted-foreground text-sm">
-							<Markdown>{reasoning}</Markdown>
+							<Markdown>{reasoningText}</Markdown>
 						</div>
 					</motion.div>
 				)}

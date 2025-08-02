@@ -12,12 +12,3 @@ export const APP_DESCRIPTION =
 export const APP_URL =
 	process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 export const APP_OG_IMAGE = "/images/og.png";
-
-// All models require user's own API keys (BYOK - Bring Your Own Key)
-export const BYOK_MODEL_IDS = [
-	"gpt-4o",
-	"claude-3-7-sonnet-20250219",
-	"gemini-2.0-flash-001",
-	"grok-3",
-	"ministral-3b-latest",
-];

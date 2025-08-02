@@ -1,294 +1,126 @@
-import { api } from "@/convex/_generated/api";
-import { createOpenAI, openai as defaultOpenAI } from "@ai-sdk/openai";
-import type { LanguageModelV1 } from "@ai-sdk/provider";
-import type { Attachment } from "@ai-sdk/ui-utils";
-import { generateId } from "ai";
-import { type Message as MessageAISDK, streamText } from "ai";
-import { ConvexHttpClient } from "convex/browser";
-import { after } from "next/server";
-import { createResumableStreamContext } from "resumable-stream";
-import { BYOK_MODEL_IDS, SYSTEM_PROMPT_DEFAULT } from "~/lib/config";
-import { getAllModels } from "~/lib/models";
-import { openproviders } from "~/lib/openproviders";
-import { getProviderForModel } from "~/lib/openproviders/provider-map";
+import { convertToModelMessages, streamText, type UIMessage } from "ai";
+import { createDynamicProvider } from "~/lib/openproviders";
+import { getProviderKeyMap } from "~/lib/models/providers";
 
+// Allow streaming responses up to 60 seconds
 export const maxDuration = 60;
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
-
-// TODO: ⚠️ Resumable streams still buggy; fix ASAP.
-// ---------------- Resumable stream helpers ----------------
-const streamContext = createResumableStreamContext({ waitUntil: after });
-
-// Lightweight in-memory map chatId -> streamIds (stored on globalThis).
-const chatStreams: Map<string, string[]> = ((): Map<string, string[]> => {
-	const g = globalThis as unknown as {
-		__chaiChatStreams__?: Map<string, string[]>;
-	};
-	if (!g.__chaiChatStreams__) {
-		g.__chaiChatStreams__ = new Map<string, string[]>();
-	}
-	return g.__chaiChatStreams__;
-})();
-
-function appendStreamId(chatId: string, streamId: string) {
-	const arr = chatStreams.get(chatId) ?? [];
-	arr.push(streamId);
-	chatStreams.set(chatId, arr);
-}
-
-function loadStreams(chatId: string): string[] {
-	return chatStreams.get(chatId) ?? [];
-}
 
 type ChatRequest = {
-	messages: MessageAISDK[];
-	chatId: string;
-	userId: string;
+	messages: UIMessage[];
 	model: string;
-	isAuthenticated: boolean;
-	systemPrompt: string;
-	agentId?: string;
-	regenerateMessageId?: string;
+	system?: string;
 	temperature?: number;
-	searchEnabled?: boolean;
-	// For non-logged users: their API keys from localStorage
 	userApiKeys?: Record<string, string | undefined>;
 };
+
+// Helper function to extract provider from model ID
+function extractProviderFromModelId(modelId: string): string | null {
+	try {
+		const fs = require('fs');
+		const path = require('path');
+		const modelsPath = path.join(process.cwd(), 'public', 'models.json');
+		
+		if (fs.existsSync(modelsPath)) {
+			const modelsData = JSON.parse(fs.readFileSync(modelsPath, 'utf8'));
+			const model = modelsData?.models?.find((m: any) => m.id === modelId);
+			
+			if (model?.provider) {
+				return model.provider
+					.toLowerCase()
+					.replace(/[^a-z0-9]/g, '-')
+					.replace(/-+/g, '-')
+					.replace(/^-|-$/g, '');
+			}
+		}
+	} catch (error) {
+		console.warn('Failed to extract provider from models.json:', error);
+	}
+	
+	return null;
+}
 
 export async function POST(req: Request) {
 	try {
 		const body = await req.json();
-
+		
 		const {
 			messages,
-			chatId,
-			userId,
 			model,
-			isAuthenticated,
-			systemPrompt,
-			agentId,
-			regenerateMessageId,
-			temperature,
-			searchEnabled = false,
-			userApiKeys: localApiKeys = {},
-		} = body as ChatRequest;
+			system,
+			temperature = 0.7,
+			userApiKeys = {},
+		}: ChatRequest = body;
 
-		if (!messages || !chatId || !userId) {
+		// Validation
+		if (!messages?.length || !model) {
 			return new Response(
-				JSON.stringify({ error: "Error, missing information" }),
-				{ status: 400 },
+				JSON.stringify({ error: "Messages and model are required" }),
+				{ status: 400, headers: { "Content-Type": "application/json" } }
 			);
 		}
 
-		const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL;
-		if (!convexUrl) {
-			throw new Error("NEXT_PUBLIC_CONVEX_URL is not configured");
-		}
-		const convex = new ConvexHttpClient(convexUrl);
+		// Get API key using provider mapping
+		const providerId = extractProviderFromModelId(model);
+		const keyMap = await getProviderKeyMap();
+		const keyField = keyMap[providerId || ""];
+		const apiKey = keyField ? userApiKeys[keyField] : undefined;
 
-		// All models now require user API keys (BYOK)
-		const isBYOKModel = BYOK_MODEL_IDS.includes(model);
-
-		if (!isBYOKModel) {
+		// Create the dynamic model instance
+		const modelInstance = await createDynamicProvider(model, apiKey);
+		
+		if (!modelInstance) {
 			return new Response(
-				JSON.stringify({
-					error: `Model ${model} is not supported`,
-					code: "MODEL_NOT_SUPPORTED",
-				}),
-				{ status: 400 },
+				JSON.stringify({ error: `Failed to create model instance for: ${model}` }),
+				{ status: 500, headers: { "Content-Type": "application/json" } }
 			);
 		}
 
-		let userApiKeys: Record<string, string | undefined> = {};
-
-		if (isAuthenticated) {
-			// Get user's API keys from Convex for logged-in users
-			try {
-				userApiKeys = await convex.action(api.userKeys.getUserKeysForAPI, {
-					userId,
-				});
-			} catch (error) {
-				console.error("Failed to fetch user API keys:", error);
-			}
-		} else {
-			// Use API keys from request body for non-logged users
-			userApiKeys = localApiKeys;
-		}
-
-		const allModels = await getAllModels();
-		const modelConfig = allModels.find((m) => m.id === model);
-
-		if (!modelConfig || !modelConfig.apiSdk) {
-			throw new Error(`Model ${model} not found`);
-		}
-
-		// Validate attachment support
-		const hasAttachmentsInMessages = messages.some((m) => {
-			const attachments = (
-				m as unknown as { experimental_attachments?: Attachment[] }
-			).experimental_attachments;
-			return Array.isArray(attachments) && attachments.length > 0;
-		});
-		if (
-			hasAttachmentsInMessages &&
-			!modelConfig?.attachments &&
-			!modelConfig?.vision
-		) {
-			return new Response(
-				JSON.stringify({
-					error:
-						"The selected model does not support file or image attachments.",
-					code: "ATTACHMENT_NOT_SUPPORTED",
-				}),
-				{ status: 400 },
-			);
-		}
-
-		let effectiveSystemPrompt = systemPrompt || SYSTEM_PROMPT_DEFAULT;
-
-		if (searchEnabled && modelConfig.providerId === "openai") {
-			effectiveSystemPrompt +=
-				"\nYou have access to a web search tool named `openai.web_search_preview`. When the user asks about real-time or recent information, think about whether you should call this tool. After obtaining results, cite them in your final answer.";
-		}
-
-		let streamError: unknown | null = null;
-
-		// All models require user's API key now
-		const provider = getProviderForModel(model);
-		const userKey = userApiKeys[`${provider}Key`];
-
-		if (!userKey) {
-			return new Response(
-				JSON.stringify({
-					error: `This model requires your own ${provider.toUpperCase()} API key. Please add it in Settings.`,
-					code: "API_KEY_REQUIRED",
-				}),
-				{ status: 403 },
-			);
-		}
-
-		const apiKey = userKey;
-
-		let modelInstance: LanguageModelV1;
-
-		if (modelConfig.providerId === "openai" && searchEnabled) {
-			const provider = apiKey
-				? createOpenAI({ apiKey, compatibility: "strict" })
-				: defaultOpenAI;
-			// biome-ignore lint/suspicious/noExplicitAny: provider dynamic call
-			modelInstance = (provider as any).responses(model as any);
-		} else if (modelConfig.providerId === "google" && searchEnabled) {
-			modelInstance = openproviders(
-				model as never,
-				// biome-ignore lint/suspicious/noExplicitAny: provider settings are provider-specific
-				{ useSearchGrounding: true } as any,
-				apiKey,
-			);
-		} else {
-			modelInstance = modelConfig.apiSdk(apiKey);
-		}
-
-		let tools: Record<string, unknown> | undefined;
-		let maxSteps: number | undefined;
-		let toolChoice: unknown | undefined;
-
-		if (searchEnabled && modelConfig.providerId === "openai") {
-			tools = {
-				// biome-ignore lint/suspicious/noExplicitAny: provider tooling types are complex
-				web_search_preview: (defaultOpenAI as any).tools.webSearchPreview(),
-			} as Record<string, unknown>;
-			maxSteps = 2;
-			// biome-ignore lint/suspicious/noExplicitAny: toolChoice intentional any cast
-			toolChoice = { type: "tool", toolName: "web_search_preview" } as any;
-		}
-
-		// No quota checks anymore - everyone can use the service freely!
-
-		// Filter out system messages and any messages that have no content or attachments.
-		// Gemini (and some other providers) return an error if a message has an empty "parts" array.
-		const filteredMessages = messages.filter((m) => {
-			if (m.role === "system") return false;
-
-			// Accept if there is non-empty textual content.
-			if (typeof m.content === "string" && m.content.trim().length > 0) {
-				return true;
-			}
-
-			// Otherwise, check if the message carries attachments.
-			const attachments = (
-				m as unknown as { experimental_attachments?: Attachment[] }
-			).experimental_attachments;
-
-			return Array.isArray(attachments) && attachments.length > 0;
-		});
-
-		const streamId = generateId();
-
-		// Record stream id for resumptions
-		appendStreamId(chatId, streamId);
-
-		const aiStream = streamText({
+		// Stream the response using AI SDK v5
+		const result = streamText({
 			model: modelInstance,
-			system: effectiveSystemPrompt,
-			messages: filteredMessages,
-			maxSteps: maxSteps ?? 10,
-			// biome-ignore lint/suspicious/noExplicitAny: toolset casting for AI-SDK
-			tools: tools as unknown as any,
-			// Pass toolChoice if we set it
-			// biome-ignore lint/suspicious/noExplicitAny: toolChoice cast
-			...(toolChoice ? { toolChoice: toolChoice as any } : {}),
-			temperature: temperature || 0.8,
-			onError: (err: unknown) => {
-				console.error("🛑 Provider/stream error:", err);
-				streamError = err;
-			},
+			system,
+			messages: convertToModelMessages(messages),
+			temperature,
 		});
 
-		if (streamError) {
-			const errObj = streamError as Record<string, unknown>;
-			const msg =
-				typeof errObj?.error === "string"
-					? errObj.error
-					: ((streamError as Error)?.message ?? String(streamError));
-			return new Response(
-				JSON.stringify({ error: msg, code: "PROVIDER_ERROR" }),
-				{ status: 502 },
-			);
-		}
-
-		// Return the SDK response that contains all parts (text, tool-calls, sources, …)
-		const dataStream = await streamContext.resumableStream(streamId, () => {
-			const res = aiStream.toDataStreamResponse();
-			const body = res.body;
-			if (!body) {
-				throw new Error("AI stream response has no body");
-			}
-			const textStream = body.pipeThrough(new TextDecoderStream());
-			return textStream;
-		});
-
-		if (!dataStream) {
-			// fallback shouldn't happen but just in case
-			return new Response("Failed to create stream", { status: 500 });
-		}
-
-		return new Response(dataStream, { status: 200 });
+		// Return the proper v5 streaming response
+		return result.toUIMessageStreamResponse();
+		
 	} catch (err: unknown) {
-		console.error("Error in /api/chat:", err);
-		const error = err as { code?: string; message?: string };
-		if (error.code === "DAILY_LIMIT_REACHED") {
+		console.error("Chat API error:", err);
+		
+		const errorMessage = err instanceof Error ? err.message : "Unknown error occurred";
+		
+		// Handle specific error types
+		if (errorMessage.includes("429") || errorMessage.includes("rate limit")) {
 			return new Response(
-				JSON.stringify({ error: error.message, code: error.code }),
-				{ status: 403 },
+				JSON.stringify({ 
+					error: "Rate limit exceeded. Please wait a moment and try again.",
+					code: "RATE_LIMITED"
+				}),
+				{ status: 429, headers: { "Content-Type": "application/json" } }
 			);
 		}
 
+		if (errorMessage.includes("quota") || errorMessage.includes("insufficient")) {
+			return new Response(
+				JSON.stringify({ 
+					error: "API quota exceeded. Please check your API key limits.",
+					code: "QUOTA_EXCEEDED"
+				}),
+				{ status: 402, headers: { "Content-Type": "application/json" } }
+			);
+		}
+		
 		return new Response(
-			JSON.stringify({ error: error.message || "Internal server error" }),
-			{ status: 500 },
+			JSON.stringify({ 
+				error: "Internal server error", 
+				details: errorMessage 
+			}),
+			{ 
+				status: 500, 
+				headers: { "Content-Type": "application/json" } 
+			}
 		);
 	}
 }
-
-// Stream resumption utilities removed for now - will be fixed in a future update

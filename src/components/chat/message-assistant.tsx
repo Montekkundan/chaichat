@@ -1,4 +1,5 @@
-import type { Message as MessageAISDK } from "@ai-sdk/react";
+import type { UIMessage as MessageAISDK } from "@ai-sdk/react";
+import type { ToolUIPart } from "ai";
 import { Check, Copy, GitBranch } from "@phosphor-icons/react";
 import React, { useMemo } from "react";
 import {
@@ -8,7 +9,6 @@ import {
 	MessageContent,
 } from "~/components/prompt-kit/message";
 import { cn } from "~/lib/utils";
-import { getSources } from "./get-sources";
 import { Reasoning } from "./reasoning";
 import { SearchImages } from "./search-images";
 import { SourcesList } from "./sources-list";
@@ -44,10 +44,26 @@ export const MessageAssistant = React.memo(function MessageAssistant({
 	model,
 }: MessageAssistantProps) {
 	// const { preferences } = useUserPreferences()
-	const sources = useMemo(() => getSources(parts), [parts]);
+	
+	// Extract sources from v5 parts - look for source-url and source-document parts
+	const sources = useMemo(() => {
+		if (!parts) return [];
+		return parts
+			.filter((part) => part.type === "source-url" || part.type === "source-document")
+			.map((part) => {
+				if (part.type === "source-url") {
+					return { url: part.url, title: part.title };
+				}
+				if (part.type === "source-document") {
+					return { url: "", title: part.title, content: part.filename };
+				}
+				return null;
+			})
+			.filter((source): source is NonNullable<typeof source> => source !== null);
+	}, [parts]);
 
 	const toolInvocationParts = useMemo(
-		() => parts?.filter((part) => part.type === "tool-invocation"),
+		() => parts?.filter((part) => part.type.startsWith("tool-")) as ToolUIPart<any>[] | undefined,
 		[parts],
 	);
 
@@ -59,26 +75,7 @@ export const MessageAssistant = React.memo(function MessageAssistant({
 	const contentNullOrEmpty = children === null || children === "";
 	const isLastStreaming = status === "streaming" && isLast;
 
-	const searchImageResults = useMemo(
-		() =>
-			parts
-				?.filter(
-					(part) =>
-						part.type === "tool-invocation" &&
-						part.toolInvocation?.state === "result" &&
-						part.toolInvocation?.toolName === "imageSearch" &&
-						part.toolInvocation?.result?.content?.[0]?.type === "images",
-				)
-				.flatMap((part) =>
-					part.type === "tool-invocation" &&
-					part.toolInvocation?.state === "result" &&
-					part.toolInvocation?.toolName === "imageSearch" &&
-					part.toolInvocation?.result?.content?.[0]?.type === "images"
-						? (part.toolInvocation?.result?.content?.[0]?.results ?? [])
-						: [],
-				) ?? [],
-		[parts],
-	);
+	const searchImageResults: any[] = [];
 
 	const messageContent = useMemo(
 		() => (
@@ -96,20 +93,20 @@ export const MessageAssistant = React.memo(function MessageAssistant({
 	);
 
 	return (
-		<Message
+        <Message
 			className={cn(
 				"group flex w-full max-w-3xl flex-1 items-start gap-4 px-6 pb-2",
 				hasScrollAnchor && "min-h-scroll-anchor",
 			)}
 		>
-			<div className={cn("flex min-w-full flex-col gap-2", isLast && "pb-8")}>
-				{reasoningParts?.reasoning && (
-					<Reasoning reasoning={reasoningParts.reasoning} />
+            <div className={cn("flex min-w-full flex-col gap-2", isLast && "pb-8")}>
+				{reasoningParts?.text && (
+					<Reasoning reasoningText={reasoningParts.text} />
 				)}
 
 				{toolInvocationParts && toolInvocationParts.length > 0 && (
 					// preferences.showToolInvocations && (
-					<ToolInvocation toolInvocations={toolInvocationParts} />
+					(<ToolInvocation toolInvocations={toolInvocationParts} />)
 				)}
 
 				{searchImageResults.length > 0 && (
@@ -165,6 +162,6 @@ export const MessageAssistant = React.memo(function MessageAssistant({
 					</div>
 				)}
 			</div>
-		</Message>
-	);
+        </Message>
+    );
 });

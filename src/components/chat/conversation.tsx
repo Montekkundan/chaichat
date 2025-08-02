@@ -1,26 +1,26 @@
-import type { Message as MessageType } from "@ai-sdk/react";
+import type { UIMessage as MessageType } from "@ai-sdk/react";
 import {
 	ChatContainerContent,
 	ChatContainerRoot,
 } from "~/components/prompt-kit/chat-container";
 import { Loader } from "~/components/prompt-kit/loader";
 import { ScrollButton } from "~/components/prompt-kit/scroll-button";
-
-type MessageWithModel = Omit<MessageType, "role"> & {
-	role: "user" | "assistant" | "system" | "data";
-	model?: string;
-	convexId?: string;
-};
 import { useRef } from "react";
 import { Message } from "./message";
 
 type ConversationProps = {
-	messages: MessageWithModel[];
+	messages: (MessageType & { model?: string; convexId?: string })[];
 	status?: "streaming" | "ready" | "submitted" | "error";
 	onDelete: (id: string) => void;
 	onEdit: (id: string, newText: string) => void;
 	onReload: () => void;
 	onBranch?: (messageIndex: number) => void;
+};
+
+const getTextContent = (parts: MessageType["parts"]) => {
+	if (!parts) return "";
+	const textParts = parts.filter((part) => part.type === "text");
+	return textParts.map((part) => part.type === "text" ? part.text : "").join("");
 };
 
 export function Conversation({
@@ -39,6 +39,8 @@ export function Conversation({
 	}
 
 	const activeMessages = messages.filter((m) => {
+		// Filter out any non-standard roles and only keep valid UIMessage roles
+		if (!["user", "assistant", "system"].includes(m.role)) return false;
 		if (m.role !== "assistant") return true;
 		// biome-ignore lint/suspicious/noExplicitAny: runtime field
 		return (m as any).isActive !== false;
@@ -92,20 +94,19 @@ export function Conversation({
 							<Message
 								key={message.id}
 								id={message.id}
-								message={message}
+								message={message as MessageType}
 								variant={message.role}
-								attachments={message.experimental_attachments}
+								parts={message.parts}
 								isLast={isLast}
 								onDelete={onDelete}
 								onEdit={onEdit}
 								onReload={onReload}
 								onBranch={onBranch ? () => onBranch(index) : undefined}
 								hasScrollAnchor={hasScrollAnchor}
-								parts={message.parts}
 								status={status}
-								model={(message as MessageWithModel).model}
+								model={message.model}
 							>
-								{message.content}
+								{getTextContent(message.parts)}
 							</Message>
 						);
 					})}

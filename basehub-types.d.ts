@@ -100,7 +100,7 @@ export interface BlockColor {
     __typename: 'BlockColor'
 }
 
-export type BlockDocument = (Changelog | Components | ImageComponent | Pages | PagesItem | Tags | TagsItem | TweetComponent | VideoComponent | YoutubeComponent | _AgentSTART | imageComponent_AsList | pagesItem_AsList | tagsItem_AsList | tweetComponent_AsList | videoComponent_AsList | youtubeComponent_AsList) & { __isUnion?: true }
+export type BlockDocument = (Changelog | Components | ImageComponent | Pages | PagesItem | Tags | TagsItem | TweetComponent | VideoComponent | YoutubeComponent | _AgentStart | imageComponent_AsList | pagesItem_AsList | tagsItem_AsList | tweetComponent_AsList | videoComponent_AsList | youtubeComponent_AsList) & { __isUnion?: true }
 
 export interface BlockDocumentSys {
     apiNamePath: Scalars['String']
@@ -240,6 +240,8 @@ export interface GetUploadSignedURL {
 export interface ImageComponent {
     _analyticsKey: Scalars['String']
     _dashboardUrl: Scalars['String']
+    /** Array of search highlight information with field names and HTML markup */
+    _highlight: (SearchHighlight_z1l5L3M9ZpPwZtTj1Uia0[] | null)
     _id: Scalars['String']
     _idPath: Scalars['String']
     _slug: Scalars['String']
@@ -250,7 +252,7 @@ export interface ImageComponent {
     __typename: 'ImageComponent'
 }
 
-export type ImageComponentOrderByEnum = '_sys_createdAt__ASC' | '_sys_createdAt__DESC' | '_sys_hash__ASC' | '_sys_hash__DESC' | '_sys_id__ASC' | '_sys_id__DESC' | '_sys_lastModifiedAt__ASC' | '_sys_lastModifiedAt__DESC' | '_sys_slug__ASC' | '_sys_slug__DESC' | '_sys_title__ASC' | '_sys_title__DESC' | 'url__ASC' | 'url__DESC'
+export type ImageComponentOrderByEnum = '_sys_createdAt__ASC' | '_sys_createdAt__DESC' | '_sys_hash__ASC' | '_sys_hash__DESC' | '_sys_id__ASC' | '_sys_id__DESC' | '_sys_lastModifiedAt__ASC' | '_sys_lastModifiedAt__DESC' | '_sys_slug__ASC' | '_sys_slug__DESC' | '_sys_title__ASC' | '_sys_title__DESC' | 'untitled__ASC' | 'untitled__DESC' | 'url__ASC' | 'url__DESC'
 
 export interface ListMeta {
     /** Number of items after applying filters but before pagination */
@@ -319,6 +321,8 @@ export interface Pages {
 export interface PagesItem {
     _analyticsKey: Scalars['String']
     _dashboardUrl: Scalars['String']
+    /** Array of search highlight information with field names and HTML markup */
+    _highlight: (SearchHighlight_da595a5a418a57167c8b4[] | null)
     _id: Scalars['String']
     _idPath: Scalars['String']
     _slug: Scalars['String']
@@ -336,11 +340,13 @@ export interface PagesItem {
 export type PagesItemOrderByEnum = '_sys_createdAt__ASC' | '_sys_createdAt__DESC' | '_sys_hash__ASC' | '_sys_hash__DESC' | '_sys_id__ASC' | '_sys_id__DESC' | '_sys_lastModifiedAt__ASC' | '_sys_lastModifiedAt__DESC' | '_sys_slug__ASC' | '_sys_slug__DESC' | '_sys_title__ASC' | '_sys_title__DESC' | 'content__ASC' | 'content__DESC' | 'date__ASC' | 'date__DESC' | 'description__ASC' | 'description__DESC' | 'tags__ASC' | 'tags__DESC' | 'version__ASC' | 'version__DESC'
 
 export interface Query {
-    _agent: (_AgentSTART | null)
+    _agent: (_AgentStart | null)
     /** Query across the custom AI agents in the repository. */
     _agents: _agents
     /** Query across all of the instances of a component. Pass in filters and sorts if you want, and get each instance via the `items` key. */
     _componentInstances: _components
+    /** The diff between the current branch and the head commit. */
+    _diff: Scalars['JSON']
     /** The structure of the repository. Used by START. */
     _structure: Scalars['JSON']
     _sys: RepoSys
@@ -360,6 +366,54 @@ export interface RepoSys {
 }
 
 export type RichTextJson = (BaseRichTextJson | ContentRichText) & { __isUnion?: true }
+
+export interface SearchHighlight_1N8oOrcmyNzxqyz404Pti {
+    /** The field/path that was matched (e.g., "title", "body.content") */
+    by: Scalars['String']
+    /** HTML snippet with <mark> tags around the matched terms */
+    snippet: Scalars['String']
+    __typename: 'SearchHighlight_1N8oOrcmyNzxqyz404Pti'
+}
+
+export interface SearchHighlight_7c6c746eb4c3d9ac2d3e1 {
+    /** The field/path that was matched (e.g., "title", "body.content") */
+    by: Scalars['String']
+    /** HTML snippet with <mark> tags around the matched terms */
+    snippet: Scalars['String']
+    __typename: 'SearchHighlight_7c6c746eb4c3d9ac2d3e1'
+}
+
+export interface SearchHighlight_BqluItM67eIFYP6P4HpNX {
+    /** The field/path that was matched (e.g., "title", "body.content") */
+    by: Scalars['String']
+    /** HTML snippet with <mark> tags around the matched terms */
+    snippet: Scalars['String']
+    __typename: 'SearchHighlight_BqluItM67eIFYP6P4HpNX'
+}
+
+export interface SearchHighlight_RXQAKvhosL2dgLKJ8SaLx {
+    /** The field/path that was matched (e.g., "title", "body.content") */
+    by: Scalars['String']
+    /** HTML snippet with <mark> tags around the matched terms */
+    snippet: Scalars['String']
+    __typename: 'SearchHighlight_RXQAKvhosL2dgLKJ8SaLx'
+}
+
+export interface SearchHighlight_da595a5a418a57167c8b4 {
+    /** The field/path that was matched (e.g., "title", "body.content") */
+    by: Scalars['String']
+    /** HTML snippet with <mark> tags around the matched terms */
+    snippet: Scalars['String']
+    __typename: 'SearchHighlight_da595a5a418a57167c8b4'
+}
+
+export interface SearchHighlight_z1l5L3M9ZpPwZtTj1Uia0 {
+    /** The field/path that was matched (e.g., "title", "body.content") */
+    by: Scalars['String']
+    /** HTML snippet with <mark> tags around the matched terms */
+    snippet: Scalars['String']
+    __typename: 'SearchHighlight_z1l5L3M9ZpPwZtTj1Uia0'
+}
 
 export interface Tags {
     _analyticsKey: Scalars['String']
@@ -383,6 +437,8 @@ export interface Tags {
 export interface TagsItem {
     _analyticsKey: Scalars['String']
     _dashboardUrl: Scalars['String']
+    /** Array of search highlight information with field names and HTML markup */
+    _highlight: (SearchHighlight_7c6c746eb4c3d9ac2d3e1[] | null)
     _id: Scalars['String']
     _idPath: Scalars['String']
     _slug: Scalars['String']
@@ -410,6 +466,8 @@ export type TransactionStatusEnum = 'Cancelled' | 'Completed' | 'Failed' | 'Runn
 export interface TweetComponent {
     _analyticsKey: Scalars['String']
     _dashboardUrl: Scalars['String']
+    /** Array of search highlight information with field names and HTML markup */
+    _highlight: (SearchHighlight_RXQAKvhosL2dgLKJ8SaLx[] | null)
     _id: Scalars['String']
     _idPath: Scalars['String']
     _slug: Scalars['String']
@@ -420,7 +478,7 @@ export interface TweetComponent {
     __typename: 'TweetComponent'
 }
 
-export type TweetComponentOrderByEnum = '_sys_createdAt__ASC' | '_sys_createdAt__DESC' | '_sys_hash__ASC' | '_sys_hash__DESC' | '_sys_id__ASC' | '_sys_id__DESC' | '_sys_lastModifiedAt__ASC' | '_sys_lastModifiedAt__DESC' | '_sys_slug__ASC' | '_sys_slug__DESC' | '_sys_title__ASC' | '_sys_title__DESC' | 'tweetId__ASC' | 'tweetId__DESC'
+export type TweetComponentOrderByEnum = '_sys_createdAt__ASC' | '_sys_createdAt__DESC' | '_sys_hash__ASC' | '_sys_hash__DESC' | '_sys_id__ASC' | '_sys_id__DESC' | '_sys_lastModifiedAt__ASC' | '_sys_lastModifiedAt__DESC' | '_sys_slug__ASC' | '_sys_slug__DESC' | '_sys_title__ASC' | '_sys_title__DESC' | 'tweetId__ASC' | 'tweetId__DESC' | 'untitled__ASC' | 'untitled__DESC'
 
 export type UnionVideoComponentYoutubeComponentTweetComponentImageComponent = (ImageComponent | TweetComponent | VideoComponent | YoutubeComponent) & { __isUnion?: true }
 
@@ -436,6 +494,8 @@ export interface Variant {
 export interface VideoComponent {
     _analyticsKey: Scalars['String']
     _dashboardUrl: Scalars['String']
+    /** Array of search highlight information with field names and HTML markup */
+    _highlight: (SearchHighlight_1N8oOrcmyNzxqyz404Pti[] | null)
     _id: Scalars['String']
     _idPath: Scalars['String']
     _slug: Scalars['String']
@@ -446,11 +506,13 @@ export interface VideoComponent {
     __typename: 'VideoComponent'
 }
 
-export type VideoComponentOrderByEnum = '_sys_createdAt__ASC' | '_sys_createdAt__DESC' | '_sys_hash__ASC' | '_sys_hash__DESC' | '_sys_id__ASC' | '_sys_id__DESC' | '_sys_lastModifiedAt__ASC' | '_sys_lastModifiedAt__DESC' | '_sys_slug__ASC' | '_sys_slug__DESC' | '_sys_title__ASC' | '_sys_title__DESC' | 'url__ASC' | 'url__DESC'
+export type VideoComponentOrderByEnum = '_sys_createdAt__ASC' | '_sys_createdAt__DESC' | '_sys_hash__ASC' | '_sys_hash__DESC' | '_sys_id__ASC' | '_sys_id__DESC' | '_sys_lastModifiedAt__ASC' | '_sys_lastModifiedAt__DESC' | '_sys_slug__ASC' | '_sys_slug__DESC' | '_sys_title__ASC' | '_sys_title__DESC' | 'untitled__ASC' | 'untitled__DESC' | 'url__ASC' | 'url__DESC'
 
 export interface YoutubeComponent {
     _analyticsKey: Scalars['String']
     _dashboardUrl: Scalars['String']
+    /** Array of search highlight information with field names and HTML markup */
+    _highlight: (SearchHighlight_BqluItM67eIFYP6P4HpNX[] | null)
     _id: Scalars['String']
     _idPath: Scalars['String']
     _slug: Scalars['String']
@@ -461,9 +523,9 @@ export interface YoutubeComponent {
     __typename: 'YoutubeComponent'
 }
 
-export type YoutubeComponentOrderByEnum = '_sys_createdAt__ASC' | '_sys_createdAt__DESC' | '_sys_hash__ASC' | '_sys_hash__DESC' | '_sys_id__ASC' | '_sys_id__DESC' | '_sys_lastModifiedAt__ASC' | '_sys_lastModifiedAt__DESC' | '_sys_slug__ASC' | '_sys_slug__DESC' | '_sys_title__ASC' | '_sys_title__DESC' | 'youtubeId__ASC' | 'youtubeId__DESC'
+export type YoutubeComponentOrderByEnum = '_sys_createdAt__ASC' | '_sys_createdAt__DESC' | '_sys_hash__ASC' | '_sys_hash__DESC' | '_sys_id__ASC' | '_sys_id__DESC' | '_sys_lastModifiedAt__ASC' | '_sys_lastModifiedAt__DESC' | '_sys_slug__ASC' | '_sys_slug__DESC' | '_sys_title__ASC' | '_sys_title__DESC' | 'untitled__ASC' | 'untitled__DESC' | 'youtubeId__ASC' | 'youtubeId__DESC'
 
-export interface _AgentSTART {
+export interface _AgentStart {
     _agentKey: Scalars['String']
     _analyticsKey: Scalars['String']
     _dashboardUrl: Scalars['String']
@@ -488,7 +550,7 @@ export interface _AgentSTART {
     searchTheWeb: Scalars['Boolean']
     slackInstallUrl: Scalars['String']
     systemPrompt: Scalars['String']
-    __typename: '_AgentSTART'
+    __typename: '_AgentStart'
 }
 
 export interface _BranchInfo {
@@ -557,7 +619,7 @@ export type _ResolveTargetsWithEnum = 'id' | 'objectName'
 export type _StructureFormatEnum = 'json' | 'xml'
 
 export interface _agents {
-    start: _AgentSTART
+    start: _AgentStart
     __typename: '_agents'
 }
 
@@ -749,7 +811,7 @@ export interface BlockDocumentGenqlSelection{
     on_TweetComponent?: TweetComponentGenqlSelection
     on_VideoComponent?: VideoComponentGenqlSelection
     on_YoutubeComponent?: YoutubeComponentGenqlSelection
-    on__AgentSTART?: _AgentSTARTGenqlSelection
+    on__AgentStart?: _AgentStartGenqlSelection
     on_imageComponent_AsList?: imageComponent_AsListGenqlSelection
     on_pagesItem_AsList?: pagesItem_AsListGenqlSelection
     on_tagsItem_AsList?: tagsItem_AsListGenqlSelection
@@ -906,6 +968,8 @@ export interface ChangelogGenqlSelection{
     first?: (Scalars['Int'] | null), 
     /** Order by a field. */
     orderBy?: (PagesItemOrderByEnum | null), 
+    /** Search configuration */
+    search?: (PagesItemSearchInput | null), 
     /** Skip the first n items. */
     skip?: (Scalars['Int'] | null)} })
     __typename?: boolean | number
@@ -972,6 +1036,8 @@ export interface ImageComponentGenqlSelection{
      */
     scope?: (AnalyticsKeyScope | null)} } | boolean | number
     _dashboardUrl?: boolean | number
+    /** Array of search highlight information with field names and HTML markup */
+    _highlight?: SearchHighlight_z1l5L3M9ZpPwZtTj1Uia0GenqlSelection
     _id?: boolean | number
     _idPath?: boolean | number
     _slug?: boolean | number
@@ -983,6 +1049,12 @@ export interface ImageComponentGenqlSelection{
 }
 
 export interface ImageComponentFilterInput {AND?: (ImageComponentFilterInput | null),OR?: (ImageComponentFilterInput | null),_id?: (StringFilter | null),_slug?: (StringFilter | null),_sys_apiNamePath?: (StringFilter | null),_sys_createdAt?: (DateFilter | null),_sys_hash?: (StringFilter | null),_sys_id?: (StringFilter | null),_sys_idPath?: (StringFilter | null),_sys_lastModifiedAt?: (DateFilter | null),_sys_slug?: (StringFilter | null),_sys_slugPath?: (StringFilter | null),_sys_title?: (StringFilter | null),_title?: (StringFilter | null),url?: (StringFilter | null)}
+
+export interface ImageComponentSearchInput {
+/** Searchable fields for query */
+by?: (Scalars['String'][] | null),
+/** Search query */
+q?: (Scalars['String'] | null)}
 
 export interface ListFilter {isEmpty?: (Scalars['Boolean'] | null),length?: (Scalars['Int'] | null)}
 
@@ -1109,6 +1181,8 @@ export interface PagesItemGenqlSelection{
      */
     scope?: (AnalyticsKeyScope | null)} } | boolean | number
     _dashboardUrl?: boolean | number
+    /** Array of search highlight information with field names and HTML markup */
+    _highlight?: SearchHighlight_da595a5a418a57167c8b4GenqlSelection
     _id?: boolean | number
     _idPath?: boolean | number
     _slug?: boolean | number
@@ -1125,6 +1199,8 @@ export interface PagesItemGenqlSelection{
     first?: (Scalars['Int'] | null), 
     /** Order by a field. */
     orderBy?: (TagsItemOrderByEnum | null), 
+    /** Search configuration */
+    search?: (TagsItemSearchInput | null), 
     /** Skip the first n items. */
     skip?: (Scalars['Int'] | null)} })
     version?: boolean | number
@@ -1133,14 +1209,24 @@ export interface PagesItemGenqlSelection{
 
 export interface PagesItemFilterInput {AND?: (PagesItemFilterInput | null),OR?: (PagesItemFilterInput | null),_id?: (StringFilter | null),_slug?: (StringFilter | null),_sys_apiNamePath?: (StringFilter | null),_sys_createdAt?: (DateFilter | null),_sys_hash?: (StringFilter | null),_sys_id?: (StringFilter | null),_sys_idPath?: (StringFilter | null),_sys_lastModifiedAt?: (DateFilter | null),_sys_slug?: (StringFilter | null),_sys_slugPath?: (StringFilter | null),_sys_title?: (StringFilter | null),_title?: (StringFilter | null),date?: (StringFilter | null),description?: (StringFilter | null),tags?: (ListFilter | null),version?: (StringFilter | null)}
 
+export interface PagesItemSearchInput {
+/** Searchable fields for query */
+by?: (Scalars['String'][] | null),
+/** Search query */
+q?: (Scalars['String'] | null)}
+
 export interface QueryGenqlSelection{
-    _agent?: (_AgentSTARTGenqlSelection & { __args: {
+    _agent?: (_AgentStartGenqlSelection & { __args: {
     /** The ID of the agent. */
     id: Scalars['String']} })
     /** Query across the custom AI agents in the repository. */
     _agents?: _agentsGenqlSelection
     /** Query across all of the instances of a component. Pass in filters and sorts if you want, and get each instance via the `items` key. */
     _componentInstances?: _componentsGenqlSelection
+    /** The diff between the current branch and the head commit. */
+    _diff?: { __args: {
+    /** Simplified diff returns only the items array showing statuses. */
+    simplified?: (Scalars['Boolean'] | null)} } | boolean | number
     /** The structure of the repository. Used by START. */
     _structure?: { __args: {
     /** The format of the structure. */
@@ -1176,6 +1262,54 @@ export interface RichTextJsonGenqlSelection{
     toc?: boolean | number
     on_BaseRichTextJson?: BaseRichTextJsonGenqlSelection
     on_ContentRichText?: ContentRichTextGenqlSelection
+    __typename?: boolean | number
+}
+
+export interface SearchHighlight_1N8oOrcmyNzxqyz404PtiGenqlSelection{
+    /** The field/path that was matched (e.g., "title", "body.content") */
+    by?: boolean | number
+    /** HTML snippet with <mark> tags around the matched terms */
+    snippet?: boolean | number
+    __typename?: boolean | number
+}
+
+export interface SearchHighlight_7c6c746eb4c3d9ac2d3e1GenqlSelection{
+    /** The field/path that was matched (e.g., "title", "body.content") */
+    by?: boolean | number
+    /** HTML snippet with <mark> tags around the matched terms */
+    snippet?: boolean | number
+    __typename?: boolean | number
+}
+
+export interface SearchHighlight_BqluItM67eIFYP6P4HpNXGenqlSelection{
+    /** The field/path that was matched (e.g., "title", "body.content") */
+    by?: boolean | number
+    /** HTML snippet with <mark> tags around the matched terms */
+    snippet?: boolean | number
+    __typename?: boolean | number
+}
+
+export interface SearchHighlight_RXQAKvhosL2dgLKJ8SaLxGenqlSelection{
+    /** The field/path that was matched (e.g., "title", "body.content") */
+    by?: boolean | number
+    /** HTML snippet with <mark> tags around the matched terms */
+    snippet?: boolean | number
+    __typename?: boolean | number
+}
+
+export interface SearchHighlight_da595a5a418a57167c8b4GenqlSelection{
+    /** The field/path that was matched (e.g., "title", "body.content") */
+    by?: boolean | number
+    /** HTML snippet with <mark> tags around the matched terms */
+    snippet?: boolean | number
+    __typename?: boolean | number
+}
+
+export interface SearchHighlight_z1l5L3M9ZpPwZtTj1Uia0GenqlSelection{
+    /** The field/path that was matched (e.g., "title", "body.content") */
+    by?: boolean | number
+    /** HTML snippet with <mark> tags around the matched terms */
+    snippet?: boolean | number
     __typename?: boolean | number
 }
 
@@ -1219,6 +1353,8 @@ export interface TagsItemGenqlSelection{
      */
     scope?: (AnalyticsKeyScope | null)} } | boolean | number
     _dashboardUrl?: boolean | number
+    /** Array of search highlight information with field names and HTML markup */
+    _highlight?: SearchHighlight_7c6c746eb4c3d9ac2d3e1GenqlSelection
     _id?: boolean | number
     _idPath?: boolean | number
     _slug?: boolean | number
@@ -1229,6 +1365,12 @@ export interface TagsItemGenqlSelection{
 }
 
 export interface TagsItemFilterInput {AND?: (TagsItemFilterInput | null),OR?: (TagsItemFilterInput | null),_id?: (StringFilter | null),_slug?: (StringFilter | null),_sys_apiNamePath?: (StringFilter | null),_sys_createdAt?: (DateFilter | null),_sys_hash?: (StringFilter | null),_sys_id?: (StringFilter | null),_sys_idPath?: (StringFilter | null),_sys_lastModifiedAt?: (DateFilter | null),_sys_slug?: (StringFilter | null),_sys_slugPath?: (StringFilter | null),_sys_title?: (StringFilter | null),_title?: (StringFilter | null)}
+
+export interface TagsItemSearchInput {
+/** Searchable fields for query */
+by?: (Scalars['String'][] | null),
+/** Search query */
+q?: (Scalars['String'] | null)}
 
 export interface TargetBlock {focus?: (Scalars['Boolean'] | null),id: Scalars['String'],label: Scalars['String']}
 
@@ -1252,6 +1394,8 @@ export interface TweetComponentGenqlSelection{
      */
     scope?: (AnalyticsKeyScope | null)} } | boolean | number
     _dashboardUrl?: boolean | number
+    /** Array of search highlight information with field names and HTML markup */
+    _highlight?: SearchHighlight_RXQAKvhosL2dgLKJ8SaLxGenqlSelection
     _id?: boolean | number
     _idPath?: boolean | number
     _slug?: boolean | number
@@ -1263,6 +1407,12 @@ export interface TweetComponentGenqlSelection{
 }
 
 export interface TweetComponentFilterInput {AND?: (TweetComponentFilterInput | null),OR?: (TweetComponentFilterInput | null),_id?: (StringFilter | null),_slug?: (StringFilter | null),_sys_apiNamePath?: (StringFilter | null),_sys_createdAt?: (DateFilter | null),_sys_hash?: (StringFilter | null),_sys_id?: (StringFilter | null),_sys_idPath?: (StringFilter | null),_sys_lastModifiedAt?: (DateFilter | null),_sys_slug?: (StringFilter | null),_sys_slugPath?: (StringFilter | null),_sys_title?: (StringFilter | null),_title?: (StringFilter | null),tweetId?: (StringFilter | null)}
+
+export interface TweetComponentSearchInput {
+/** Searchable fields for query */
+by?: (Scalars['String'][] | null),
+/** Search query */
+q?: (Scalars['String'] | null)}
 
 export interface UnionVideoComponentYoutubeComponentTweetComponentImageComponentGenqlSelection{
     on_ImageComponent?:ImageComponentGenqlSelection,
@@ -1291,6 +1441,8 @@ export interface VideoComponentGenqlSelection{
      */
     scope?: (AnalyticsKeyScope | null)} } | boolean | number
     _dashboardUrl?: boolean | number
+    /** Array of search highlight information with field names and HTML markup */
+    _highlight?: SearchHighlight_1N8oOrcmyNzxqyz404PtiGenqlSelection
     _id?: boolean | number
     _idPath?: boolean | number
     _slug?: boolean | number
@@ -1303,6 +1455,12 @@ export interface VideoComponentGenqlSelection{
 
 export interface VideoComponentFilterInput {AND?: (VideoComponentFilterInput | null),OR?: (VideoComponentFilterInput | null),_id?: (StringFilter | null),_slug?: (StringFilter | null),_sys_apiNamePath?: (StringFilter | null),_sys_createdAt?: (DateFilter | null),_sys_hash?: (StringFilter | null),_sys_id?: (StringFilter | null),_sys_idPath?: (StringFilter | null),_sys_lastModifiedAt?: (DateFilter | null),_sys_slug?: (StringFilter | null),_sys_slugPath?: (StringFilter | null),_sys_title?: (StringFilter | null),_title?: (StringFilter | null),url?: (StringFilter | null)}
 
+export interface VideoComponentSearchInput {
+/** Searchable fields for query */
+by?: (Scalars['String'][] | null),
+/** Search query */
+q?: (Scalars['String'] | null)}
+
 export interface YoutubeComponentGenqlSelection{
     _analyticsKey?: { __args: {
     /**
@@ -1312,6 +1470,8 @@ export interface YoutubeComponentGenqlSelection{
      */
     scope?: (AnalyticsKeyScope | null)} } | boolean | number
     _dashboardUrl?: boolean | number
+    /** Array of search highlight information with field names and HTML markup */
+    _highlight?: SearchHighlight_BqluItM67eIFYP6P4HpNXGenqlSelection
     _id?: boolean | number
     _idPath?: boolean | number
     _slug?: boolean | number
@@ -1324,7 +1484,13 @@ export interface YoutubeComponentGenqlSelection{
 
 export interface YoutubeComponentFilterInput {AND?: (YoutubeComponentFilterInput | null),OR?: (YoutubeComponentFilterInput | null),_id?: (StringFilter | null),_slug?: (StringFilter | null),_sys_apiNamePath?: (StringFilter | null),_sys_createdAt?: (DateFilter | null),_sys_hash?: (StringFilter | null),_sys_id?: (StringFilter | null),_sys_idPath?: (StringFilter | null),_sys_lastModifiedAt?: (DateFilter | null),_sys_slug?: (StringFilter | null),_sys_slugPath?: (StringFilter | null),_sys_title?: (StringFilter | null),_title?: (StringFilter | null),youtubeId?: (StringFilter | null)}
 
-export interface _AgentSTARTGenqlSelection{
+export interface YoutubeComponentSearchInput {
+/** Searchable fields for query */
+by?: (Scalars['String'][] | null),
+/** Search query */
+q?: (Scalars['String'] | null)}
+
+export interface _AgentStartGenqlSelection{
     _agentKey?: boolean | number
     _analyticsKey?: { __args: {
     /**
@@ -1420,7 +1586,7 @@ export interface _PlaygroundInfoGenqlSelection{
 }
 
 export interface _agentsGenqlSelection{
-    start?: _AgentSTARTGenqlSelection
+    start?: _AgentStartGenqlSelection
     __typename?: boolean | number
 }
 
@@ -1432,6 +1598,8 @@ export interface _componentsGenqlSelection{
     first?: (Scalars['Int'] | null), 
     /** Order by a field. */
     orderBy?: (ImageComponentOrderByEnum | null), 
+    /** Search configuration */
+    search?: (ImageComponentSearchInput | null), 
     /** Skip the first n items. */
     skip?: (Scalars['Int'] | null)} })
     pagesItem?: (pagesItem_AsListGenqlSelection & { __args?: {
@@ -1441,6 +1609,8 @@ export interface _componentsGenqlSelection{
     first?: (Scalars['Int'] | null), 
     /** Order by a field. */
     orderBy?: (PagesItemOrderByEnum | null), 
+    /** Search configuration */
+    search?: (PagesItemSearchInput | null), 
     /** Skip the first n items. */
     skip?: (Scalars['Int'] | null)} })
     tagsItem?: (tagsItem_AsListGenqlSelection & { __args?: {
@@ -1450,6 +1620,8 @@ export interface _componentsGenqlSelection{
     first?: (Scalars['Int'] | null), 
     /** Order by a field. */
     orderBy?: (TagsItemOrderByEnum | null), 
+    /** Search configuration */
+    search?: (TagsItemSearchInput | null), 
     /** Skip the first n items. */
     skip?: (Scalars['Int'] | null)} })
     tweet?: (tweetComponent_AsListGenqlSelection & { __args?: {
@@ -1459,6 +1631,8 @@ export interface _componentsGenqlSelection{
     first?: (Scalars['Int'] | null), 
     /** Order by a field. */
     orderBy?: (TweetComponentOrderByEnum | null), 
+    /** Search configuration */
+    search?: (TweetComponentSearchInput | null), 
     /** Skip the first n items. */
     skip?: (Scalars['Int'] | null)} })
     video?: (videoComponent_AsListGenqlSelection & { __args?: {
@@ -1468,6 +1642,8 @@ export interface _componentsGenqlSelection{
     first?: (Scalars['Int'] | null), 
     /** Order by a field. */
     orderBy?: (VideoComponentOrderByEnum | null), 
+    /** Search configuration */
+    search?: (VideoComponentSearchInput | null), 
     /** Skip the first n items. */
     skip?: (Scalars['Int'] | null)} })
     youtube?: (youtubeComponent_AsListGenqlSelection & { __args?: {
@@ -1477,6 +1653,8 @@ export interface _componentsGenqlSelection{
     first?: (Scalars['Int'] | null), 
     /** Order by a field. */
     orderBy?: (YoutubeComponentOrderByEnum | null), 
+    /** Search configuration */
+    search?: (YoutubeComponentSearchInput | null), 
     /** Skip the first n items. */
     skip?: (Scalars['Int'] | null)} })
     __typename?: boolean | number
@@ -1737,6 +1915,30 @@ export interface FragmentsMap {
     root: RichTextJson,
     selection: RichTextJsonGenqlSelection,
 }
+  SearchHighlight_1N8oOrcmyNzxqyz404Pti: {
+    root: SearchHighlight_1N8oOrcmyNzxqyz404Pti,
+    selection: SearchHighlight_1N8oOrcmyNzxqyz404PtiGenqlSelection,
+}
+  SearchHighlight_7c6c746eb4c3d9ac2d3e1: {
+    root: SearchHighlight_7c6c746eb4c3d9ac2d3e1,
+    selection: SearchHighlight_7c6c746eb4c3d9ac2d3e1GenqlSelection,
+}
+  SearchHighlight_BqluItM67eIFYP6P4HpNX: {
+    root: SearchHighlight_BqluItM67eIFYP6P4HpNX,
+    selection: SearchHighlight_BqluItM67eIFYP6P4HpNXGenqlSelection,
+}
+  SearchHighlight_RXQAKvhosL2dgLKJ8SaLx: {
+    root: SearchHighlight_RXQAKvhosL2dgLKJ8SaLx,
+    selection: SearchHighlight_RXQAKvhosL2dgLKJ8SaLxGenqlSelection,
+}
+  SearchHighlight_da595a5a418a57167c8b4: {
+    root: SearchHighlight_da595a5a418a57167c8b4,
+    selection: SearchHighlight_da595a5a418a57167c8b4GenqlSelection,
+}
+  SearchHighlight_z1l5L3M9ZpPwZtTj1Uia0: {
+    root: SearchHighlight_z1l5L3M9ZpPwZtTj1Uia0,
+    selection: SearchHighlight_z1l5L3M9ZpPwZtTj1Uia0GenqlSelection,
+}
   Tags: {
     root: Tags,
     selection: TagsGenqlSelection,
@@ -1765,9 +1967,9 @@ export interface FragmentsMap {
     root: YoutubeComponent,
     selection: YoutubeComponentGenqlSelection,
 }
-  _AgentSTART: {
-    root: _AgentSTART,
-    selection: _AgentSTARTGenqlSelection,
+  _AgentStart: {
+    root: _AgentStart,
+    selection: _AgentStartGenqlSelection,
 }
   _BranchInfo: {
     root: _BranchInfo,

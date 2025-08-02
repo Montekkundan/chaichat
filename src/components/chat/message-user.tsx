@@ -1,6 +1,6 @@
 "use client";
 
-import type { Message as MessageType } from "@ai-sdk/react";
+import type { UIMessage as MessageType } from "@ai-sdk/react";
 import { Check, Copy } from "@phosphor-icons/react";
 import Image from "next/image";
 import { useRef, useState } from "react";
@@ -26,9 +26,27 @@ const getTextFromDataUrl = (dataUrl: string) => {
 	return base64;
 };
 
+// Helper function to extract file attachments from v5 message parts
+const getFileAttachments = (parts?: MessageType["parts"]) => {
+	if (!parts) return [];
+	return parts
+		.filter((part) => part.type === "file")
+		.map((part) => {
+			if (part.type === "file") {
+				return {
+					name: part.filename || "Unknown file",
+					url: part.url,
+					contentType: part.mediaType,
+				};
+			}
+			return null;
+		})
+		.filter((attachment): attachment is NonNullable<typeof attachment> => attachment !== null);
+};
+
 export type MessageUserProps = {
 	hasScrollAnchor?: boolean;
-	attachments?: MessageType["experimental_attachments"];
+	parts?: MessageType["parts"];
 	children: string;
 	copied: boolean;
 	copyToClipboard: () => void;
@@ -40,7 +58,7 @@ export type MessageUserProps = {
 
 export function MessageUser({
 	hasScrollAnchor,
-	attachments,
+	parts,
 	children,
 	copied,
 	copyToClipboard,
@@ -52,6 +70,9 @@ export function MessageUser({
 	const [editInput, setEditInput] = useState(children);
 	const [isEditing, setIsEditing] = useState(false);
 	const contentRef = useRef<HTMLDivElement>(null);
+
+	// Extract file attachments from v5 message parts
+	const attachments = getFileAttachments(parts);
 
 	const handleEditCancel = () => {
 		setIsEditing(false);

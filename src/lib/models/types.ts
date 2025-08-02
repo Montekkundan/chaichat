@@ -1,4 +1,4 @@
-import type { LanguageModelV1 } from "ai";
+import type { LanguageModel } from "ai";
 
 type ModelConfig = {
 	id: string; // "gpt-4.1-nano" // same from AI SDKs
@@ -18,7 +18,7 @@ type ModelConfig = {
 	vision?: boolean;
 	tools?: boolean;
 	audio?: boolean;
-	reasoning?: boolean;
+	reasoningText?: boolean;
 	openSource?: boolean;
 
 	attachments?: boolean; // Whether the model supports file/image attachments
@@ -26,13 +26,12 @@ type ModelConfig = {
 	speed?: "Fast" | "Medium" | "Slow";
 	intelligence?: "Low" | "Medium" | "High";
 
-	website?: string; // official website (e.g. https://openai.com)
 	apiDocs?: string; // official API docs (e.g. https://platform.openai.com/docs/api-reference)
 	modelPage?: string; // official product page (e.g. https://x.ai/news/grok-2)
 	releasedAt?: string; // "2024-12-01" (optional, for tracking changes)
 
 	// apiSdk?: () => LanguageModelV1 // "openai("gpt-4.1-nano")"
-	apiSdk?: (apiKey?: string) => LanguageModelV1;
+	apiSdk?: (apiKey?: string) => LanguageModel | Promise<LanguageModel>;
 };
 
 export type { ModelConfig };

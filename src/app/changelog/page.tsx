@@ -1,6 +1,6 @@
 import { basehub } from "basehub";
 import { RichText } from "basehub/react-rich-text";
-import { ThemeToggle } from "~/components/ui/theme-toggle";
+import  ThemeToggle from "~/components/ui/theme-toggle";
 import { formatDate, cn } from "~/lib/utils";
 import { Tweet } from "react-tweet";
 import Image from "next/image";

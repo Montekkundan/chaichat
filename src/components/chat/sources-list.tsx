@@ -1,6 +1,6 @@
 "use client";
 
-import type { SourceUIPart } from "@ai-sdk/ui-utils";
+import type { SourceUrlUIPart } from 'ai';
 import { CaretDown, Link } from "@phosphor-icons/react";
 import { AnimatePresence, motion } from "motion/react";
 import Image from "next/image";
@@ -9,7 +9,7 @@ import { addUTM, formatUrl, getFavicon } from "~/components/chat/utils";
 import { cn } from "~/lib/utils";
 
 type SourcesListProps = {
-	sources: SourceUIPart["source"][];
+	sources: Array<{ url: string; title?: string; content?: string; id?: string; }>;
 	className?: string;
 };
 
@@ -93,7 +93,7 @@ export function SourcesList({ sources, className }: SourcesListProps) {
 										!faviconUrl || failedFavicons.has(source.url);
 
 									return (
-										<li key={source.id} className="flex items-center text-sm">
+										<li key={source.id || source.url} className="flex items-center text-sm">
 											<div className="min-w-0 flex-1 overflow-hidden">
 												<a
 													href={addUTM(source.url)}

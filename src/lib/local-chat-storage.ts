@@ -80,18 +80,7 @@ export class LocalChatStorage {
 
 		const targetUserId = userId || "local_user";
 
-		// Try to get chat by _id first
-		let chat = await db.chats.get(chatId);
-
-		// If not found, try to find by id field (for backward compatibility)
-		if (!chat) {
-			const chats = await db.chats
-				.where("userId")
-				.equals(targetUserId)
-				.toArray();
-
-			chat = chats.find((c) => c._id === chatId);
-		}
+		const chat = await db.chats.get(chatId);
 
 		if (!chat || chat.userId !== targetUserId) return null;
 

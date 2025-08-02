@@ -1,10 +1,15 @@
 "use client";
 
+import { useState } from "react";
+import { Gear } from "@phosphor-icons/react";
+import { SettingsDialog } from "~/components/settings-dialog";
+import  ThemeToggle from "~/components/ui/theme-toggle";
 import { useSidebar } from "~/components/ui/sidebar";
 
 export function LayoutChat({ children }: { children: React.ReactNode }) {
 	const { state } = useSidebar();
 	const collapsed = state === "collapsed";
+	const [settingsOpen, setSettingsOpen] = useState(false);
 
 	return (
 		<div className="absolute top-0 bottom-0 w-full">
@@ -43,7 +48,26 @@ export function LayoutChat({ children }: { children: React.ReactNode }) {
 					</svg>
 				</div>
 			</div>
+			
+			{/* Settings and Theme Toggle Bar */}
+			<div className="fixed top-2 right-2 z-50 max-sm:hidden">
+				<div className="flex flex-row items-center gap-0.5 rounded-md rounded-bl-xl bg-sidebar p-1 text-muted-foreground transition-all">
+					<button
+						type="button"
+						aria-label="Open settings"
+						onClick={() => setSettingsOpen(true)}
+						className="inline-flex size-8 items-center justify-center rounded-md rounded-bl-xl hover:bg-muted/40 hover:text-foreground"
+						data-discover="true"
+					>
+						<Gear className="size-4" />
+					</button>
+					<ThemeToggle />
+				</div>
+			</div>
+			
 			{children}
+			
+			<SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
 		</div>
 	);
 }

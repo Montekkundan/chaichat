@@ -37,6 +37,13 @@ import {
 } from "~/lib/local-chat-storage";
 import { useCache } from "~/lib/providers/cache-provider";
 
+const getTextContent = (parts: { type: string; text: string }[]) => {
+	return parts
+		.filter((part) => part.type === "text")
+		.map((part) => part.text)
+		.join("");
+};
+
 export function HistoryDialog({
 	open,
 	onOpenChange,
@@ -249,7 +256,12 @@ export function HistoryDialog({
 	const convertToMessageFormat = (localMessage: LocalMessage) => ({
 		id: localMessage._id,
 		role: localMessage.role as "user" | "assistant" | "system",
-		content: localMessage.content,
+		parts: [
+			{
+				type: "text" as const,
+				text: localMessage.content,
+			}
+		],
 		createdAt: new Date(localMessage.createdAt),
 		_creationTime: localMessage._creationTime,
 		model: localMessage.model,
@@ -300,6 +312,7 @@ export function HistoryDialog({
 										id={message.id}
 										message={message}
 										variant={message.role}
+										parts={message.parts}
 										isLast={isLast}
 										onDelete={() => {}}
 										onEdit={() => {}}
@@ -308,7 +321,7 @@ export function HistoryDialog({
 										status="ready"
 										model={message.model}
 									>
-										{message.content}
+										{getTextContent(message.parts)}
 									</Message>
 								);
 							})}

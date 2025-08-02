@@ -4,6 +4,8 @@ import { generateReactHelpers } from "@uploadthing/react";
 import { motion } from "framer-motion";
 import { Paperclip } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useAction } from "convex/react";
+import { api } from "@/convex/_generated/api";
 import type { UploadRouter } from "~/app/api/uploadthing/core";
 import { CookiePreferencesModal } from "~/components/modals/cookie-preferences-modal";
 import { Button } from "~/components/ui/button";
@@ -20,10 +22,24 @@ import {
 	TooltipTrigger,
 } from "~/components/ui/tooltip";
 import { filterValidFiles } from "~/lib/file-upload/validation";
-import { getBestAvailableModel } from "~/lib/model-utils";
+import { getBestAvailableModel } from "~/lib/models/model-utils";
 import { getModelInfo } from "~/lib/models";
+import { shouldShowSearchToggle, getSearchCapabilities } from "~/lib/models/search-utils";
 import { FileList } from "./file-list";
 import { ModelSelector } from "./model-selector";
+
+// TODO cleanup: use all user keys
+
+type UserKeys = {
+	openaiKey?: string;
+	anthropicKey?: string;
+	googleKey?: string;
+	mistralKey?: string;
+	xaiKey?: string;
+	perplexityKey?: string;
+	exaKey?: string;
+	firecrawlKey?: string;
+};
 
 type ChatInputProps = {
 	value: string;
@@ -70,9 +86,45 @@ export function ChatInput({
 }: ChatInputProps) {
 	const selectModelConfig = getModelInfo(selectedModel);
 	const hasToolSupport = Boolean(selectModelConfig?.tools);
-	const allowWebSearch = ["openai", "google"].includes(
-		selectModelConfig?.providerId ?? "",
-	);
+	
+	// User keys state for search capabilities
+	const getKeys = useAction(api.userKeys.getKeys);
+	const [userKeys, setUserKeys] = useState<UserKeys | undefined>(undefined);
+	
+	// Load user keys on mount
+	useEffect(() => {
+		const loadKeys = async () => {
+			if (isUserAuthenticated) {
+				const result = (await getKeys({})) as UserKeys;
+				setUserKeys(result);
+			} else {
+				try {
+					const { getAllKeys } = await import("~/lib/secure-local-keys");
+					const localKeys = await getAllKeys();
+					const formattedKeys: UserKeys = {
+						openaiKey: localKeys.openaiKey,
+						anthropicKey: localKeys.anthropicKey,
+						googleKey: localKeys.googleKey,
+						mistralKey: localKeys.mistralKey,
+						xaiKey: localKeys.xaiKey,
+						perplexityKey: localKeys.perplexityKey,
+						exaKey: localKeys.exaKey,
+						firecrawlKey: localKeys.firecrawlKey,
+					};
+					setUserKeys(formattedKeys);
+				} catch (error) {
+					setUserKeys({});
+				}
+			}
+		};
+		
+		loadKeys();
+	}, [isUserAuthenticated, getKeys]);
+	
+	// Determine if search is available for current model
+	const allowWebSearch = selectModelConfig && userKeys 
+		? shouldShowSearchToggle(selectModelConfig, userKeys)
+		: false;
 
 	// Helper to check if a string is only whitespace characters
 	const isOnlyWhitespace = (text: string) => !/[^\s]/.test(text);
@@ -428,7 +480,20 @@ export function ChatInput({
 						/>
 						{allowWebSearch && (
 							<PromptInputAction
-								tooltip={isSearchEnabled ? "Disable search" : "Search"}
+								tooltip={
+									(() => {
+										if (!selectModelConfig || !userKeys) return "Search";
+										
+										const capabilities = getSearchCapabilities(selectModelConfig, userKeys);
+										const methods = Object.values(capabilities.searchMethods);
+										
+										if (isSearchEnabled) {
+											return `Disable search (${methods.join(", ")})`;
+										} else {
+											return `Enable search (${methods.join(", ")})`;
+										}
+									})()
+								}
 							>
 								<Button
 									variant={isSearchEnabled ? "secondary" : "outline"}

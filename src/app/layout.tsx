@@ -13,7 +13,7 @@ import { UserSessionHandler } from "~/components/user-session-handler";
 import { APP_DESCRIPTION, APP_NAME, APP_OG_IMAGE, APP_URL } from "~/lib/config";
 import { CacheProvider } from "~/lib/providers/cache-provider";
 import { ChatsProvider } from "~/lib/providers/chats-provider";
-import { ModelsProvider } from "~/lib/providers/models-provider";
+import { ModelsProvider } from "~/lib/models";
 import { QuotaProvider } from "~/lib/providers/quota-provider";
 
 const inter = Inter({ subsets: ["latin"] });

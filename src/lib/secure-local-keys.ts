@@ -1,7 +1,41 @@
-// Secure local storage for API keys (non-logged users)
-// Uses Web Crypto API for client-side encryption - free and secure for open source projects
+// TODO cleanup
 
-export type ProviderId = "openai" | "anthropic" | "google" | "mistral" | "xai";
+// Secure local storage for API keys (non-logged users)
+// Uses Web Crypto API for client-side encryption
+
+export type LLMProviderId = 
+	| "openai" 
+	| "anthropic" 
+	| "google" 
+	| "mistral" 
+	| "xai" 
+	| "deepinfra"
+	| "deepseek"
+	| "groq"
+	| "huggingface"
+	| "requesty"
+	| "github"
+	| "inference"
+	| "together"
+	| "aws"
+	| "openrouter"
+	| "alibaba"
+	| "fireworks"
+	| "venice"
+	| "llama"
+	| "morph"
+	| "vercel"
+	| "upstage"
+	| "v0"
+	| "azure"
+	| "wandb";
+
+export type UtilityProviderId = 
+	| "perplexity"
+	| "exa" 
+	| "firecrawl";
+
+export type ProviderId = LLMProviderId | UtilityProviderId;
 
 export interface UserKeys {
 	openaiKey?: string;
@@ -9,6 +43,29 @@ export interface UserKeys {
 	googleKey?: string;
 	mistralKey?: string;
 	xaiKey?: string;
+	perplexityKey?: string;
+	deepinfraKey?: string;
+	deepseekKey?: string;
+	groqKey?: string;
+	huggingfaceKey?: string;
+	requestyKey?: string;
+	githubKey?: string;
+	inferenceKey?: string;
+	togetherKey?: string;
+	awsKey?: string;
+	openrouterKey?: string;
+	alibabaKey?: string;
+	fireworksKey?: string;
+	veniceKey?: string;
+	llamaKey?: string;
+	morphKey?: string;
+	vercelKey?: string;
+	upstageKey?: string;
+	v0Key?: string;
+	azureKey?: string;
+	wandbKey?: string;
+	exaKey?: string;
+	firecrawlKey?: string;
 }
 
 const LOCAL_KEYS_PREFIX = "chaichat_secure_keys_";
@@ -81,7 +138,7 @@ async function deriveEncryptionKey(): Promise<CryptoKey> {
 	return crypto.subtle.deriveKey(
 		{
 			name: "PBKDF2",
-			salt: salt,
+			salt: new Uint8Array(salt),
 			iterations: 100000,
 			hash: "SHA-256",
 		},
@@ -245,11 +302,11 @@ export function removeSessionKey(provider: ProviderId): void {
 // Get all local keys
 export async function getAllLocalKeys(): Promise<UserKeys> {
 	const providers: ProviderId[] = [
-		"openai",
-		"anthropic",
-		"google",
-		"mistral",
-		"xai",
+		"openai", "anthropic", "google", "mistral", "xai", "perplexity",
+		"deepinfra", "deepseek", "groq", "huggingface", "requesty", "github",
+		"inference", "together", "aws", "openrouter", "alibaba", "fireworks",
+		"venice", "llama", "morph", "vercel", "upstage", "v0", "azure", "wandb",
+		"exa", "firecrawl"
 	];
 	const keys: UserKeys = {};
 
@@ -268,11 +325,11 @@ export async function getAllLocalKeys(): Promise<UserKeys> {
 // Get all session keys
 export async function getAllSessionKeys(): Promise<UserKeys> {
 	const providers: ProviderId[] = [
-		"openai",
-		"anthropic",
-		"google",
-		"mistral",
-		"xai",
+		"openai", "anthropic", "google", "mistral", "xai", "perplexity",
+		"deepinfra", "deepseek", "groq", "huggingface", "requesty", "github",
+		"inference", "together", "aws", "openrouter", "alibaba", "fireworks",
+		"venice", "llama", "morph", "vercel", "upstage", "v0", "azure", "wandb",
+		"exa", "firecrawl"
 	];
 	const keys: UserKeys = {};
 
@@ -301,17 +358,40 @@ export async function getAllKeys(): Promise<UserKeys> {
 		googleKey: sessionKeys.googleKey || localKeys.googleKey,
 		mistralKey: sessionKeys.mistralKey || localKeys.mistralKey,
 		xaiKey: sessionKeys.xaiKey || localKeys.xaiKey,
+		perplexityKey: sessionKeys.perplexityKey || localKeys.perplexityKey,
+		deepinfraKey: sessionKeys.deepinfraKey || localKeys.deepinfraKey,
+		deepseekKey: sessionKeys.deepseekKey || localKeys.deepseekKey,
+		groqKey: sessionKeys.groqKey || localKeys.groqKey,
+		huggingfaceKey: sessionKeys.huggingfaceKey || localKeys.huggingfaceKey,
+		requestyKey: sessionKeys.requestyKey || localKeys.requestyKey,
+		githubKey: sessionKeys.githubKey || localKeys.githubKey,
+		inferenceKey: sessionKeys.inferenceKey || localKeys.inferenceKey,
+		togetherKey: sessionKeys.togetherKey || localKeys.togetherKey,
+		awsKey: sessionKeys.awsKey || localKeys.awsKey,
+		openrouterKey: sessionKeys.openrouterKey || localKeys.openrouterKey,
+		alibabaKey: sessionKeys.alibabaKey || localKeys.alibabaKey,
+		fireworksKey: sessionKeys.fireworksKey || localKeys.fireworksKey,
+		veniceKey: sessionKeys.veniceKey || localKeys.veniceKey,
+		llamaKey: sessionKeys.llamaKey || localKeys.llamaKey,
+		morphKey: sessionKeys.morphKey || localKeys.morphKey,
+		vercelKey: sessionKeys.vercelKey || localKeys.vercelKey,
+		upstageKey: sessionKeys.upstageKey || localKeys.upstageKey,
+		v0Key: sessionKeys.v0Key || localKeys.v0Key,
+		azureKey: sessionKeys.azureKey || localKeys.azureKey,
+		wandbKey: sessionKeys.wandbKey || localKeys.wandbKey,
+		exaKey: sessionKeys.exaKey || localKeys.exaKey,
+		firecrawlKey: sessionKeys.firecrawlKey || localKeys.firecrawlKey,
 	};
 }
 
 // Clear all keys from both storages
 export function clearAllKeys(): void {
 	const providers: ProviderId[] = [
-		"openai",
-		"anthropic",
-		"google",
-		"mistral",
-		"xai",
+		"openai", "anthropic", "google", "mistral", "xai", "perplexity",
+		"deepinfra", "deepseek", "groq", "huggingface", "requesty", "github",
+		"inference", "together", "aws", "openrouter", "alibaba", "fireworks",
+		"venice", "llama", "morph", "vercel", "upstage", "v0", "azure",
+		"exa", "firecrawl"
 	];
 
 	for (const provider of providers) {
@@ -334,11 +414,11 @@ export async function migrateFromPlaintextStorage(): Promise<void> {
 	const OLD_LOCAL_PREFIX = "chaichat_keys_";
 	const OLD_SESSION_PREFIX = "chaichat_session_keys_";
 	const providers: ProviderId[] = [
-		"openai",
-		"anthropic",
-		"google",
-		"mistral",
-		"xai",
+		"openai", "anthropic", "google", "mistral", "xai", "perplexity",
+		"deepinfra", "deepseek", "groq", "huggingface", "requesty", "github",
+		"inference", "together", "aws", "openrouter", "alibaba", "fireworks",
+		"venice", "llama", "morph", "vercel", "upstage", "v0", "azure",
+		"exa", "firecrawl"
 	];
 
 	let migrated = false;

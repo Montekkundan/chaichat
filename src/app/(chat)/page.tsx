@@ -12,15 +12,9 @@ export default async function Page({
 	const user = await currentUser();
 	const firstName = user?.firstName || undefined;
 
-	const params =
-		typeof searchParams?.then === "function"
-			? await searchParams
-			: searchParams;
-	const initialModel = params?.model as string | undefined;
-
 	return (
 		<LayoutChat>
-			<MessagesProvider initialModel={initialModel}>
+			<MessagesProvider>
 				<Chat initialName={firstName} />
 			</MessagesProvider>
 		</LayoutChat>

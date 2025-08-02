@@ -8,7 +8,7 @@ import {
 	useState,
 } from "react";
 import { fetchClient } from "~/lib/fetch";
-import type { ModelConfig } from "~/lib/models/types";
+import type { ModelConfig } from "./types";
 
 type ModelsContextType = {
 	models: ModelConfig[];

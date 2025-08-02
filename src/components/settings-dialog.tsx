@@ -358,7 +358,7 @@ export function SettingsDialog({
 
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
-			<DialogContent className="overflow-hidden p-0 md:max-h-[900px] md:max-w-[800px] lg:max-w-[900px]">
+			<DialogContent className="overflow-hidden p-0 md:max-h-[90vh] md:max-w-[900px] lg:max-w-[1200px]">
 				<DialogTitle className="sr-only">Settings</DialogTitle>
 				<DialogDescription className="sr-only">
 					Customize your settings here.
@@ -390,7 +390,7 @@ export function SettingsDialog({
 							</SidebarGroup>
 						</SidebarContent>
 					</Sidebar>
-					<main className="relative flex h-[860px] flex-1 flex-col overflow-hidden">
+					<main className="relative flex h-[90vh] flex-1 flex-col overflow-hidden">
 						<header className="relative flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
 							<div className="flex items-center gap-2 px-4">
 								<div
@@ -401,7 +401,7 @@ export function SettingsDialog({
 								</div>
 							</div>
 						</header>
-						<div className="relative z-30 flex flex-1 flex-col gap-4 p-4 pt-0">
+						<div className="relative z-30 flex flex-1 flex-col gap-4 p-4 pt-0 overflow-y-auto">
 							{renderContent()}
 						</div>
 					</main>

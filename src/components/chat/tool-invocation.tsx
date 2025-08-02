@@ -1,6 +1,6 @@
 "use client";
 
-import type { ToolInvocationUIPart } from "@ai-sdk/ui-utils";
+import type { ToolUIPart } from 'ai';
 import {
 	CaretDown,
 	CheckCircle,
@@ -15,7 +15,7 @@ import { useEffect, useState } from "react";
 import { cn } from "~/lib/utils";
 
 interface ToolInvocationProps {
-	toolInvocations: ToolInvocationUIPart[];
+	toolInvocations: ToolUIPart<any>[];
 	className?: string;
 	defaultOpen?: boolean;
 }
@@ -39,14 +39,14 @@ export function ToolInvocation({
 	// Group tool invocations by toolCallId
 	const groupedTools = toolInvocationsData.reduce(
 		(acc, item) => {
-			const { toolCallId } = item.toolInvocation;
+			const { toolCallId } = item;
 			if (!acc[toolCallId]) {
 				acc[toolCallId] = [];
 			}
 			acc[toolCallId].push(item);
 			return acc;
 		},
-		{} as Record<string, ToolInvocationUIPart[]>,
+		{} as Record<string, ToolUIPart<any>[]>,
 	);
 
 	const uniqueToolIds = Object.keys(groupedTools);
@@ -126,7 +126,7 @@ export function ToolInvocation({
 }
 
 type SingleToolViewProps = {
-	toolInvocations: ToolInvocationUIPart[];
+	toolInvocations: ToolUIPart<any>[];
 	defaultOpen?: boolean;
 	className?: string;
 };
@@ -139,39 +139,42 @@ function SingleToolView({
 	// Group by toolCallId and pick the most informative state
 	const groupedTools = toolInvocations.reduce(
 		(acc, item) => {
-			const { toolCallId } = item.toolInvocation;
+			const { toolCallId } = item;
 			if (!acc[toolCallId]) {
 				acc[toolCallId] = [];
 			}
 			acc[toolCallId].push(item);
 			return acc;
 		},
-		{} as Record<string, ToolInvocationUIPart[]>,
+		{} as Record<string, ToolUIPart<any>[]>,
 	);
 
-	// For each toolCallId, get the most informative state (result > call > requested)
+	// For each toolCallId, get the most informative state (output-available > input-available > input-streaming)
 	const toolsToDisplay = Object.values(groupedTools)
 		.map((group) => {
-			const resultTool = group.find(
-				(item) => item.toolInvocation.state === "result",
+			const outputAvailableTool = group.find(
+				(item) => item.state === "output-available",
 			);
-			const callTool = group.find(
-				(item) => item.toolInvocation.state === "call",
+			const outputErrorTool = group.find(
+				(item) => item.state === "output-error",
 			);
-			const partialCallTool = group.find(
-				(item) => item.toolInvocation.state === "partial-call",
+			const inputAvailableTool = group.find(
+				(item) => item.state === "input-available",
+			);
+			const inputStreamingTool = group.find(
+				(item) => item.state === "input-streaming",
 			);
 
 			// Return the most informative one
-			return resultTool || callTool || partialCallTool;
+			return outputAvailableTool || outputErrorTool || inputAvailableTool || inputStreamingTool;
 		})
-		.filter(Boolean) as ToolInvocationUIPart[];
+		.filter(Boolean) as ToolUIPart<any>[];
 
 	if (toolsToDisplay.length === 0) return null;
 
 	// If there's only one tool, display it directly
 	if (toolsToDisplay.length === 1) {
-		const firstTool = toolsToDisplay[0] as ToolInvocationUIPart;
+		const firstTool = toolsToDisplay[0] as ToolUIPart<any>;
 		return (
 			<SingleToolCard
 				toolData={firstTool}
@@ -187,7 +190,7 @@ function SingleToolView({
 			<div className="space-y-4">
 				{toolsToDisplay.map((tool) => (
 					<SingleToolCard
-						key={tool.toolInvocation.toolCallId}
+						key={tool.toolCallId}
 						toolData={tool}
 						defaultOpen={defaultOpen}
 					/>
@@ -203,7 +206,7 @@ function SingleToolCard({
 	defaultOpen = false,
 	className,
 }: {
-	toolData: ToolInvocationUIPart;
+	toolData: ToolUIPart<any>;
 	defaultOpen?: boolean;
 	className?: string;
 }) {
@@ -211,11 +214,12 @@ function SingleToolCard({
 	const [parsedResult, setParsedResult] = useState<unknown>(null);
 	const [parseError, setParseError] = useState<string | null>(null);
 
-	const { toolInvocation } = toolData;
-	const { state, toolName, toolCallId, args } = toolInvocation;
-	const isLoading = state === "call";
-	const isCompleted = state === "result";
-	const result = isCompleted ? toolInvocation.result : undefined;
+	const { state, toolCallId } = toolData;
+	const toolName = toolData.type.replace('tool-', '');
+	const args = toolData.state === 'input-streaming' || toolData.state === 'input-available' ? toolData.input : undefined;
+	const isLoading = state === "input-streaming";
+	const isCompleted = state === "output-available";
+	const result = isCompleted && 'output' in toolData ? toolData.output : undefined;
 
 	// Parse the result JSON if available
 	useEffect(() => {

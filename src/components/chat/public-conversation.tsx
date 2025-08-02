@@ -2,10 +2,10 @@
 
 import { Conversation } from "~/components/chat/conversation";
 
-import type { Message as MessageType } from "@ai-sdk/react";
+import type { UIMessage as MessageType } from "@ai-sdk/react";
 
 type MessageWithModel = Omit<MessageType, "role"> & {
-	role: "user" | "assistant" | "system" | "data";
+	role: "user" | "assistant" | "system";
 	model?: string;
 };
 

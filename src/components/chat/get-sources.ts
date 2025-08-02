@@ -1,31 +1,17 @@
-import type { Message as MessageAISDK } from "@ai-sdk/react";
+import type { UIMessage as MessageAISDK } from "@ai-sdk/react";
 
 export function getSources(parts: MessageAISDK["parts"]) {
 	const sources = parts
 		?.filter(
-			(part) => part.type === "source" || part.type === "tool-invocation",
+			(part) => part.type === "source-url" || part.type === "source-document",
 		)
 		.map((part) => {
-			if (part.type === "source") {
-				return part.source;
+			if (part.type === "source-url") {
+				return { url: part.url, title: part.title };
 			}
 
-			if (
-				part.type === "tool-invocation" &&
-				part.toolInvocation.state === "result"
-			) {
-				const result = part.toolInvocation.result;
-
-				if (
-					part.toolInvocation.toolName === "summarizeSources" &&
-					result?.result?.[0]?.citations
-				) {
-					return result.result.flatMap(
-						(item: { citations?: unknown[] }) => item.citations || [],
-					);
-				}
-
-				return Array.isArray(result) ? result.flat() : result;
+			if (part.type === "source-document") {
+				return { url: undefined, title: part.title, content: part.filename };
 			}
 
 			return null;
