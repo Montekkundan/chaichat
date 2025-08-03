@@ -81,10 +81,13 @@ export async function POST(req: Request) {
 			system,
 			messages: convertToModelMessages(messages),
 			temperature,
+			headers: {
+				'x-model-id': model,
+			},
 		});
-
-		// Return the proper v5 streaming response
-		return result.toUIMessageStreamResponse();
+		const response = result.toUIMessageStreamResponse();
+		response.headers.set('x-model-id', model);
+		return response;
 		
 	} catch (err: unknown) {
 		console.error("Chat API error:", err);

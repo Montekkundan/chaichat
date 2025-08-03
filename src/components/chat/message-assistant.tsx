@@ -9,6 +9,7 @@ import {
 	MessageContent,
 } from "~/components/prompt-kit/message";
 import { cn } from "~/lib/utils";
+import { formatModelAndProvider } from "~/lib/models/model-info";
 import { Reasoning } from "./reasoning";
 import { SearchImages } from "./search-images";
 import { SourcesList } from "./sources-list";
@@ -44,7 +45,7 @@ export const MessageAssistant = React.memo(function MessageAssistant({
 	model,
 }: MessageAssistantProps) {
 	// const { preferences } = useUserPreferences()
-	
+
 	// Extract sources from v5 parts - look for source-url and source-document parts
 	const sources = useMemo(() => {
 		if (!parts) return [];
@@ -93,13 +94,13 @@ export const MessageAssistant = React.memo(function MessageAssistant({
 	);
 
 	return (
-        <Message
+		<Message
 			className={cn(
 				"group flex w-full max-w-3xl flex-1 items-start gap-4 px-6 pb-2",
 				hasScrollAnchor && "min-h-scroll-anchor",
 			)}
 		>
-            <div className={cn("flex min-w-full flex-col gap-2", isLast && "pb-8")}>
+			<div className={cn("flex min-w-full flex-col gap-2", isLast && "pb-8")}>
 				{reasoningParts?.text && (
 					<Reasoning reasoningText={reasoningParts.text} />
 				)}
@@ -142,7 +143,8 @@ export const MessageAssistant = React.memo(function MessageAssistant({
 								</button>
 							</MessageAction>
 
-							{onBranch && (
+							{/* TODO: Improve branch functionality later */}
+							{/* {onBranch && (
 								<MessageAction
 									tooltip="Branch chat"
 									side="bottom"
@@ -157,11 +159,20 @@ export const MessageAssistant = React.memo(function MessageAssistant({
 										<GitBranch className="size-4" />
 									</button>
 								</MessageAction>
+							)} */}
+
+							{/* Model information display */}
+							{model && (
+								<div className="flex items-center justify-start">
+									<span className="text-xs px-2">
+										{formatModelAndProvider(model)}
+									</span>
+								</div>
 							)}
 						</MessageActions>
 					</div>
 				)}
 			</div>
-        </Message>
-    );
+		</Message>
+	);
 });

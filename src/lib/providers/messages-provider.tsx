@@ -33,6 +33,8 @@ type UploadedFile = {
 type ExtendedMessage = UIMessage & {
 	convexId?: string;
 	parentMessageId?: string;
+	model?: string;
+	_creationTime?: number;
 };
 
 interface MessagesContextType {
@@ -212,6 +214,10 @@ export function MessagesProvider({
 				const currentModel = selectedModelRef.current || "gpt-4o";
 				const textContent = getTextContent(message.parts);
 				
+				// model information to the message
+				const extendedMessage = message as ExtendedMessage;
+				extendedMessage.model = currentModel;
+				
 				try {
 					// Persist assistant message to cache
 					if (chatId && chatId !== "new") {
@@ -291,6 +297,8 @@ export function MessagesProvider({
 						parts: createTextParts(msg.content),
 						convexId: msg._id,
 						parentMessageId: msg.parentMessageId,
+						model: msg.model,
+						_creationTime: msg._creationTime,
 					}));
 
 					// Set messages in useChat hook
