@@ -2,7 +2,6 @@ import { convertToModelMessages, streamText, type UIMessage } from "ai";
 import { createDynamicProvider } from "~/lib/openproviders";
 import { getProviderKeyMap } from "~/lib/models/providers";
 
-// Allow streaming responses up to 60 seconds
 export const maxDuration = 60;
 
 type ChatRequest = {
@@ -13,7 +12,6 @@ type ChatRequest = {
 	userApiKeys?: Record<string, string | undefined>;
 };
 
-// Helper function to extract provider from model ID
 function extractProviderFromModelId(modelId: string): string | null {
 	try {
 		const fs = require('fs');
@@ -22,7 +20,9 @@ function extractProviderFromModelId(modelId: string): string | null {
 		
 		if (fs.existsSync(modelsPath)) {
 			const modelsData = JSON.parse(fs.readFileSync(modelsPath, 'utf8'));
-			const model = modelsData?.models?.find((m: any) => m.id === modelId);
+			const { filterModelsJsonByTested } = require('~/lib/models/tested-providers');
+			const filteredData = filterModelsJsonByTested(modelsData);
+			const model = filteredData?.models?.find((m: any) => m.id === modelId);
 			
 			if (model?.provider) {
 				return model.provider
@@ -51,7 +51,6 @@ export async function POST(req: Request) {
 			userApiKeys = {},
 		}: ChatRequest = body;
 
-		// Validation
 		if (!messages?.length || !model) {
 			return new Response(
 				JSON.stringify({ error: "Messages and model are required" }),
@@ -59,13 +58,10 @@ export async function POST(req: Request) {
 			);
 		}
 
-		// Get API key using provider mapping
 		const providerId = extractProviderFromModelId(model);
 		const keyMap = await getProviderKeyMap();
 		const keyField = keyMap[providerId || ""];
 		const apiKey = keyField ? userApiKeys[keyField] : undefined;
-
-		// Create the dynamic model instance
 		const modelInstance = await createDynamicProvider(model, apiKey);
 		
 		if (!modelInstance) {
@@ -75,26 +71,28 @@ export async function POST(req: Request) {
 			);
 		}
 
-		// Stream the response using AI SDK v5
+		const convertedMessages = convertToModelMessages(messages);
+		
+		if (providerId === "google" && (!convertedMessages || convertedMessages.length === 0)) {
+			return new Response(
+				JSON.stringify({ error: "No valid messages provided for Google Gemini" }),
+				{ status: 400, headers: { "Content-Type": "application/json" } }
+			);
+		}
+		
 		const result = streamText({
 			model: modelInstance,
 			system,
-			messages: convertToModelMessages(messages),
+			messages: convertedMessages,
 			temperature,
-			headers: {
-				'x-model-id': model,
-			},
 		});
-		const response = result.toUIMessageStreamResponse();
-		response.headers.set('x-model-id', model);
-		return response;
+		
+		return result.toUIMessageStreamResponse();
 		
 	} catch (err: unknown) {
 		console.error("Chat API error:", err);
-		
 		const errorMessage = err instanceof Error ? err.message : "Unknown error occurred";
 		
-		// Handle specific error types
 		if (errorMessage.includes("429") || errorMessage.includes("rate limit")) {
 			return new Response(
 				JSON.stringify({ 

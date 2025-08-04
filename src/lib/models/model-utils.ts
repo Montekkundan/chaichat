@@ -1,5 +1,6 @@
 import { getAllKeys, type UserKeys } from "~/lib/secure-local-keys";
 import { getProviderKeyMap, normalizeProviderName as normalizeProviderFromModelsJson } from "./providers";
+import { filterModelsJsonByTested } from "./tested-providers";
 
 /**
  * Get all available model IDs from models.json
@@ -11,7 +12,8 @@ async function getAllModelIds(): Promise<string[]> {
 			const response = await fetch('/models.json');
 			if (response.ok) {
 				const data = await response.json();
-				return data.models.map((m: any) => m.id);
+				const filteredData = filterModelsJsonByTested(data);
+				return filteredData.models.map((m: any) => m.id);
 			}
 		} else {
 			const fs = require('fs');
@@ -20,7 +22,8 @@ async function getAllModelIds(): Promise<string[]> {
 			
 			if (fs.existsSync(modelsPath)) {
 				const modelsData = JSON.parse(fs.readFileSync(modelsPath, 'utf8'));
-				return modelsData.models.map((m: any) => m.id);
+				const filteredData = filterModelsJsonByTested(modelsData);
+				return filteredData.models.map((m: any) => m.id);
 			}
 		}
 	} catch (error) {
@@ -246,7 +249,8 @@ async function loadModelsData(): Promise<any> {
 			try {
 				const response = await fetch('/models.json');
 				if (response.ok) {
-					modelsCache = await response.json();
+					const data = await response.json();
+					modelsCache = filterModelsJsonByTested(data);
 				}
 			} catch (error) {
 				console.warn('Failed to load models.json:', error);
@@ -259,7 +263,8 @@ async function loadModelsData(): Promise<any> {
 		const modelsPath = path.join(process.cwd(), 'public', 'models.json');
 		
 		if (fs.existsSync(modelsPath)) {
-			return JSON.parse(fs.readFileSync(modelsPath, 'utf8'));
+			const data = JSON.parse(fs.readFileSync(modelsPath, 'utf8'));
+			return filterModelsJsonByTested(data);
 		}
 	}
 	return null;

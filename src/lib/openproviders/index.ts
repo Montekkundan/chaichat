@@ -1,14 +1,11 @@
-// TODO: cleanup
-
-/**
- * Cache for models data and provider metadata
- */
 let modelsDataCache: any = null;
 let providerMetadataCache: Map<string, any> = new Map();
 
-/**
- * Load models data from models.json
- */
+function clearCache() {
+  modelsDataCache = null;
+  providerMetadataCache.clear();
+}
+
 async function loadModelsData(): Promise<any> {
   if (modelsDataCache) {
     return modelsDataCache;
@@ -18,29 +15,29 @@ async function loadModelsData(): Promise<any> {
     try {
       const response = await fetch('/models.json');
       if (response.ok) {
-        modelsDataCache = await response.json();
+        const data = await response.json();
+        const { filterModelsJsonByTested } = await import('../models/tested-providers');
+        modelsDataCache = filterModelsJsonByTested(data);
         return modelsDataCache;
       }
     } catch (error) {
       console.warn('Failed to load models.json:', error);
     }
   } else {
-    // Server-side
     const fs = require('fs');
     const path = require('path');
     const modelsPath = path.join(process.cwd(), 'public', 'models.json');
     
     if (fs.existsSync(modelsPath)) {
-      modelsDataCache = JSON.parse(fs.readFileSync(modelsPath, 'utf8'));
+      const data = JSON.parse(fs.readFileSync(modelsPath, 'utf8'));
+      const { filterModelsJsonByTested } = await import('../models/tested-providers');
+      modelsDataCache = filterModelsJsonByTested(data);
       return modelsDataCache;
     }
   }
   return null;
 }
 
-/**
- * Get provider metadata for a given provider name
- */
 async function getProviderMetadata(providerName: string): Promise<any> {
   if (providerMetadataCache.has(providerName)) {
     return providerMetadataCache.get(providerName);
@@ -60,9 +57,6 @@ async function getProviderMetadata(providerName: string): Promise<any> {
   return null;
 }
 
-/**
- * Get provider ID and metadata from model ID using models.json
- */
 async function getProviderFromModelId(modelId: string): Promise<{ id: string; metadata: any } | null> {
   try {
     const modelsData = await loadModelsData();
@@ -74,7 +68,6 @@ async function getProviderFromModelId(modelId: string): Promise<{ id: string; me
     if (model?.provider) {
       const metadata = await getProviderMetadata(model.provider);
       
-      // Normalize provider name to ID
       const providerId = model.provider
         .toLowerCase()
         .replace(/[^a-z0-9]/g, '-')
@@ -93,12 +86,8 @@ async function getProviderFromModelId(modelId: string): Promise<{ id: string; me
   return null;
 }
 
-/**
- * Dynamically import and create AI SDK provider instance
- */
 async function createProviderFromNpm(npmPackage: string, apiKey?: string, metadata?: any, providerOptions?: any): Promise<any> {
   try {
-    // Handle @ai-sdk/openai-compatible specially as it doesn't exist as a standalone package
     if (npmPackage === "@ai-sdk/openai-compatible") {
       const { createOpenAI } = await import("@ai-sdk/openai");
       if (!apiKey) {
@@ -107,7 +96,6 @@ async function createProviderFromNpm(npmPackage: string, apiKey?: string, metada
       return createOpenAI({ apiKey });
     }
     
-    // Check if this is a server-only provider
     const { isServerOnlyProvider } = await import('./provider-constants');
     if (isServerOnlyProvider(npmPackage)) {
       if (typeof window !== 'undefined') {
@@ -117,7 +105,6 @@ async function createProviderFromNpm(npmPackage: string, apiKey?: string, metada
       return getServerProvider(npmPackage, apiKey, metadata, providerOptions);
     }
     
-    // Use explicit dynamic imports for known client-safe packages to help webpack
     let providerModule;
     try {
       switch (npmPackage) {
@@ -164,46 +151,28 @@ async function createProviderFromNpm(npmPackage: string, apiKey?: string, metada
       throw new Error(`Package ${npmPackage} is not installed. Please install it with: npm install ${npmPackage}`);
     }
     
-    // Try to find the appropriate create function and default instance
     let createFunction = null;
     let defaultInstance = null;
     
-    // Look for common patterns in AI SDK packages
     for (const [key, value] of Object.entries(providerModule)) {
       if (typeof value === 'function') {
         if (key.startsWith('create') && key.length > 6) {
           createFunction = value;
         } else if (!key.startsWith('create') && !key.startsWith('_') && key.length < 15) {
-          // Likely a default instance (openai, anthropic, etc.)
           defaultInstance = value;
         }
       }
     }
     
-    // If we have a create function and an API key, use it
     if (createFunction && apiKey) {
-      try {
-        // Merge API key with any provider-specific options
-        const config = { apiKey, ...providerOptions };
-        return createFunction(config);
-      } catch (error) {
-        // Fallback to other configurations if basic one fails
-        try {
-          const config = { apiKey, ...providerOptions };
-          return createFunction(config);
-        } catch (error2) {
-          // If still fails, try with minimal config
-          return createFunction({ apiKey });
-        }
-      }
+      const config = { apiKey, ...providerOptions };
+      return createFunction(config);
     }
     
-    // Otherwise, try to use the default instance
     if (defaultInstance) {
       return defaultInstance;
     }
     
-    // If we can't find a suitable export, throw an error
     throw new Error(`Could not find suitable provider factory in ${npmPackage}. Available exports: ${Object.keys(providerModule).join(', ')}`);
     
   } catch (error) {
@@ -211,16 +180,11 @@ async function createProviderFromNpm(npmPackage: string, apiKey?: string, metada
   }
 }
 
-/**
- * Get base URL for OpenAI-compatible providers from metadata
- */
 function getBaseURLFromMetadata(metadata: any): string | null {
-  // Check if metadata has baseURL or url field
   if (metadata?.baseURL) return metadata.baseURL;
   if (metadata?.url) return metadata.url;
   if (metadata?.endpoint) return metadata.endpoint;
   
-  // Check in the env field for URL patterns
   if (metadata?.env) {
     for (const [key, value] of Object.entries(metadata.env)) {
       if (typeof value === 'string' && (
@@ -236,9 +200,6 @@ function getBaseURLFromMetadata(metadata: any): string | null {
   return null;
 }
 
-/**
- * Create AI SDK instance dynamically based on npm package from models.json
- */
 export async function createDynamicProvider(
   modelId: string,
   apiKey?: string,
@@ -257,7 +218,6 @@ export async function createDynamicProvider(
     throw new Error(`No npm package specified for provider: ${providerId}`);
   }
 
-  // Handle OpenAI-compatible providers
   if (npmPackage === "@ai-sdk/openai-compatible") {
     if (!apiKey) {
       throw new Error(`API key required for OpenAI-compatible provider: ${providerId}`);
@@ -270,35 +230,31 @@ export async function createDynamicProvider(
 
     const { createOpenAI } = await import("@ai-sdk/openai");
     
+    const transformedModelId = modelId;
+    
     const provider = createOpenAI({
-      baseURL,
-      apiKey: providerId === "ollama" ? "ollama" : apiKey, // Ollama doesn't require a real API key
+      baseURL: baseURL,
+      apiKey: providerId === "ollama" ? "ollama" : apiKey,
       name: providerId,
     });
     
+    return provider(transformedModelId as any);
+  }
+
+  const { isServerOnlyProvider } = await import('./provider-constants');
+  if (isServerOnlyProvider(npmPackage)) {
+    if (typeof window !== 'undefined') {
+      throw new Error(`${npmPackage} models are only available on the server-side. Provider: ${providerId}, Model: ${modelId}`);
+    }
+    const { getServerProvider } = await import('./server-providers');
+    const provider = await getServerProvider(npmPackage, apiKey, metadata, providerOptions);
     return provider(modelId as any);
   }
 
-    // Check if this is a server-only provider early
-    const { isServerOnlyProvider } = await import('./provider-constants');
-    if (isServerOnlyProvider(npmPackage)) {
-      if (typeof window !== 'undefined') {
-        throw new Error(`${npmPackage} models are only available on the server-side. Provider: ${providerId}, Model: ${modelId}`);
-      }
-      // Handle server-only providers
-      const { getServerProvider } = await import('./server-providers');
-      const provider = await getServerProvider(npmPackage, apiKey, metadata, providerOptions);
-      return provider(modelId as any);
-    }
-
-  // Handle other npm packages
   const provider = await createProviderFromNpm(npmPackage, apiKey, metadata, providerOptions);
   return provider(modelId as any);
 }
 
-/**
- * Get all supported providers from models.json
- */
 export async function getSupportedProviders(): Promise<string[]> {
   try {
     const modelsData = await loadModelsData();
@@ -325,9 +281,6 @@ export async function getSupportedProviders(): Promise<string[]> {
   }
 }
 
-/**
- * Check if a model is supported by this dynamic provider system
- */
 export async function isModelSupported(modelId: string): Promise<boolean> {
   try {
     const providerId = await getProviderFromModelId(modelId);
@@ -336,4 +289,8 @@ export async function isModelSupported(modelId: string): Promise<boolean> {
     console.warn('Failed to check model support:', error);
     return false;
   }
+}
+
+export function clearModelsCache(): void {
+  clearCache();
 }

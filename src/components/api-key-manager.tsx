@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { cn } from "~/lib/utils";
 import { api } from "~/../convex/_generated/api";
 import { Button } from "~/components/ui/button";
+import { ProviderStatusIndicator } from "~/components/debug/provider-debug-panel";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { Checkbox } from "~/components/ui/checkbox";
@@ -53,6 +54,9 @@ import {
 	removeSessionKey,
 	setLocalKey,
 	setSessionKey,
+	getLocalKey,
+	getSessionKey,
+	migrateFromPlaintextStorage,
 } from "~/lib/secure-local-keys";
 import { getProviderConfigs, type ProviderConfig } from "~/lib/models/providers";
 
@@ -87,11 +91,24 @@ export function ApiKeyManager() {
 	const id = useId();
 	const inputRef = useRef<HTMLInputElement>(null);
 
+	// Core state
 	const [keys, setKeys] = useState<Record<string, string>>({});
 	const [showKeys, setShowKeys] = useState<Record<string, boolean>>({});
 	const [isLoading, setIsLoading] = useState(true);
 	const [useSessionStorage, setUseSessionStorage] = useState(false);
 	const [providers, setProviders] = useState<ProviderConfig[]>([]);
+
+	// Use ref for initialization to survive component remounting
+	const initializationRef = useRef<{
+		initialized: boolean;
+		promise: Promise<void> | null;
+	}>({ initialized: false, promise: null });
+
+	// Track unsaved changes for auto-save on unmount
+	const unsavedChangesRef = useRef<Record<string, string>>({});
+	
+	// Debounce timers for auto-save
+	const autoSaveTimersRef = useRef<Record<string, NodeJS.Timeout>>({});
 
 	// Table state
 	const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
@@ -112,69 +129,146 @@ export function ApiKeyManager() {
 	const removeKeyMutation = useMutation(api.userKeys.removeKey);
 	const getKeysAction = useAction(api.userKeys.getKeys);
 
-	// Load providers from models.json
 	useEffect(() => {
-		const loadProviders = async () => {
+		if (initializationRef.current.initialized || initializationRef.current.promise) {
+			return;
+		}
+
+		const initializeComponent = async () => {
 			try {
+				setIsLoading(true);
+				await migrateFromPlaintextStorage();
 				const providerConfigs = await getProviderConfigs();
 				setProviders(providerConfigs);
+				await loadExistingKeys(providerConfigs, isLoggedIn);
 			} catch (error) {
-				console.error("Failed to load provider configs:", error);
+				console.error("ApiKeyManager: Initialization failed:", error);
+			} finally {
+				setIsLoading(false);
+				initializationRef.current.initialized = true;
+				initializationRef.current.promise = null;
 			}
 		};
 
-		loadProviders();
+		initializationRef.current.promise = initializeComponent();
 	}, []);
 
-	// Load keys on mount
 	useEffect(() => {
-		const loadKeys = async () => {
-			if (isLoggedIn) {
-				// For logged users, fetch from Convex
-				try {
-					// Use the Convex query to get keys
-					const convexKeys = await getKeysAction({});
-					// Filter out undefined values and convert to Record<string, string>
-					const filteredKeys: Record<string, string> = {};
-					if (convexKeys) {
-						for (const [key, value] of Object.entries(convexKeys)) {
-							if (value) {
-								const provider = key.replace("Key", "") as ProviderId;
-								filteredKeys[provider] = value as string;
+		const currentProviders = providers;
+		const currentIsLoggedIn = isLoggedIn;
+		const currentUseSessionStorage = useSessionStorage;
+		
+		return () => {
+			Object.values(autoSaveTimersRef.current).forEach(timer => {
+				if (timer) clearTimeout(timer);
+			});
+			autoSaveTimersRef.current = {};
+			
+			const unsavedChanges = unsavedChangesRef.current;
+			if (Object.keys(unsavedChanges).length > 0) {
+				for (const [provider, value] of Object.entries(unsavedChanges)) {
+					const providerConfig = currentProviders.find((p) => p.id === provider);
+					const keyName = providerConfig?.keyName;
+					
+					if (!keyName) {
+						continue;
+					}
+					
+					const trimmedValue = value.trim();
+					
+					if (trimmedValue) {
+						if (currentIsLoggedIn) {
+							storeKeyMutation({ provider: provider as ProviderId, apiKey: trimmedValue }).catch(err => {
+								console.error(`Failed to auto-save ${provider}:`, err);
+							});
+						} else {
+							if (currentUseSessionStorage) {
+								setSessionKey(keyName as ProviderId, trimmedValue).catch(err => {
+									console.error(`Failed to auto-save ${provider}:`, err);
+								});
+							} else {
+								setLocalKey(keyName as ProviderId, trimmedValue).catch(err => {
+									console.error(`Failed to auto-save ${provider}:`, err);
+								});
 							}
 						}
 					}
-					setKeys(filteredKeys);
-				} catch (error) {
-					console.error("Failed to load keys from Convex:", error);
 				}
+				unsavedChangesRef.current = {};
+				
+				// Dispatch event to notify other components if any keys were saved
+				if (Object.keys(unsavedChanges).length > 0) {
+					window.dispatchEvent(new CustomEvent('apiKeysChanged'));
+				}
+			}
+		};
+	}, [providers, isLoggedIn, useSessionStorage, storeKeyMutation]);
+
+	const loadExistingKeys = async (providerConfigs: ProviderConfig[], loggedIn: boolean) => {
+		try {
+			if (loggedIn) {
+				const convexKeys = await getKeysAction({});
+				const formattedKeys: Record<string, string> = {};
+				if (convexKeys) {
+					const keyToProviders: Record<string, string[]> = {};
+					for (const provider of providerConfigs) {
+						if (provider.requiresApiKey && provider.keyName) {
+							if (!keyToProviders[provider.keyName]) {
+								keyToProviders[provider.keyName] = [];
+							}
+							keyToProviders[provider.keyName]!.push(provider.id);
+						}
+					}
+
+					for (const [key, value] of Object.entries(convexKeys)) {
+						if (value && typeof value === 'string') {
+							const providerIds = keyToProviders[key];
+							if (providerIds) {
+								for (const providerId of providerIds) {
+									formattedKeys[providerId] = value;
+								}
+							} else {
+								const provider = key.replace("Key", "");
+								formattedKeys[provider] = value;
+							}
+						}
+					}
+				}
+				setKeys(formattedKeys);
 			} else {
-				// For non-logged users, fetch from local storage
-				try {
-					const localKeys = await getAllKeys();
-					const formattedKeys: Record<string, string> = {};
-					for (const [key, value] of Object.entries(localKeys)) {
-						if (value) {
-							const provider = key.replace("Key", "") as ProviderId;
+				const localKeys = await getAllKeys();
+				const formattedKeys: Record<string, string> = {};
+				const keyToProviders: Record<string, string[]> = {};
+				
+				for (const provider of providerConfigs) {
+					if (provider.requiresApiKey && provider.keyName) {
+						if (!keyToProviders[provider.keyName]) {
+							keyToProviders[provider.keyName] = [];
+						}
+						keyToProviders[provider.keyName]!.push(provider.id);
+					}
+				}
+
+				for (const [key, value] of Object.entries(localKeys)) {
+					if (value && typeof value === 'string') {
+						const providerIds = keyToProviders[key];
+						if (providerIds) {
+							for (const providerId of providerIds) {
+								formattedKeys[providerId] = value;
+							}
+						} else {
+							const provider = key.replace("Key", "");
 							formattedKeys[provider] = value;
 						}
 					}
-					setKeys(formattedKeys);
-				} catch (error) {
-					console.error("Failed to load keys from local storage:", error);
 				}
+				setKeys(formattedKeys);
 			}
-			setIsLoading(false);
-		};
-
-		loadKeys();
-	}, [isLoggedIn, getKeysAction]);
-
-	// Notify other components when keys change
-	useEffect(() => {
-		// Dispatch a custom event to notify other components
-		window.dispatchEvent(new CustomEvent("apiKeysChanged", { detail: keys }));
-	}, [keys]);
+		} catch (error) {
+			console.error("ApiKeyManager: Failed to load existing keys:", error);
+			setKeys({});
+		}
+	};
 
 	// Transform providers to table data
 	const data = useMemo((): ApiKeyItem[] => {
@@ -214,25 +308,35 @@ export function ApiKeyManager() {
 		try {
 			const providerConfig = providers.find((p) => p.id === provider);
 			const providerName = providerConfig?.name || provider;
+			const keyName = providerConfig?.keyName;
+
+			if (!keyName) {
+				console.error(`ApiKeyManager: No keyName found for provider ${provider}`);
+				toast.error("Invalid provider configuration");
+				return;
+			}
 
 			if (isLoggedIn) {
-				// Store in Convex for logged users
 				await storeKeyMutation({ provider, apiKey: trimmedKey });
 				toast.success(`${providerName} API key saved securely`);
 			} else {
-				// Store in encrypted local/session storage for non-logged users
+				const storageProviderKey = keyName.replace(/Key$/, '');
+				
 				if (useSessionStorage) {
-					await setSessionKey(provider, trimmedKey);
+					await setSessionKey(storageProviderKey as ProviderId, trimmedKey);
 					toast.success(`${providerName} API key saved for this session`);
 				} else {
-					await setLocalKey(provider, trimmedKey);
+					await setLocalKey(storageProviderKey as ProviderId, trimmedKey);
 					toast.success(`${providerName} API key saved locally (encrypted)`);
 				}
 			}
 
 			setKeys((prev) => ({ ...prev, [provider]: trimmedKey }));
+
+			// Dispatch event to notify other components
+			window.dispatchEvent(new CustomEvent('apiKeysChanged'));
 		} catch (error) {
-			console.error("Failed to save API key:", error);
+			console.error("ApiKeyManager: Failed to save API key:", error);
 			toast.error("Failed to save API key");
 		}
 	};
@@ -241,14 +345,21 @@ export function ApiKeyManager() {
 		try {
 			const providerConfig = providers.find((p) => p.id === provider);
 			const providerName = providerConfig?.name || provider;
+			const keyName = providerConfig?.keyName;
+
+			if (!keyName) {
+				console.error(`ApiKeyManager: No keyName found for provider ${provider}`);
+				toast.error("Invalid provider configuration");
+				return;
+			}
 
 			if (isLoggedIn) {
 				// Remove from Convex for logged users
 				await removeKeyMutation({ provider });
 			} else {
 				// Remove from local storage for non-logged users
-				removeLocalKey(provider);
-				removeSessionKey(provider);
+				removeLocalKey(keyName as ProviderId);
+				removeSessionKey(keyName as ProviderId);
 			}
 
 			setKeys((prev) => {
@@ -258,8 +369,11 @@ export function ApiKeyManager() {
 			});
 
 			toast.success(`${providerName} API key removed`);
+
+			// Dispatch event to notify other components
+			window.dispatchEvent(new CustomEvent('apiKeysChanged'));
 		} catch (error) {
-			console.error("Failed to remove API key:", error);
+			console.error("ApiKeyManager: Failed to remove API key:", error);
 			toast.error("Failed to remove API key");
 		}
 	};
@@ -282,7 +396,8 @@ export function ApiKeyManager() {
 				return (
 					<div className="flex items-center gap-3 font-medium">
 						<IconComponent className="h-5 w-5" />
-						{row.getValue("name")}
+						<span>{row.getValue("name")}</span>
+						<ProviderStatusIndicator providerName={row.original.name} />
 					</div>
 				);
 			},
@@ -360,27 +475,49 @@ export function ApiKeyManager() {
 										...prev,
 										[provider]: newValue,
 									}));
-
-									const trimmedValue = newValue.trim();
-									if (trimmedValue && trimmedValue !== currentKey) {
-										// Small delay to avoid saving while user is still typing
-										setTimeout(() => {
-											handleSaveKey(provider, trimmedValue);
-										}, 500);
+									
+									if (autoSaveTimersRef.current[provider]) {
+										clearTimeout(autoSaveTimersRef.current[provider]);
 									}
+									
+									if (newValue.trim() !== currentKey.trim()) {
+										unsavedChangesRef.current[provider] = newValue.trim();
+										
+										if (newValue.trim()) {
+											autoSaveTimersRef.current[provider] = setTimeout(() => {
+												handleSaveKey(provider, newValue.trim());
+												delete unsavedChangesRef.current[provider];
+												delete autoSaveTimersRef.current[provider];
+											}, 1500);
+										}
+									} else {
+										delete unsavedChangesRef.current[provider];
+									}
+								}}
+								onPaste={(e) => {
+									setTimeout(() => {
+										const value = e.currentTarget.value.trim();
+										if (value && value !== currentKey.trim()) {
+											handleSaveKey(provider, value);
+											delete unsavedChangesRef.current[provider];
+										}
+									}, 100);
 								}}
 								onBlur={(e) => {
 									const value = e.target.value.trim();
-									if (value !== currentKey) {
+									if (value !== currentKey.trim()) {
 										handleSaveKey(provider, value);
+										delete unsavedChangesRef.current[provider];
 									}
 								}}
 								onKeyDown={(e) => {
 									if (e.key === "Enter") {
-										handleSaveKey(provider, e.currentTarget.value);
+										const value = e.currentTarget.value.trim();
+										handleSaveKey(provider, value);
+										delete unsavedChangesRef.current[provider];
 									}
 								}}
-								className="pr-16 text-sm"
+								className="pr-24 text-sm"
 							/>
 							<div className="absolute top-1/2 right-2 -translate-y-1/2 flex gap-1">
 								<Button

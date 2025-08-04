@@ -23,6 +23,7 @@ import {
 	TbApi
 } from "react-icons/tb";
 import { Building2, Zap, Globe, Brain, Code2, Sparkles, Cpu, Bot, Network } from "lucide-react";
+import { filterProvidersByTested, filterModelsJsonByTested } from "./tested-providers";
 
 export interface ProviderConfig {
 	id: string;
@@ -34,28 +35,19 @@ export interface ProviderConfig {
 	apiDocs?: string;
 }
 
-/**
- * STATIC PROVIDER ICONS MAPPING
- * 
- * This is the master list of provider icons. Update this manually when you want to
- * change icons for providers. New providers from models.json get added automatically
- * with Globe icon during build - you can then update them here.
- * 
- * Generated from models.json providers on: 2025-08-01T21:30:02.831Z
- */
 const PROVIDER_ICONS: Record<string, React.ComponentType<React.SVGProps<SVGSVGElement>>> = {
 	// === MAJOR AI PROVIDERS ===
 	"openai": SiOpenai,
 	"anthropic": SiAnthropic,
 	"google": SiGoogle,
 	"meta": SiMeta,
-	"microsoft": TbCloud, // No SiMicrosoft available, using cloud icon
+	"microsoft": TbCloud,
 	"nvidia": SiNvidia,
 	"amazon-bedrock": SiAmazon,
 	
 	// === CLOUD & PLATFORMS ===
 	"vertex": SiGoogle,
-	"azure": TbCloud, // Microsoft Azure using cloud icon
+	"azure": TbCloud,
 	"github-models": SiGithub,
 	"github-copilot": SiGithub,
 	"vercel-ai-gateway": TbCloud,
@@ -81,26 +73,19 @@ const PROVIDER_ICONS: Record<string, React.ComponentType<React.SVGProps<SVGSVGEl
 	"weights-biases": TbCloudComputing,
 	"venice-ai": TbCloud,
 	"morph": TbNetwork,
-	"alibaba": Building2, // No SiAlibaba available, using building icon
+	"alibaba": Building2,
 	
 	// === SPECIALIZED ===
 	"ollama": TbCpu,
 	"local": TbCpu,
 	"llama": SiMeta,
 	"requesty": TbApi,
+	"cerebras": Globe,
 	
-	// === AUTO-GENERATED (update these manually) ===
-	// New providers from models.json added automatically with Globe icon
-	// TODO: Update these with appropriate icons from the libraries above
-		"cerebras": Globe, // TODO: Update with appropriate icon,
-
 	// === DEFAULT FALLBACK ===
 	"default": Globe
 };
 
-/**
- * Normalize provider name to ID
- */
 export function normalizeProviderName(providerName: string): string {
 	return providerName
 		.toLowerCase()
@@ -109,29 +94,20 @@ export function normalizeProviderName(providerName: string): string {
 		.replace(/^-|-$/g, '');
 }
 
-/**
- * Get icon for provider - uses exact match from PROVIDER_ICONS
- */
 function getProviderIcon(providerId: string): React.ComponentType<React.SVGProps<SVGSVGElement>> {
-	// Try exact match first
 	if (PROVIDER_ICONS[providerId]) {
 		return PROVIDER_ICONS[providerId];
 	}
 	
-	// Try partial matches for known providers
 	for (const [key, icon] of Object.entries(PROVIDER_ICONS)) {
 		if (key !== "default" && (providerId.includes(key) || key.includes(providerId))) {
 			return icon;
 		}
 	}
 	
-	// Default fallback
 	return PROVIDER_ICONS["default"] || Globe;
 }
 
-/**
- * Generate placeholder text for API key input
- */
 function generatePlaceholder(providerId: string, displayName: string): string {
 	const commonPrefixes: Record<string, string> = {
 		"openai": "sk-...",
@@ -147,18 +123,15 @@ function generatePlaceholder(providerId: string, displayName: string): string {
 		"perplexity": "pplx-..."
 	};
 	
-	// Check for known prefix
 	for (const [key, prefix] of Object.entries(commonPrefixes)) {
 		if (providerId.includes(key)) {
 			return `${prefix} (from ${displayName})`;
 		}
 	}
 	
-	// Generic format
 	const prefix = displayName.toLowerCase().substring(0, 3);
 	return `${prefix}-... (from ${displayName})`;
 }
-
 
 function requiresApiKey(providerId: string): boolean {
 	const freeProviders = [
@@ -170,11 +143,14 @@ function requiresApiKey(providerId: string): boolean {
 	return !freeProviders.some(free => providerId.includes(free));
 }
 
-/**
- * Generate key name for UserKeys interface
- */
 function generateKeyName(providerId: string): string {
-	// Convert provider ID to camelCase + Key
+	if (providerId === 'github-models') {
+		return 'githubModelsKey';
+	}
+	if (providerId === 'github-copilot') {
+		return 'githubCopilotKey';
+	}
+	
 	const camelCase = providerId
 		.split('-')
 		.map((word, index) => index === 0 ? word : word.charAt(0).toUpperCase() + word.slice(1))
@@ -183,53 +159,50 @@ function generateKeyName(providerId: string): string {
 	return `${camelCase}Key`;
 }
 
-/**
- * Cache for provider configs
- */
 let providerConfigsCache: ProviderConfig[] | null = null;
+let lastLoadTime = 0;
+const CACHE_DURATION = 60000;
 
-/**
- * Load models data from models.json
- */
 async function loadModelsData(): Promise<any> {
 	if (typeof window !== 'undefined') {
 		try {
 			const response = await fetch('/models.json');
 			if (response.ok) {
-				return await response.json();
+				const data = await response.json();
+				return filterModelsJsonByTested(data);
 			}
 		} catch (error) {
 			console.warn('Failed to load models.json:', error);
 		}
 	} else {
-		// Server-side
 		const fs = require('fs');
 		const path = require('path');
 		const modelsPath = path.join(process.cwd(), 'public', 'models.json');
 		
 		if (fs.existsSync(modelsPath)) {
-			return JSON.parse(fs.readFileSync(modelsPath, 'utf8'));
+			const data = JSON.parse(fs.readFileSync(modelsPath, 'utf8'));
+			return filterModelsJsonByTested(data);
 		}
 	}
 	return null;
 }
 
-/**
- * Get all provider configurations dynamically from models.json
- */
 export async function getProviderConfigs(): Promise<ProviderConfig[]> {
-	if (providerConfigsCache) {
+	const now = Date.now();
+	
+	if (providerConfigsCache && (now - lastLoadTime) < CACHE_DURATION) {
 		return providerConfigsCache;
 	}
 	
 	try {
 		const modelsData = await loadModelsData();
 		if (!modelsData?.models) {
-			console.warn('No models data found, using fallback providers');
-			return getFallbackProviders();
+			const fallback = getFallbackProviders();
+			providerConfigsCache = fallback;
+			lastLoadTime = now;
+			return fallback;
 		}
 		
-		// Extract unique providers and their metadata
 		const uniqueProviders = new Set<string>();
 		const providerUrls = new Map<string, { apiDocs?: string }>();
 		
@@ -237,7 +210,6 @@ export async function getProviderConfigs(): Promise<ProviderConfig[]> {
 			if (model.provider) {
 				uniqueProviders.add(model.provider);
 				
-				// Extract provider URLs from the first model that has them
 				const normalizedId = normalizeProviderName(model.provider);
 				if (!providerUrls.has(normalizedId) && (model.apiDocs)) {
 					providerUrls.set(normalizedId, {
@@ -247,7 +219,6 @@ export async function getProviderConfigs(): Promise<ProviderConfig[]> {
 			}
 		}
 		
-		// Generate provider configs
 		const configs: ProviderConfig[] = [];
 		for (const providerName of uniqueProviders) {
 			const id = normalizeProviderName(providerName);
@@ -259,7 +230,7 @@ export async function getProviderConfigs(): Promise<ProviderConfig[]> {
 			
 			configs.push({
 				id,
-				name: providerName, // Keep original name from models.json
+				name: providerName,
 				icon,
 				keyName,
 				placeholder,
@@ -268,15 +239,21 @@ export async function getProviderConfigs(): Promise<ProviderConfig[]> {
 			});
 		}
 		
-		// Sort by name
 		configs.sort((a, b) => a.name.localeCompare(b.name));
 		
-		providerConfigsCache = configs;
-		return configs;
+		// Filter configs to only include tested providers
+		const filteredConfigs = filterProvidersByTested(configs);
+		
+		providerConfigsCache = filteredConfigs;
+		lastLoadTime = now;
+		return filteredConfigs;
 		
 	} catch (error) {
 		console.error('Failed to generate provider configs:', error);
-		return getFallbackProviders();
+		const fallback = getFallbackProviders();
+		providerConfigsCache = fallback;
+		lastLoadTime = now;
+		return fallback;
 	}
 }
 

@@ -1,11 +1,12 @@
 "use client";
 
-import { ExternalLink, Key, RotateCcw } from "lucide-react";
+import { ExternalLink, Key, RotateCcw, Bug } from "lucide-react";
 import { GearIcon } from "@phosphor-icons/react";
 import * as React from "react";
 
 import { useTheme } from "next-themes";
 import { ApiKeyManager } from "~/components/api-key-manager";
+import { ProviderDebugPanel } from "~/components/debug/provider-debug-panel";
 import { Button } from "~/components/ui/button";
 import {
 	Dialog,
@@ -39,10 +40,11 @@ const data = {
 	nav: [
 		{ name: "API Keys", icon: Key, id: "api-keys" },
 		{ name: "Appearance", icon: GearIcon, id: "appearance" },
+		{ name: "Developer", icon: Bug, id: "developer" },
 	],
 };
 
-type SettingsSection = "api-keys" | "appearance";
+type SettingsSection = "api-keys" | "appearance" | "developer";
 
 export function SettingsDialog({
 	open,
@@ -60,14 +62,14 @@ export function SettingsDialog({
 	const [themeUrl, setThemeUrl] = React.useState("");
 	const [isLoading, setIsLoading] = React.useState(false);
 
+	const apiKeyManagerComponent = React.useMemo(() => <ApiKeyManager />, []);
+
 	React.useEffect(() => {
-		// Check if Tweakcn theme is stored locally
 		const storedTheme = getStoredTweakcnTheme();
 		setTweakcnTheme(storedTheme);
 		setIsTweakcnActive(isTweakcnThemeActive());
 	}, []);
 
-	// Listen for theme reset events
 	React.useEffect(() => {
 		const handleThemeReset = () => {
 			setTweakcnTheme(null);
@@ -76,13 +78,11 @@ export function SettingsDialog({
 		};
 
 		window.addEventListener(TWEAKCN_THEME_RESET_EVENT, handleThemeReset);
-
 		return () => {
 			window.removeEventListener(TWEAKCN_THEME_RESET_EVENT, handleThemeReset);
 		};
 	}, []);
 
-	// Sync tweakcn theme with resolvedTheme changes (light/dark mode toggle)
 	React.useEffect(() => {
 		if (tweakcnTheme && resolvedTheme) {
 			const newMode = resolvedTheme === "dark" ? "dark" : "light";
@@ -92,7 +92,6 @@ export function SettingsDialog({
 					currentMode: newMode as "dark" | "light",
 				};
 				setTweakcnTheme(syncedTheme);
-				// Use bypassThrottle for instant mode changes
 				applyTweakcnTheme(syncedTheme, true);
 			}
 		}
@@ -104,11 +103,9 @@ export function SettingsDialog({
 			return;
 		}
 
-		// Validate URL format
 		if (!themeUrl.startsWith("https://tweakcn.com/r/themes/")) {
 			toast({
-				title:
-					"Please use a valid Tweakcn theme URL (https://tweakcn.com/r/themes/...)",
+				title: "Please use a valid Tweakcn theme URL (https://tweakcn.com/r/themes/...)",
 				status: "error",
 			});
 			return;
@@ -118,15 +115,11 @@ export function SettingsDialog({
 		try {
 			const theme = await fetchTweakcnTheme(themeUrl);
 			if (theme) {
-				// Sync the theme mode with current next-themes mode
 				const syncedTheme = {
 					...theme,
-					currentMode: (resolvedTheme === "dark" ? "dark" : "light") as
-						| "dark"
-						| "light",
+					currentMode: (resolvedTheme === "dark" ? "dark" : "light") as "dark" | "light",
 				};
 				setTweakcnTheme(syncedTheme);
-				// Automatically apply the theme
 				applyTweakcnTheme(syncedTheme);
 				setIsTweakcnActive(true);
 				toast({ title: "Theme fetched and applied!", status: "success" });
@@ -146,10 +139,8 @@ export function SettingsDialog({
 		}
 	};
 
-	// Auto-fetch when URL changes (with debounce and validation)
 	React.useEffect(() => {
 		if (!themeUrl.trim()) {
-			// If URL is cleared, reset the theme
 			if (tweakcnTheme) {
 				resetToDefaultTheme();
 				setTweakcnTheme(null);
@@ -159,9 +150,8 @@ export function SettingsDialog({
 			return;
 		}
 
-		// Validate URL format
 		if (!themeUrl.startsWith("https://tweakcn.com/r/themes/")) {
-			return; // Don't auto-fetch invalid URLs
+			return;
 		}
 
 		const timeoutId = setTimeout(async () => {
@@ -171,9 +161,7 @@ export function SettingsDialog({
 				if (theme) {
 					const syncedTheme = {
 						...theme,
-						currentMode: (resolvedTheme === "dark" ? "dark" : "light") as
-							| "dark"
-							| "light",
+						currentMode: (resolvedTheme === "dark" ? "dark" : "light") as "dark" | "light",
 					};
 					setTweakcnTheme(syncedTheme);
 					applyTweakcnTheme(syncedTheme);
@@ -222,7 +210,7 @@ export function SettingsDialog({
 	const renderContent = () => {
 		switch (activeSection) {
 			case "api-keys":
-				return <ApiKeyManager />;
+				return apiKeyManagerComponent;
 			case "appearance":
 				return (
 					<div className="space-y-6">
@@ -349,8 +337,25 @@ export function SettingsDialog({
 						</div>
 					</div>
 				);
+			case "developer":
+				return (
+					<div className="space-y-6">
+						<div>
+							<h3 className="font-semibold text-lg">Developer Tools</h3>
+							<p
+								className="text-sm"
+								style={{ color: "var(--foreground)", opacity: 0.8 }}
+							>
+								Debug and development utilities
+							</p>
+						</div>
+						<div className="space-y-4">
+							<ProviderDebugPanel />
+						</div>
+					</div>
+				);
 			default:
-				return <ApiKeyManager />;
+				return apiKeyManagerComponent;
 		}
 	};
 

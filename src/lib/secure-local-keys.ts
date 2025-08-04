@@ -14,7 +14,8 @@ export type LLMProviderId =
 	| "groq"
 	| "huggingface"
 	| "requesty"
-	| "github"
+	| "githubModels"
+	| "githubCopilot"
 	| "inference"
 	| "together"
 	| "aws"
@@ -49,7 +50,8 @@ export interface UserKeys {
 	groqKey?: string;
 	huggingfaceKey?: string;
 	requestyKey?: string;
-	githubKey?: string;
+	githubModelsKey?: string;
+	githubCopilotKey?: string;
 	inferenceKey?: string;
 	togetherKey?: string;
 	awsKey?: string;
@@ -303,7 +305,7 @@ export function removeSessionKey(provider: ProviderId): void {
 export async function getAllLocalKeys(): Promise<UserKeys> {
 	const providers: ProviderId[] = [
 		"openai", "anthropic", "google", "mistral", "xai", "perplexity",
-		"deepinfra", "deepseek", "groq", "huggingface", "requesty", "github",
+		"deepinfra", "deepseek", "groq", "huggingface", "requesty", "githubModels", "githubCopilot",
 		"inference", "together", "aws", "openrouter", "alibaba", "fireworks",
 		"venice", "llama", "morph", "vercel", "upstage", "v0", "azure", "wandb",
 		"exa", "firecrawl"
@@ -326,7 +328,7 @@ export async function getAllLocalKeys(): Promise<UserKeys> {
 export async function getAllSessionKeys(): Promise<UserKeys> {
 	const providers: ProviderId[] = [
 		"openai", "anthropic", "google", "mistral", "xai", "perplexity",
-		"deepinfra", "deepseek", "groq", "huggingface", "requesty", "github",
+		"deepinfra", "deepseek", "groq", "huggingface", "requesty", "githubModels", "githubCopilot",
 		"inference", "together", "aws", "openrouter", "alibaba", "fireworks",
 		"venice", "llama", "morph", "vercel", "upstage", "v0", "azure", "wandb",
 		"exa", "firecrawl"
@@ -364,7 +366,8 @@ export async function getAllKeys(): Promise<UserKeys> {
 		groqKey: sessionKeys.groqKey || localKeys.groqKey,
 		huggingfaceKey: sessionKeys.huggingfaceKey || localKeys.huggingfaceKey,
 		requestyKey: sessionKeys.requestyKey || localKeys.requestyKey,
-		githubKey: sessionKeys.githubKey || localKeys.githubKey,
+		githubModelsKey: sessionKeys.githubModelsKey || localKeys.githubModelsKey,
+		githubCopilotKey: sessionKeys.githubCopilotKey || localKeys.githubCopilotKey,
 		inferenceKey: sessionKeys.inferenceKey || localKeys.inferenceKey,
 		togetherKey: sessionKeys.togetherKey || localKeys.togetherKey,
 		awsKey: sessionKeys.awsKey || localKeys.awsKey,
@@ -388,7 +391,7 @@ export async function getAllKeys(): Promise<UserKeys> {
 export function clearAllKeys(): void {
 	const providers: ProviderId[] = [
 		"openai", "anthropic", "google", "mistral", "xai", "perplexity",
-		"deepinfra", "deepseek", "groq", "huggingface", "requesty", "github",
+		"deepinfra", "deepseek", "groq", "huggingface", "requesty", "githubModels", "githubCopilot",
 		"inference", "together", "aws", "openrouter", "alibaba", "fireworks",
 		"venice", "llama", "morph", "vercel", "upstage", "v0", "azure",
 		"exa", "firecrawl"
@@ -407,21 +410,21 @@ export function clearAllKeys(): void {
 	}
 }
 
-// Migration function to upgrade from old plaintext storage
+// Migration for plaintext storage (existing function)
 export async function migrateFromPlaintextStorage(): Promise<void> {
 	if (typeof window === "undefined") return;
+
+	let migrated = false;
 
 	const OLD_LOCAL_PREFIX = "chaichat_keys_";
 	const OLD_SESSION_PREFIX = "chaichat_session_keys_";
 	const providers: ProviderId[] = [
 		"openai", "anthropic", "google", "mistral", "xai", "perplexity",
-		"deepinfra", "deepseek", "groq", "huggingface", "requesty", "github",
+		"deepinfra", "deepseek", "groq", "huggingface", "requesty", "githubModels", "githubCopilot",
 		"inference", "together", "aws", "openrouter", "alibaba", "fireworks",
 		"venice", "llama", "morph", "vercel", "upstage", "v0", "azure",
 		"exa", "firecrawl"
 	];
-
-	let migrated = false;
 
 	// Migrate localStorage
 	for (const provider of providers) {

@@ -2,6 +2,7 @@
 
 import { createDynamicProvider } from "../openproviders";
 import { normalizeProviderName } from "./providers";
+import { filterModelsByTestedProviders } from "./tested-providers";
 import type { ModelConfig } from "./types";
 
 // Re-export the provider components
@@ -120,9 +121,14 @@ export async function getAllModels(): Promise<ModelConfig[]> {
 		});
 
 		console.log(`Converted ${convertedModels.length} models successfully`);
-		modelsCache = convertedModels;
+		
+		// Filter models to only include tested providers
+		const filteredModels = filterModelsByTestedProviders(convertedModels);
+		console.log(`Filtered to ${filteredModels.length} models from tested providers`);
+		
+		modelsCache = filteredModels;
 		lastFetchTime = now;
-		return convertedModels;
+		return filteredModels;
 	} catch (error) {
 		console.warn("Failed to load models from static models.json, using fallback:", error);
 		console.log(`Returning ${FALLBACK_MODELS.length} fallback models`);

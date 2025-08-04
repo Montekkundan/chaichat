@@ -184,7 +184,6 @@ export function MessagesProvider({
 		}
 	}, [user?.id]);
 
-	// Use the v5 useChat hook with proper configuration
 	const {
 		messages,
 		status,
@@ -214,7 +213,6 @@ export function MessagesProvider({
 				const currentModel = selectedModelRef.current || "gpt-4o";
 				const textContent = getTextContent(message.parts);
 				
-				// model information to the message
 				const extendedMessage = message as ExtendedMessage;
 				extendedMessage.model = currentModel;
 				

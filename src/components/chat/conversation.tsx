@@ -18,7 +18,10 @@ type ConversationProps = {
 };
 
 const getTextContent = (parts: MessageType["parts"]) => {
-	if (!parts) return "";
+	if (!parts || !Array.isArray(parts)) {
+		console.log("No parts or parts is not an array:", parts);
+		return "";
+	}
 	const textParts = parts.filter((part) => part.type === "text");
 	return textParts.map((part) => part.type === "text" ? part.text : "").join("");
 };
@@ -90,6 +93,9 @@ export function Conversation({
 						const hasScrollAnchor =
 							isLast && sortedMessages.length > initialMessageCount.current;
 
+						// Get text content from parts for v5
+						const textContent = getTextContent(message.parts);
+
 						return (
 							<Message
 								key={message.id}
@@ -106,7 +112,7 @@ export function Conversation({
 								status={status}
 								model={message.model}
 							>
-								{getTextContent(message.parts)}
+								{textContent}
 							</Message>
 						);
 					})}

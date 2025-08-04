@@ -27,11 +27,15 @@ https.get(url, (res) => {
           const provider = providerData;
           const providerName = provider.name || providerId;
           
-          providerMetadata.set(providerName, {
+          const metadata = {
             apiDocs: provider.doc || null,
             npm: provider.npm || null,
-            env: provider.env || null
-          });
+            env: provider.env || null,
+            baseURL: provider.api || null,
+            url: provider.url || null
+          };
+          
+          providerMetadata.set(providerName, metadata);
         }
       }
       

@@ -85,6 +85,48 @@
       "apiDocs": "https://deepinfra.com/models"
     },
     {
+      "id": "mercury-coder",
+      "name": "Mercury Coder",
+      "provider": "Inception",
+      "pricing": {
+        "input": 0.25,
+        "output": 1,
+        "unit": "1M tokens"
+      },
+      "context_window": 128000,
+      "capabilities": {
+        "vision": false,
+        "tools": true,
+        "audio": false,
+        "reasoningText": false
+      },
+      "released_at": "2025-02-26",
+      "description": "Mercury Coder from Inception",
+      "open_source": false,
+      "apiDocs": "https://platform.inceptionlabs.ai/docs"
+    },
+    {
+      "id": "mercury",
+      "name": "Mercury",
+      "provider": "Inception",
+      "pricing": {
+        "input": 0.25,
+        "output": 1,
+        "unit": "1M tokens"
+      },
+      "context_window": 128000,
+      "capabilities": {
+        "vision": false,
+        "tools": true,
+        "audio": false,
+        "reasoningText": false
+      },
+      "released_at": "2025-06-26",
+      "description": "Mercury from Inception",
+      "open_source": false,
+      "apiDocs": "https://platform.inceptionlabs.ai/docs"
+    },
+    {
       "id": "gpt-3.5-turbo",
       "name": "GPT-3.5-turbo",
       "provider": "OpenAI",
@@ -482,6 +524,174 @@
       "description": "o3 from OpenAI",
       "open_source": false,
       "apiDocs": "https://platform.openai.com/docs/models"
+    },
+    {
+      "id": "moonshotai/Kimi-K2-Instruct-modelscope",
+      "name": "Kimi-K2-Instruct",
+      "provider": "ModelScope",
+      "pricing": {
+        "input": 0,
+        "output": 0,
+        "unit": "1M tokens"
+      },
+      "context_window": 128000,
+      "capabilities": {
+        "vision": false,
+        "tools": true,
+        "audio": false,
+        "reasoningText": false
+      },
+      "released_at": "2025-07-14",
+      "description": "Kimi-K2-Instruct from ModelScope",
+      "open_source": true,
+      "apiDocs": "https://modelscope.cn/docs/model-service/API-Inference/intro"
+    },
+    {
+      "id": "Qwen/Qwen3-30B-A3B-Thinking-2507",
+      "name": "Qwen3 30B A3B Thinking 2507",
+      "provider": "ModelScope",
+      "pricing": {
+        "input": 0,
+        "output": 0,
+        "unit": "1M tokens"
+      },
+      "context_window": 262144,
+      "capabilities": {
+        "vision": false,
+        "tools": true,
+        "audio": false,
+        "reasoningText": false
+      },
+      "released_at": "2025-07-30",
+      "description": "Qwen3 30B A3B Thinking 2507 from ModelScope",
+      "open_source": true,
+      "apiDocs": "https://modelscope.cn/docs/model-service/API-Inference/intro"
+    },
+    {
+      "id": "Qwen/Qwen3-Coder-30B-A3B-Instruct",
+      "name": "Qwen3 Coder 30B A3B Instruct",
+      "provider": "ModelScope",
+      "pricing": {
+        "input": 0,
+        "output": 0,
+        "unit": "1M tokens"
+      },
+      "context_window": 262144,
+      "capabilities": {
+        "vision": false,
+        "tools": true,
+        "audio": false,
+        "reasoningText": false
+      },
+      "released_at": "2025-07-31",
+      "description": "Qwen3 Coder 30B A3B Instruct from ModelScope",
+      "open_source": true,
+      "apiDocs": "https://modelscope.cn/docs/model-service/API-Inference/intro"
+    },
+    {
+      "id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+      "name": "Qwen3 235B A22B Instruct 2507",
+      "provider": "ModelScope",
+      "pricing": {
+        "input": 0,
+        "output": 0,
+        "unit": "1M tokens"
+      },
+      "context_window": 262144,
+      "capabilities": {
+        "vision": false,
+        "tools": true,
+        "audio": false,
+        "reasoningText": false
+      },
+      "released_at": "2025-04-28",
+      "description": "Qwen3 235B A22B Instruct 2507 from ModelScope",
+      "open_source": true,
+      "apiDocs": "https://modelscope.cn/docs/model-service/API-Inference/intro"
+    },
+    {
+      "id": "Qwen/Qwen3-Coder-480B-A35B-Instruct-modelscope",
+      "name": "Qwen3-Coder-480B-A35B-Instruct",
+      "provider": "ModelScope",
+      "pricing": {
+        "input": 0,
+        "output": 0,
+        "unit": "1M tokens"
+      },
+      "context_window": 262144,
+      "capabilities": {
+        "vision": false,
+        "tools": true,
+        "audio": false,
+        "reasoningText": false
+      },
+      "released_at": "2025-07-23",
+      "description": "Qwen3-Coder-480B-A35B-Instruct from ModelScope",
+      "open_source": true,
+      "apiDocs": "https://modelscope.cn/docs/model-service/API-Inference/intro"
+    },
+    {
+      "id": "Qwen/Qwen3-30B-A3B-Instruct-2507",
+      "name": "Qwen3 30B A3B Instruct 2507",
+      "provider": "ModelScope",
+      "pricing": {
+        "input": 0,
+        "output": 0,
+        "unit": "1M tokens"
+      },
+      "context_window": 262144,
+      "capabilities": {
+        "vision": false,
+        "tools": true,
+        "audio": false,
+        "reasoningText": false
+      },
+      "released_at": "2025-07-30",
+      "description": "Qwen3 30B A3B Instruct 2507 from ModelScope",
+      "open_source": true,
+      "apiDocs": "https://modelscope.cn/docs/model-service/API-Inference/intro"
+    },
+    {
+      "id": "Qwen/Qwen3-235B-A22B-Thinking-2507",
+      "name": "Qwen3-235B-A22B-Thinking-2507",
+      "provider": "ModelScope",
+      "pricing": {
+        "input": 0,
+        "output": 0,
+        "unit": "1M tokens"
+      },
+      "context_window": 262144,
+      "capabilities": {
+        "vision": false,
+        "tools": true,
+        "audio": false,
+        "reasoningText": false
+      },
+      "released_at": "2025-07-25",
+      "description": "Qwen3-235B-A22B-Thinking-2507 from ModelScope",
+      "open_source": true,
+      "apiDocs": "https://modelscope.cn/docs/model-service/API-Inference/intro"
+    },
+    {
+      "id": "ZhipuAI/GLM-4.5",
+      "name": "GLM-4.5",
+      "provider": "ModelScope",
+      "pricing": {
+        "input": 0,
+        "output": 0,
+        "unit": "1M tokens"
+      },
+      "context_window": 131072,
+      "capabilities": {
+        "vision": false,
+        "tools": true,
+        "audio": false,
+        "reasoningText": false
+      },
+      "released_at": "2025-07-28",
+      "description": "GLM-4.5 from ModelScope",
+      "open_source": true,
+      "apiDocs": "https://modelscope.cn/docs/model-service/API-Inference/intro"
     },
     {
       "id": "deepseek-chat",
@@ -1198,7 +1408,7 @@
       "apiDocs": "https://huggingface.co/docs/inference-providers"
     },
     {
-      "id": "Qwen/Qwen3-235B-A22B-Thinking-2507",
+      "id": "Qwen/Qwen3-235B-A22B-Thinking-2507-huggingface",
       "name": "Qwen3-235B-A22B-Thinking-2507",
       "provider": "Hugging Face",
       "pricing": {
@@ -1811,6 +2021,8 @@
       "name": "AI21 Jamba 1.5 Mini",
       "provider": "GitHub Models",
       "pricing": {
+        "input": 0,
+        "output": 0,
         "unit": "1M tokens"
       },
       "context_window": 256000,
@@ -1830,6 +2042,8 @@
       "name": "AI21 Jamba 1.5 Large",
       "provider": "GitHub Models",
       "pricing": {
+        "input": 0,
+        "output": 0,
         "unit": "1M tokens"
       },
       "context_window": 256000,
@@ -1849,6 +2063,8 @@
       "name": "GPT-4.1-mini",
       "provider": "GitHub Models",
       "pricing": {
+        "input": 0,
+        "output": 0,
         "unit": "1M tokens"
       },
       "context_window": 128000,
@@ -1868,6 +2084,8 @@
       "name": "OpenAI o4-mini",
       "provider": "GitHub Models",
       "pricing": {
+        "input": 0,
+        "output": 0,
         "unit": "1M tokens"
       },
       "context_window": 200000,
@@ -1887,6 +2105,8 @@
       "name": "OpenAI o1-mini",
       "provider": "GitHub Models",
       "pricing": {
+        "input": 0,
+        "output": 0,
         "unit": "1M tokens"
       },
       "context_window": 128000,
@@ -1906,6 +2126,8 @@
       "name": "GPT-4.1-nano",
       "provider": "GitHub Models",
       "pricing": {
+        "input": 0,
+        "output": 0,
         "unit": "1M tokens"
       },
       "context_window": 128000,
@@ -1925,6 +2147,8 @@
       "name": "OpenAI o1-preview",
       "provider": "GitHub Models",
       "pricing": {
+        "input": 0,
+        "output": 0,
         "unit": "1M tokens"
       },
       "context_window": 128000,
@@ -1944,6 +2168,8 @@
       "name": "GPT-4o mini",
       "provider": "GitHub Models",
       "pricing": {
+        "input": 0,
+        "output": 0,
         "unit": "1M tokens"
       },
       "context_window": 128000,
@@ -1963,6 +2189,8 @@
       "name": "OpenAI o3-mini",
       "provider": "GitHub Models",
       "pricing": {
+        "input": 0,
+        "output": 0,
         "unit": "1M tokens"
       },
       "context_window": 200000,
@@ -1982,6 +2210,8 @@
       "name": "OpenAI o1",
       "provider": "GitHub Models",
       "pricing": {
+        "input": 0,
+        "output": 0,
         "unit": "1M tokens"
       },
       "context_window": 200000,
@@ -2001,6 +2231,8 @@
       "name": "GPT-4.1",
       "provider": "GitHub Models",
       "pricing": {
+        "input": 0,
+        "output": 0,
         "unit": "1M tokens"
       },
       "context_window": 128000,
@@ -2020,6 +2252,8 @@
       "name": "GPT-4o",
       "provider": "GitHub Models",
       "pricing": {
+        "input": 0,
+        "output": 0,
         "unit": "1M tokens"
       },
       "context_window": 128000,
@@ -2039,6 +2273,8 @@
       "name": "OpenAI o3",
       "provider": "GitHub Models",
       "pricing": {
+        "input": 0,
+        "output": 0,
         "unit": "1M tokens"
       },
       "context_window": 200000,
@@ -2058,6 +2294,8 @@
       "name": "DeepSeek-R1-0528",
       "provider": "GitHub Models",
       "pricing": {
+        "input": 0,
+        "output": 0,
         "unit": "1M tokens"
       },
       "context_window": 65536,
@@ -2077,6 +2315,8 @@
       "name": "DeepSeek-R1",
       "provider": "GitHub Models",
       "pricing": {
+        "input": 0,
+        "output": 0,
         "unit": "1M tokens"
       },
       "context_window": 65536,
@@ -2096,6 +2336,8 @@
       "name": "DeepSeek-V3-0324",
       "provider": "GitHub Models",
       "pricing": {
+        "input": 0,
+        "output": 0,
         "unit": "1M tokens"
       },
       "context_window": 128000,
@@ -2115,6 +2357,8 @@
       "name": "JAIS 30b Chat",
       "provider": "GitHub Models",
       "pricing": {
+        "input": 0,
+        "output": 0,
         "unit": "1M tokens"
       },
       "context_window": 8192,
@@ -2134,6 +2378,8 @@
       "name": "Phi-3.5-vision instruct (128k)",
       "provider": "GitHub Models",
       "pricing": {
+        "input": 0,
+        "output": 0,
         "unit": "1M tokens"
       },
       "context_window": 128000,
@@ -2153,6 +2399,8 @@
       "name": "Phi-4-multimodal-instruct",
       "provider": "GitHub Models",
       "pricing": {
+        "input": 0,
+        "output": 0,
         "unit": "1M tokens"
       },
       "context_window": 128000,
@@ -2172,6 +2420,8 @@
       "name": "Phi-3-small instruct (128k)",
       "provider": "GitHub Models",
       "pricing": {
+        "input": 0,
+        "output": 0,
         "unit": "1M tokens"
       },
       "context_window": 128000,
@@ -2191,6 +2441,8 @@
       "name": "MAI-DS-R1",
       "provider": "GitHub Models",
       "pricing": {
+        "input": 0,
+        "output": 0,
         "unit": "1M tokens"
       },
       "context_window": 65536,
@@ -2210,6 +2462,8 @@
       "name": "Phi-4-mini-reasoning",
       "provider": "GitHub Models",
       "pricing": {
+        "input": 0,
+        "output": 0,
         "unit": "1M tokens"
       },
       "context_window": 128000,
@@ -2229,6 +2483,8 @@
       "name": "Phi-3-small instruct (8k)",
       "provider": "GitHub Models",
       "pricing": {
+        "input": 0,
+        "output": 0,
         "unit": "1M tokens"
       },
       "context_window": 8192,
@@ -2248,6 +2504,8 @@
       "name": "Phi-3.5-mini instruct (128k)",
       "provider": "GitHub Models",
       "pricing": {
+        "input": 0,
+        "output": 0,
         "unit": "1M tokens"
       },
       "context_window": 128000,
@@ -2267,6 +2525,8 @@
       "name": "Phi-3-mini instruct (128k)",
       "provider": "GitHub Models",
       "pricing": {
+        "input": 0,
+        "output": 0,
         "unit": "1M tokens"
       },
       "context_window": 128000,
@@ -2286,6 +2546,8 @@
       "name": "Phi-4",
       "provider": "GitHub Models",
       "pricing": {
+        "input": 0,
+        "output": 0,
         "unit": "1M tokens"
       },
       "context_window": 16000,
@@ -2305,6 +2567,8 @@
       "name": "Phi-3-medium instruct (4k)",
       "provider": "GitHub Models",
       "pricing": {
+        "input": 0,
+        "output": 0,
         "unit": "1M tokens"
       },
       "context_window": 4096,
@@ -2324,6 +2588,8 @@
       "name": "Phi-4-mini-instruct",
       "provider": "GitHub Models",
       "pricing": {
+        "input": 0,
+        "output": 0,
         "unit": "1M tokens"
       },
       "context_window": 128000,
@@ -2343,6 +2609,8 @@
       "name": "Phi-3-mini instruct (4k)",
       "provider": "GitHub Models",
       "pricing": {
+        "input": 0,
+        "output": 0,
         "unit": "1M tokens"
       },
       "context_window": 4096,
@@ -2362,6 +2630,8 @@
       "name": "Phi-3-medium instruct (128k)",
       "provider": "GitHub Models",
       "pricing": {
+        "input": 0,
+        "output": 0,
         "unit": "1M tokens"
       },
       "context_window": 128000,
@@ -2381,6 +2651,8 @@
       "name": "Phi-3.5-MoE instruct (128k)",
       "provider": "GitHub Models",
       "pricing": {
+        "input": 0,
+        "output": 0,
         "unit": "1M tokens"
       },
       "context_window": 128000,
@@ -2400,6 +2672,8 @@
       "name": "Phi-4-Reasoning",
       "provider": "GitHub Models",
       "pricing": {
+        "input": 0,
+        "output": 0,
         "unit": "1M tokens"
       },
       "context_window": 128000,
@@ -2419,6 +2693,8 @@
       "name": "Meta-Llama-3-70B-Instruct",
       "provider": "GitHub Models",
       "pricing": {
+        "input": 0,
+        "output": 0,
         "unit": "1M tokens"
       },
       "context_window": 8192,
@@ -2438,6 +2714,8 @@
       "name": "Meta-Llama-3-8B-Instruct",
       "provider": "GitHub Models",
       "pricing": {
+        "input": 0,
+        "output": 0,
         "unit": "1M tokens"
       },
       "context_window": 8192,
@@ -2457,6 +2735,8 @@
       "name": "Llama-3.2-90B-Vision-Instruct",
       "provider": "GitHub Models",
       "pricing": {
+        "input": 0,
+        "output": 0,
         "unit": "1M tokens"
       },
       "context_window": 128000,
@@ -2476,6 +2756,8 @@
       "name": "Meta-Llama-3.1-8B-Instruct",
       "provider": "GitHub Models",
       "pricing": {
+        "input": 0,
+        "output": 0,
         "unit": "1M tokens"
       },
       "context_window": 128000,
@@ -2495,6 +2777,8 @@
       "name": "Meta-Llama-3.1-405B-Instruct",
       "provider": "GitHub Models",
       "pricing": {
+        "input": 0,
+        "output": 0,
         "unit": "1M tokens"
       },
       "context_window": 128000,
@@ -2514,6 +2798,8 @@
       "name": "Meta-Llama-3.1-70B-Instruct",
       "provider": "GitHub Models",
       "pricing": {
+        "input": 0,
+        "output": 0,
         "unit": "1M tokens"
       },
       "context_window": 128000,
@@ -2533,6 +2819,8 @@
       "name": "Llama 4 Scout 17B 16E Instruct",
       "provider": "GitHub Models",
       "pricing": {
+        "input": 0,
+        "output": 0,
         "unit": "1M tokens"
       },
       "context_window": 128000,
@@ -2552,6 +2840,8 @@
       "name": "Llama-3.3-70B-Instruct",
       "provider": "GitHub Models",
       "pricing": {
+        "input": 0,
+        "output": 0,
         "unit": "1M tokens"
       },
       "context_window": 128000,
@@ -2571,6 +2861,8 @@
       "name": "Llama 4 Maverick 17B 128E Instruct FP8",
       "provider": "GitHub Models",
       "pricing": {
+        "input": 0,
+        "output": 0,
         "unit": "1M tokens"
       },
       "context_window": 128000,
@@ -2590,6 +2882,8 @@
       "name": "Llama-3.2-11B-Vision-Instruct",
       "provider": "GitHub Models",
       "pricing": {
+        "input": 0,
+        "output": 0,
         "unit": "1M tokens"
       },
       "context_window": 128000,
@@ -2609,6 +2903,8 @@
       "name": "Mistral Medium 3 (25.05)",
       "provider": "GitHub Models",
       "pricing": {
+        "input": 0,
+        "output": 0,
         "unit": "1M tokens"
       },
       "context_window": 128000,
@@ -2628,6 +2924,8 @@
       "name": "Mistral Large 24.11",
       "provider": "GitHub Models",
       "pricing": {
+        "input": 0,
+        "output": 0,
         "unit": "1M tokens"
       },
       "context_window": 128000,
@@ -2647,6 +2945,8 @@
       "name": "Mistral Small 3.1",
       "provider": "GitHub Models",
       "pricing": {
+        "input": 0,
+        "output": 0,
         "unit": "1M tokens"
       },
       "context_window": 128000,
@@ -2666,6 +2966,8 @@
       "name": "Codestral 25.01",
       "provider": "GitHub Models",
       "pricing": {
+        "input": 0,
+        "output": 0,
         "unit": "1M tokens"
       },
       "context_window": 32000,
@@ -2685,6 +2987,8 @@
       "name": "Ministral 3B",
       "provider": "GitHub Models",
       "pricing": {
+        "input": 0,
+        "output": 0,
         "unit": "1M tokens"
       },
       "context_window": 128000,
@@ -2704,6 +3008,8 @@
       "name": "Mistral Nemo",
       "provider": "GitHub Models",
       "pricing": {
+        "input": 0,
+        "output": 0,
         "unit": "1M tokens"
       },
       "context_window": 128000,
@@ -2723,6 +3029,8 @@
       "name": "Grok 3 Mini",
       "provider": "GitHub Models",
       "pricing": {
+        "input": 0,
+        "output": 0,
         "unit": "1M tokens"
       },
       "context_window": 128000,
@@ -2742,6 +3050,8 @@
       "name": "Grok 3",
       "provider": "GitHub Models",
       "pricing": {
+        "input": 0,
+        "output": 0,
         "unit": "1M tokens"
       },
       "context_window": 128000,
@@ -2761,6 +3071,8 @@
       "name": "Cohere Command R",
       "provider": "GitHub Models",
       "pricing": {
+        "input": 0,
+        "output": 0,
         "unit": "1M tokens"
       },
       "context_window": 128000,
@@ -2780,6 +3092,8 @@
       "name": "Cohere Command A",
       "provider": "GitHub Models",
       "pricing": {
+        "input": 0,
+        "output": 0,
         "unit": "1M tokens"
       },
       "context_window": 128000,
@@ -2799,6 +3113,8 @@
       "name": "Cohere Command R 08-2024",
       "provider": "GitHub Models",
       "pricing": {
+        "input": 0,
+        "output": 0,
         "unit": "1M tokens"
       },
       "context_window": 128000,
@@ -2818,6 +3134,8 @@
       "name": "Cohere Command R+",
       "provider": "GitHub Models",
       "pricing": {
+        "input": 0,
+        "output": 0,
         "unit": "1M tokens"
       },
       "context_window": 128000,
@@ -2837,6 +3155,8 @@
       "name": "Cohere Command R+ 08-2024",
       "provider": "GitHub Models",
       "pricing": {
+        "input": 0,
+        "output": 0,
         "unit": "1M tokens"
       },
       "context_window": 128000,
@@ -5015,6 +5335,27 @@
       "apiDocs": "https://openrouter.ai/models"
     },
     {
+      "id": "mistralai/codestral-2508",
+      "name": "Codestral 2508",
+      "provider": "OpenRouter",
+      "pricing": {
+        "input": 0.3,
+        "output": 0.9,
+        "unit": "1M tokens"
+      },
+      "context_window": 256000,
+      "capabilities": {
+        "vision": false,
+        "tools": true,
+        "audio": false,
+        "reasoningText": false
+      },
+      "released_at": "2025-08-01",
+      "description": "Codestral 2508 from OpenRouter",
+      "open_source": true,
+      "apiDocs": "https://openrouter.ai/models"
+    },
+    {
       "id": "mistralai/devstral-small-2505",
       "name": "Devstral Small",
       "provider": "OpenRouter",
@@ -5221,6 +5562,27 @@
       },
       "released_at": "2025-04-28",
       "description": "Qwen3 235B A22B (free) from OpenRouter",
+      "open_source": true,
+      "apiDocs": "https://openrouter.ai/models"
+    },
+    {
+      "id": "qwen/qwen3-30b-a3b-instruct-2507",
+      "name": "Qwen3 30B A3B Instruct 2507",
+      "provider": "OpenRouter",
+      "pricing": {
+        "input": 0.2,
+        "output": 0.8,
+        "unit": "1M tokens"
+      },
+      "context_window": 131072,
+      "capabilities": {
+        "vision": false,
+        "tools": false,
+        "audio": false,
+        "reasoningText": false
+      },
+      "released_at": "2025-07-29",
+      "description": "Qwen3 30B A3B Instruct 2507 from OpenRouter",
       "open_source": true,
       "apiDocs": "https://openrouter.ai/models"
     },
@@ -5435,6 +5797,139 @@
       "apiDocs": "https://openrouter.ai/models"
     },
     {
+      "id": "chutesai/Devstral-Small-2505",
+      "name": "Devstral Small (2505)",
+      "provider": "Chutes",
+      "pricing": {
+        "unit": "1M tokens"
+      },
+      "context_window": 32768,
+      "capabilities": {
+        "vision": false,
+        "tools": true,
+        "audio": false,
+        "reasoningText": false
+      },
+      "released_at": "2025-08-01",
+      "description": "Devstral Small (2505) from Chutes",
+      "open_source": true,
+      "apiDocs": "https://llm.chutes.ai/v1/models"
+    },
+    {
+      "id": "chutesai/Mistral-Small-3.2-24B-Instruct-2506",
+      "name": "Mistral Small 3.2 24B Instruct (2506)",
+      "provider": "Chutes",
+      "pricing": {
+        "unit": "1M tokens"
+      },
+      "context_window": 96000,
+      "capabilities": {
+        "vision": false,
+        "tools": true,
+        "audio": false,
+        "reasoningText": false
+      },
+      "released_at": "2025-08-01",
+      "description": "Mistral Small 3.2 24B Instruct (2506) from Chutes",
+      "open_source": true,
+      "apiDocs": "https://llm.chutes.ai/v1/models"
+    },
+    {
+      "id": "deepseek-ai/DeepSeek-V3-0324",
+      "name": "DeepSeek V3 (0324)",
+      "provider": "Chutes",
+      "pricing": {
+        "unit": "1M tokens"
+      },
+      "context_window": 163840,
+      "capabilities": {
+        "vision": false,
+        "tools": true,
+        "audio": false,
+        "reasoningText": false
+      },
+      "released_at": "2025-08-01",
+      "description": "DeepSeek V3 (0324) from Chutes",
+      "open_source": false,
+      "apiDocs": "https://llm.chutes.ai/v1/models"
+    },
+    {
+      "id": "deepseek-ai/DeepSeek-R1-0528-chutes",
+      "name": "DeepSeek R1 (0528)",
+      "provider": "Chutes",
+      "pricing": {
+        "unit": "1M tokens"
+      },
+      "context_window": 163840,
+      "capabilities": {
+        "vision": false,
+        "tools": true,
+        "audio": false,
+        "reasoningText": false
+      },
+      "released_at": "2025-08-01",
+      "description": "DeepSeek R1 (0528) from Chutes",
+      "open_source": false,
+      "apiDocs": "https://llm.chutes.ai/v1/models"
+    },
+    {
+      "id": "moonshotai/Kimi-K2-Instruct-chutes",
+      "name": "Kimi K2 Instruct",
+      "provider": "Chutes",
+      "pricing": {
+        "unit": "1M tokens"
+      },
+      "context_window": 32768,
+      "capabilities": {
+        "vision": false,
+        "tools": true,
+        "audio": false,
+        "reasoningText": false
+      },
+      "released_at": "2025-08-01",
+      "description": "Kimi K2 Instruct from Chutes",
+      "open_source": false,
+      "apiDocs": "https://llm.chutes.ai/v1/models"
+    },
+    {
+      "id": "Qwen/Qwen3-Coder-480B-A35B-Instruct-FP8-chutes",
+      "name": "Qwen3 Coder 480B A35B Instruct (FP8)",
+      "provider": "Chutes",
+      "pricing": {
+        "unit": "1M tokens"
+      },
+      "context_window": 262144,
+      "capabilities": {
+        "vision": false,
+        "tools": true,
+        "audio": false,
+        "reasoningText": false
+      },
+      "released_at": "2025-08-01",
+      "description": "Qwen3 Coder 480B A35B Instruct (FP8) from Chutes",
+      "open_source": false,
+      "apiDocs": "https://llm.chutes.ai/v1/models"
+    },
+    {
+      "id": "zai-org/GLM-4.5-Air-chutes",
+      "name": "GLM 4.5 Air",
+      "provider": "Chutes",
+      "pricing": {
+        "unit": "1M tokens"
+      },
+      "context_window": 131072,
+      "capabilities": {
+        "vision": false,
+        "tools": true,
+        "audio": false,
+        "reasoningText": false
+      },
+      "released_at": "2025-08-01",
+      "description": "GLM 4.5 Air from Chutes",
+      "open_source": false,
+      "apiDocs": "https://llm.chutes.ai/v1/models"
+    },
+    {
       "id": "gemini-2.5-flash-lite-preview-06-17",
       "name": "Gemini 2.5 Flash Lite Preview 06-17",
       "provider": "Vertex",
@@ -5607,8 +6102,8 @@
       "name": "Qwen 3 Coder 480B",
       "provider": "Cerebras",
       "pricing": {
-        "input": 1,
-        "output": 5,
+        "input": 2,
+        "output": 2,
         "unit": "1M tokens"
       },
       "context_window": 131000,
@@ -6254,7 +6749,7 @@
       "apiDocs": "https://docs.venice.ai"
     },
     {
-      "id": "deepseek-ai/DeepSeek-V3-0324",
+      "id": "deepseek-ai/DeepSeek-V3-0324-wandb",
       "name": "DeepSeek-V3-0324",
       "provider": "Weights & Biases",
       "pricing": {
@@ -6317,7 +6812,7 @@
       "apiDocs": "https://weave-docs.wandb.ai/guides/integrations/inference/"
     },
     {
-      "id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+      "id": "Qwen/Qwen3-235B-A22B-Instruct-2507-wandb",
       "name": "Qwen3 235B A22B Instruct 2507",
       "provider": "Weights & Biases",
       "pricing": {
@@ -7724,6 +8219,27 @@
       "apiDocs": "https://github.com/vercel/ai/tree/5eb85cc45a259553501f535b8ac79a77d0e79223/packages/gateway"
     },
     {
+      "id": "cerebras/qwen3-coder",
+      "name": "Qwen 3 Coder 480B",
+      "provider": "Vercel AI Gateway",
+      "pricing": {
+        "input": 2,
+        "output": 2,
+        "unit": "1M tokens"
+      },
+      "context_window": 131000,
+      "capabilities": {
+        "vision": false,
+        "tools": true,
+        "audio": false,
+        "reasoningText": false
+      },
+      "released_at": "2025-07-23",
+      "description": "Qwen 3 Coder 480B from Vercel AI Gateway",
+      "open_source": true,
+      "apiDocs": "https://github.com/vercel/ai/tree/5eb85cc45a259553501f535b8ac79a77d0e79223/packages/gateway"
+    },
+    {
       "id": "google/gemini-2.0-flash-lite",
       "name": "Gemini 2.0 Flash Lite",
       "provider": "Vercel AI Gateway",
@@ -8205,6 +8721,48 @@
       "description": "v0-1.5-lg from v0",
       "open_source": false,
       "apiDocs": "https://sdk.vercel.ai/providers/ai-sdk-providers/vercel"
+    },
+    {
+      "id": "qwen/qwen3-30b-a3b-2507",
+      "name": "Qwen3 30B A3B 2507",
+      "provider": "LMStudio",
+      "pricing": {
+        "input": 0,
+        "output": 0,
+        "unit": "1M tokens"
+      },
+      "context_window": 262144,
+      "capabilities": {
+        "vision": false,
+        "tools": true,
+        "audio": false,
+        "reasoningText": false
+      },
+      "released_at": "2025-07-30",
+      "description": "Qwen3 30B A3B 2507 from LMStudio",
+      "open_source": true,
+      "apiDocs": "https://lmstudio.ai/models"
+    },
+    {
+      "id": "qwen/qwen3-coder-30b",
+      "name": "Qwen3 Coder 30B",
+      "provider": "LMStudio",
+      "pricing": {
+        "input": 0,
+        "output": 0,
+        "unit": "1M tokens"
+      },
+      "context_window": 262144,
+      "capabilities": {
+        "vision": false,
+        "tools": true,
+        "audio": false,
+        "reasoningText": false
+      },
+      "released_at": "2025-07-23",
+      "description": "Qwen3 Coder 30B from LMStudio",
+      "open_source": true,
+      "apiDocs": "https://lmstudio.ai/models"
     },
     {
       "id": "claude-sonnet-4",
@@ -8874,6 +9432,69 @@
       "description": "o3 from Azure",
       "open_source": false,
       "apiDocs": "https://learn.microsoft.com/en-us/azure/ai-services/openai/concepts/models"
+    },
+    {
+      "id": "glm-4.5-flash",
+      "name": "GLM-4.5-Flash",
+      "provider": "Zhipu AI",
+      "pricing": {
+        "input": 0,
+        "output": 0,
+        "unit": "1M tokens"
+      },
+      "context_window": 131072,
+      "capabilities": {
+        "vision": false,
+        "tools": true,
+        "audio": false,
+        "reasoningText": false
+      },
+      "released_at": "2025-07-28",
+      "description": "GLM-4.5-Flash from Zhipu AI",
+      "open_source": true,
+      "apiDocs": "https://docs.z.ai/guides/overview/pricing"
+    },
+    {
+      "id": "glm-4.5-air",
+      "name": "GLM-4.5-Air",
+      "provider": "Zhipu AI",
+      "pricing": {
+        "input": 0.2,
+        "output": 1.1,
+        "unit": "1M tokens"
+      },
+      "context_window": 131072,
+      "capabilities": {
+        "vision": false,
+        "tools": true,
+        "audio": false,
+        "reasoningText": false
+      },
+      "released_at": "2025-07-28",
+      "description": "GLM-4.5-Air from Zhipu AI",
+      "open_source": true,
+      "apiDocs": "https://docs.z.ai/guides/overview/pricing"
+    },
+    {
+      "id": "glm-4.5",
+      "name": "GLM-4.5",
+      "provider": "Zhipu AI",
+      "pricing": {
+        "input": 0.6,
+        "output": 2.2,
+        "unit": "1M tokens"
+      },
+      "context_window": 131072,
+      "capabilities": {
+        "vision": false,
+        "tools": true,
+        "audio": false,
+        "reasoningText": false
+      },
+      "released_at": "2025-07-28",
+      "description": "GLM-4.5 from Zhipu AI",
+      "open_source": true,
+      "apiDocs": "https://docs.z.ai/guides/overview/pricing"
     }
   ],
   "providers": {
@@ -8882,21 +9503,45 @@
       "npm": "@ai-sdk/deepinfra",
       "env": [
         "DEEPINFRA_API_KEY"
-      ]
+      ],
+      "baseURL": null,
+      "url": null
+    },
+    "Inception": {
+      "apiDocs": "https://platform.inceptionlabs.ai/docs",
+      "npm": "@ai-sdk/openai-compatible",
+      "env": [
+        "INCEPTION_API_KEY"
+      ],
+      "baseURL": "https://api.inceptionlabs.ai/v1/",
+      "url": null
     },
     "OpenAI": {
       "apiDocs": "https://platform.openai.com/docs/models",
       "npm": "@ai-sdk/openai",
       "env": [
         "OPENAI_API_KEY"
-      ]
+      ],
+      "baseURL": null,
+      "url": null
+    },
+    "ModelScope": {
+      "apiDocs": "https://modelscope.cn/docs/model-service/API-Inference/intro",
+      "npm": "@ai-sdk/openai-compatible",
+      "env": [
+        "MODELSCOPE_API_KEY"
+      ],
+      "baseURL": "https://api-inference.modelscope.cn/v1",
+      "url": null
     },
     "DeepSeek": {
       "apiDocs": "https://platform.deepseek.com/api-docs/pricing",
       "npm": "@ai-sdk/openai-compatible",
       "env": [
         "DEEPSEEK_API_KEY"
-      ]
+      ],
+      "baseURL": "https://api.deepseek.com",
+      "url": null
     },
     "Vertex": {
       "apiDocs": "https://cloud.google.com/vertex-ai/generative-ai/docs/models",
@@ -8905,63 +9550,81 @@
         "GOOGLE_VERTEX_PROJECT",
         "GOOGLE_VERTEX_LOCATION",
         "GOOGLE_APPLICATION_CREDENTIALS"
-      ]
+      ],
+      "baseURL": null,
+      "url": null
     },
     "Anthropic": {
       "apiDocs": "https://docs.anthropic.com/en/docs/about-claude/models",
       "npm": "@ai-sdk/anthropic",
       "env": [
         "ANTHROPIC_API_KEY"
-      ]
+      ],
+      "baseURL": null,
+      "url": null
     },
     "Groq": {
       "apiDocs": "https://console.groq.com/docs/models",
       "npm": "@ai-sdk/groq",
       "env": [
         "GROQ_API_KEY"
-      ]
+      ],
+      "baseURL": null,
+      "url": null
     },
     "Hugging Face": {
       "apiDocs": "https://huggingface.co/docs/inference-providers",
       "npm": "@ai-sdk/openai-compatible",
       "env": [
         "HF_TOKEN"
-      ]
+      ],
+      "baseURL": "https://router.huggingface.co/v1",
+      "url": null
     },
     "Requesty": {
       "apiDocs": "https://requesty.ai/solution/llm-routing/models",
       "npm": "@requesty/ai-sdk",
       "env": [
         "REQUESTY_API_KEY"
-      ]
+      ],
+      "baseURL": null,
+      "url": null
     },
     "Mistral": {
       "apiDocs": "https://docs.mistral.ai/getting-started/models/",
       "npm": "@ai-sdk/mistral",
       "env": [
         "MISTRAL_API_KEY"
-      ]
+      ],
+      "baseURL": null,
+      "url": null
     },
     "GitHub Models": {
       "apiDocs": "https://docs.github.com/en/github-models",
       "npm": "@ai-sdk/openai-compatible",
       "env": [
         "GITHUB_TOKEN"
-      ]
+      ],
+      "baseURL": "https://models.github.ai/inference",
+      "url": null
     },
     "Inference": {
       "apiDocs": "https://inference.net/models",
       "npm": "@ai-sdk/openai-compatible",
       "env": [
         "INFERENCE_API_KEY"
-      ]
+      ],
+      "baseURL": "https://inference.net/v1",
+      "url": null
     },
     "Together AI": {
       "apiDocs": "https://docs.together.ai/docs/serverless-models",
       "npm": "@ai-sdk/togetherai",
       "env": [
         "TOGETHER_API_KEY"
-      ]
+      ],
+      "baseURL": null,
+      "url": null
     },
     "Amazon Bedrock": {
       "apiDocs": "https://docs.aws.amazon.com/bedrock/latest/userguide/models-supported.html",
@@ -8970,105 +9633,153 @@
         "AWS_ACCESS_KEY_ID",
         "AWS_SECRET_ACCESS_KEY",
         "AWS_REGION"
-      ]
+      ],
+      "baseURL": null,
+      "url": null
     },
     "OpenRouter": {
       "apiDocs": "https://openrouter.ai/models",
       "npm": "@ai-sdk/openai-compatible",
       "env": [
         "OPENROUTER_API_KEY"
-      ]
+      ],
+      "baseURL": "https://openrouter.ai/api/v1",
+      "url": null
+    },
+    "Chutes": {
+      "apiDocs": "https://llm.chutes.ai/v1/models",
+      "npm": "@ai-sdk/openai-compatible",
+      "env": [
+        "CHUTES_API_KEY"
+      ],
+      "baseURL": "https://llm.chutes.ai/v1",
+      "url": null
     },
     "Cerebras": {
       "apiDocs": "https://inference-docs.cerebras.ai/models/overview",
       "npm": "@ai-sdk/cerebras",
       "env": [
         "CEREBRAS_API_KEY"
-      ]
+      ],
+      "baseURL": null,
+      "url": null
     },
     "Google": {
       "apiDocs": "https://ai.google.dev/gemini-api/docs/pricing",
       "npm": "@ai-sdk/google",
       "env": [
         "GOOGLE_GENERATIVE_AI_API_KEY"
-      ]
+      ],
+      "baseURL": null,
+      "url": null
     },
     "Alibaba": {
       "apiDocs": "https://www.alibabacloud.com/help/en/model-studio/models",
       "npm": "@ai-sdk/openai-compatible",
       "env": [
         "DASHSCOPE_API_KEY"
-      ]
+      ],
+      "baseURL": "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
+      "url": null
     },
     "Fireworks AI": {
       "apiDocs": "https://fireworks.ai/docs/",
       "npm": "@ai-sdk/openai-compatible",
       "env": [
         "FIREWORKS_API_KEY"
-      ]
+      ],
+      "baseURL": "https://api.fireworks.ai/inference/v1/",
+      "url": null
     },
     "Venice AI": {
       "apiDocs": "https://docs.venice.ai",
       "npm": "@ai-sdk/openai-compatible",
       "env": [
         "VENICE_API_KEY"
-      ]
+      ],
+      "baseURL": "https://api.venice.ai/api/v1",
+      "url": null
     },
     "Weights & Biases": {
       "apiDocs": "https://weave-docs.wandb.ai/guides/integrations/inference/",
       "npm": "@ai-sdk/openai-compatible",
       "env": [
         "WANDB_API_KEY"
-      ]
+      ],
+      "baseURL": "https://api.inference.wandb.ai/v1",
+      "url": null
     },
     "Llama": {
       "apiDocs": "https://llama.developer.meta.com/docs/models",
       "npm": "@ai-sdk/openai-compatible",
       "env": [
         "LLAMA_API_KEY"
-      ]
+      ],
+      "baseURL": "https://api.llama.com/compat/v1/",
+      "url": null
     },
     "xAI": {
       "apiDocs": "https://docs.x.ai/docs/models",
       "npm": "@ai-sdk/xai",
       "env": [
         "XAI_API_KEY"
-      ]
+      ],
+      "baseURL": null,
+      "url": null
     },
     "Morph": {
       "apiDocs": "https://docs.morphllm.com/api-reference/introduction",
       "npm": "@ai-sdk/openai-compatible",
       "env": [
         "MORPH_API_KEY"
-      ]
+      ],
+      "baseURL": "https://api.morphllm.com/v1",
+      "url": null
     },
     "Vercel AI Gateway": {
       "apiDocs": "https://github.com/vercel/ai/tree/5eb85cc45a259553501f535b8ac79a77d0e79223/packages/gateway",
       "npm": "@ai-sdk/gateway",
       "env": [
         "AI_GATEWAY_API_KEY"
-      ]
+      ],
+      "baseURL": null,
+      "url": null
     },
     "Upstage": {
       "apiDocs": "https://developers.upstage.ai/docs/apis/chat",
       "npm": "@ai-sdk/openai-compatible",
       "env": [
         "UPSTAGE_API_KEY"
-      ]
+      ],
+      "baseURL": "https://api.upstage.ai",
+      "url": null
     },
     "v0": {
       "apiDocs": "https://sdk.vercel.ai/providers/ai-sdk-providers/vercel",
       "npm": "@ai-sdk/vercel",
       "env": [
         "V0_API_KEY"
-      ]
+      ],
+      "baseURL": null,
+      "url": null
+    },
+    "LMStudio": {
+      "apiDocs": "https://lmstudio.ai/models",
+      "npm": "@ai-sdk/openai-compatible",
+      "env": [
+        "LMSTUDIO_API_KEY"
+      ],
+      "baseURL": "http://127.0.0.1:1234/v1",
+      "url": null
     },
     "GitHub Copilot": {
       "apiDocs": "https://docs.github.com/en/copilot",
       "npm": "@ai-sdk/openai-compatible",
       "env": [
         "GITHUB_TOKEN"
-      ]
+      ],
+      "baseURL": "https://api.githubcopilot.com",
+      "url": null
     },
     "Azure": {
       "apiDocs": "https://learn.microsoft.com/en-us/azure/ai-services/openai/concepts/models",
@@ -9076,8 +9787,19 @@
       "env": [
         "AZURE_RESOURCE_NAME",
         "AZURE_API_KEY"
-      ]
+      ],
+      "baseURL": null,
+      "url": null
+    },
+    "Zhipu AI": {
+      "apiDocs": "https://docs.z.ai/guides/overview/pricing",
+      "npm": "@ai-sdk/openai-compatible",
+      "env": [
+        "ZHIPU_API_KEY"
+      ],
+      "baseURL": "https://api.z.ai/api/paas/v4",
+      "url": null
     }
   },
-  "last_updated": "2025-08-02T10:29:43.250Z"
+  "last_updated": "2025-08-04T16:53:32.429Z"
 }

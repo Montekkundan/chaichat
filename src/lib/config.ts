@@ -5,6 +5,21 @@ export const MODEL_DEFAULT = "gpt-4o";
 
 export const MESSAGE_MAX_LENGTH = 4000;
 
+// Only these providers will be available in the UI and API
+// Add providers here after they have been fully tested and verified
+export const TESTED_PROVIDERS: string[] = [
+	"OpenAI",
+	// "Anthropic", 
+	// "Google",
+	// "Groq",
+	// "Mistral",
+	// "xAI",
+];
+
+// Environment variable to enable all providers (for development/testing)
+// Set ENABLE_ALL_PROVIDERS=true to bypass the tested providers filter
+export const ENABLE_ALL_PROVIDERS = process.env.ENABLE_ALL_PROVIDERS === "true";
+
 // --- App SEO / metadata ---
 export const APP_NAME = "ChaiChat";
 export const APP_DESCRIPTION =
