@@ -14,35 +14,8 @@ export default defineSchema({
   users: defineTable({
     userId: v.string(),            // Clerk userId
 
-    // BYOK keys - stored in plaintext
-    openaiKey: v.optional(v.string()),
-    anthropicKey: v.optional(v.string()),
-    googleKey: v.optional(v.string()),
-    mistralKey: v.optional(v.string()),
-    xaiKey: v.optional(v.string()),
-    perplexityKey: v.optional(v.string()),
-    deepinfraKey: v.optional(v.string()),
-    deepseekKey: v.optional(v.string()),
-    groqKey: v.optional(v.string()),
-    huggingfaceKey: v.optional(v.string()),
-    requestyKey: v.optional(v.string()),
-    githubKey: v.optional(v.string()),
-    inferenceKey: v.optional(v.string()),
-    togetherKey: v.optional(v.string()),
-    awsKey: v.optional(v.string()),
-    openrouterKey: v.optional(v.string()),
-    alibabaKey: v.optional(v.string()),
-    fireworksKey: v.optional(v.string()),
-    veniceKey: v.optional(v.string()),
-    llamaKey: v.optional(v.string()),
-    morphKey: v.optional(v.string()),
-    vercelKey: v.optional(v.string()),
-    upstageKey: v.optional(v.string()),
-    v0Key: v.optional(v.string()),
-    azureKey: v.optional(v.string()),
-    wandbKey: v.optional(v.string()),
-    exaKey: v.optional(v.string()),
-    firecrawlKey: v.optional(v.string()),
+    // LLM Gateway API key
+    llmGatewayApiKey: v.optional(v.string()),
 
     // User preferences
     theme: v.optional(v.string()),

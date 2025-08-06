@@ -13,8 +13,6 @@ import { UserSessionHandler } from "~/components/user-session-handler";
 import { APP_DESCRIPTION, APP_NAME, APP_OG_IMAGE, APP_URL } from "~/lib/config";
 import { CacheProvider } from "~/lib/providers/cache-provider";
 import { ChatsProvider } from "~/lib/providers/chats-provider";
-import { ModelsProvider } from "~/lib/models";
-import { QuotaProvider } from "~/lib/providers/quota-provider";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -106,14 +104,10 @@ export default async function RootLayout({
 							<ConvexClientProvider>
 								<CacheProvider initialChats={initialChats}>
 									<ChatsProvider>
-										<ModelsProvider>
-											<QuotaProvider>
-												<UserSessionHandler />
-												<Toaster position="top-center" />
-												{children}
-												<Analytics />
-											</QuotaProvider>
-										</ModelsProvider>
+										<UserSessionHandler />
+										<Toaster position="top-center" />
+										{children}
+										<Analytics />
 									</ChatsProvider>
 								</CacheProvider>
 							</ConvexClientProvider>

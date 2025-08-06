@@ -1,25 +1,7 @@
 "use client";
 
-import { api } from "@/convex/_generated/api";
-import { useUser } from "@clerk/nextjs";
-import { 
-	CaretDown, 
-	Key, 
-	MagnifyingGlass,
-	Eye,
-	SpeakerHigh,
-	Wrench,
-	Brain,
-	Globe,
-	Clock,
-	Lightbulb,
-	CurrencyDollar,
-	CalendarBlank,
-	LinkSimple
-} from "@phosphor-icons/react";
-import { useAction, useQuery } from "convex/react";
-import { useEffect, useRef, useState, useMemo } from "react";
-import { toast } from "sonner";
+import { CaretDown, MagnifyingGlass, Info, CheckCircle, XCircle } from "@phosphor-icons/react";
+import { useEffect, useState, useRef, useMemo, useCallback } from "react";
 import { Button } from "~/components/ui/button";
 import {
 	Drawer,
@@ -31,94 +13,207 @@ import {
 import {
 	DropdownMenu,
 	DropdownMenuContent,
-	DropdownMenuGroup,
-	DropdownMenuItem,
-	DropdownMenuLabel,
-	DropdownMenuPortal,
-	DropdownMenuSeparator,
-	DropdownMenuSub,
-	DropdownMenuSubContent,
-	DropdownMenuSubTrigger,
 	DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
-import { Input } from "~/components/ui/input";
 import {
 	Tooltip,
 	TooltipContent,
+	TooltipProvider,
 	TooltipTrigger,
 } from "~/components/ui/tooltip";
+import { Badge } from "~/components/ui/badge";
+import { Input } from "~/components/ui/input";
+import { Separator } from "~/components/ui/separator";
 import { useBreakpoint } from "~/hooks/use-breakpoint";
-import { isModelLockedSync } from "~/lib/models/model-utils";
-import type { ModelConfig } from "~/lib/models/types";
-import { getProviders } from "~/lib/models/providers";
-import { useModels } from "~/lib/models";
 import { cn } from "~/lib/utils";
+import { getSelectedModel, setSelectedModel, removeSelectedModel, type SelectedModelData } from "~/lib/local-model-storage";
 
 type ModelSelectorProps = {
 	selectedModelId: string;
 	setSelectedModelId: (modelId: string) => void;
+	selectedProvider?: string;
+	setSelectedProvider?: (providerId: string) => void;
 	className?: string;
 	isUserAuthenticated?: boolean;
 };
 
-type UserKeys = {
-	openaiKey?: string;
-	anthropicKey?: string;
-	googleKey?: string;
-	mistralKey?: string;
-	xaiKey?: string;
-	perplexityKey?: string;
-	exaKey?: string;
-	firecrawlKey?: string;
+type LLMGatewayModel = {
+	id: string;
+	name: string;
+	created?: number;
+	description?: string;
+	family?: string;
+	architecture?: {
+		input_modalities?: string[];
+		output_modalities?: string[];
+		tokenizer?: string;
+	};
+	top_provider?: {
+		is_moderated?: boolean;
+	};
+	providers?: Array<{
+		providerId: string;
+		modelName: string;
+		pricing?: {
+			prompt?: string;
+			completion?: string;
+			image?: string;
+		};
+		streaming?: boolean;
+		vision?: boolean;
+		cancellation?: boolean;
+		tools?: boolean;
+	}>;
+	pricing?: {
+		prompt?: string;
+		completion?: string;
+		image?: string;
+		request?: string;
+		input_cache_read?: string;
+		input_cache_write?: string;
+		web_search?: string;
+		internal_reasoning?: string;
+	};
+	context_length?: number;
+	per_request_limits?: {
+		[key: string]: string;
+	};
+	supported_parameters?: string[];
+	json_output?: boolean;
+	deprecated_at?: string;
+	deactivated_at?: string;
 };
 
 export function ModelSelector({
 	selectedModelId,
 	setSelectedModelId,
+	selectedProvider,
+	setSelectedProvider,
 	className,
-	isUserAuthenticated = true,
+	isUserAuthenticated,
 }: ModelSelectorProps) {
-	const { user } = useUser();
-	const { models: allModels, isLoading: isLoadingModels } = useModels();
-	const preferred = useQuery(
-		api.userPreferences.getPreferredModels,
-		user?.id ? {} : "skip",
-	) as string[] | null | undefined;
-	const models =
-		preferred && preferred.length > 0
-			? allModels.filter((m) => preferred.includes(m.id))
-			: allModels;
-
-	const currentModel = models.find((model) => model.id === selectedModelId);
-	const isMobile = useBreakpoint(768);
-
-	const [providers, setProviders] = useState<Array<{
-		id: string;
-		name: string;
-		icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
-	}>>([]);
-	
-	const currentProvider = useMemo(() => {
-		return providers.find((provider) => provider.id === currentModel?.providerId);
-	}, [providers, currentModel]);
+	const [models, setModels] = useState<LLMGatewayModel[]>([]);
+	const [isLoading, setIsLoading] = useState(true);
+	const [error, setError] = useState<string | null>(null);
 	const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 	const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-	const [selectedProModel, setSelectedProModel] = useState<string | null>(null);
 	const [searchQuery, setSearchQuery] = useState("");
-
+	const [expandedModels, setExpandedModels] = useState<Set<string>>(new Set());
+	const isMobile = useBreakpoint(768);
 	const searchInputRef = useRef<HTMLInputElement>(null);
 
-	useEffect(() => {
-	}, []);
+	const hasLoadedFromStorage = useRef(false);
+	const pendingSavedModel = useRef<SelectedModelData | null>(null);
 
 	useEffect(() => {
-		const loadProviders = async () => {
-			const providersList = await getProviders();
-			setProviders(providersList);
+		if (!selectedModelId && !hasLoadedFromStorage.current) {
+			const savedModel = getSelectedModel();
+			if (savedModel?.modelId) {
+				pendingSavedModel.current = savedModel;
+				setSelectedModelId(savedModel.modelId);
+				if (savedModel.providerId && setSelectedProvider) {
+					setSelectedProvider(savedModel.providerId);
+				}
+				hasLoadedFromStorage.current = true;
+			}
+		}
+	}, [selectedModelId, setSelectedModelId, setSelectedProvider]);
+
+	useEffect(() => {
+		if (pendingSavedModel.current && models.length > 0) {
+			const savedModel = pendingSavedModel.current;
+			const modelExists = models.some((model: LLMGatewayModel) => {
+				if (model.id === savedModel.modelId || model.name === savedModel.modelId) {
+					return true;
+				}
+				
+				if (savedModel.modelId.includes('/') && savedModel.providerId) {
+					return model.providers?.some(p => 
+						p.providerId === savedModel.providerId && 
+						(p.modelName === savedModel.modelId.split('/')[1] || p.modelName === savedModel.modelId)
+					);
+				}
+				
+				return false;
+			});
+			
+			if (!modelExists) {
+				removeSelectedModel();
+				if (models.length > 0 && models[0]) {
+					setSelectedModelId(models[0].id);
+					setSelectedModel(models[0].id);
+				}
+			}
+			
+			pendingSavedModel.current = null;
+		}
+	}, [models, setSelectedModelId]);
+
+	useEffect(() => {
+		if (selectedModelId && hasLoadedFromStorage.current) {
+			const providerToUse = selectedProvider;
+			setSelectedModel(selectedModelId, providerToUse);
+		}
+	}, [selectedModelId, selectedProvider]);
+
+	const modelsCache = useRef<{
+		data: LLMGatewayModel[] | null;
+		timestamp: number;
+	}>({
+		data: null,
+		timestamp: 0,
+	});
+
+	useEffect(() => {
+		const fetchModels = async () => {
+			const now = Date.now();
+			const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+			
+			if (modelsCache.current.data && 
+				(now - modelsCache.current.timestamp) < CACHE_DURATION) {
+				setModels(modelsCache.current.data);
+				setIsLoading(false);
+				return;
+			}
+
+			try {
+				setIsLoading(true);
+				setError(null);
+				const response = await fetch("/api/models");
+				
+				if (!response.ok) {
+					throw new Error(`HTTP error! status: ${response.status}`);
+				}
+				
+				const data = await response.json();
+				
+				if (data.models && Array.isArray(data.models)) {
+					modelsCache.current = {
+						data: data.models,
+						timestamp: now,
+					};
+					
+					setModels(data.models);
+					
+					if (!selectedModelId && !hasLoadedFromStorage.current && data.models.length > 0) {
+						const savedModel = getSelectedModel();
+						if (!savedModel?.modelId && data.models[0]) {
+							setSelectedModelId(data.models[0].id);
+						}
+					}
+				} else {
+					throw new Error("Invalid response format from models API");
+				}
+			} catch (error) {
+				console.error("Failed to fetch models:", error);
+				setError(error instanceof Error ? error.message : "Failed to load models");
+			} finally {
+				setIsLoading(false);
+			}
 		};
-		
-		loadProviders();
-	}, []);
+
+		fetchModels();
+	}, [selectedModelId, setSelectedModelId, setSelectedProvider]);
 
 	useEffect(() => {
 		const handleKeyDown = (e: KeyboardEvent) => {
@@ -136,477 +231,572 @@ export function ModelSelector({
 		return () => document.removeEventListener("keydown", handleKeyDown);
 	}, [isMobile]);
 
-	const getKeys = useAction(api.userKeys.getKeys);
-	const [userKeys, setUserKeys] = useState<UserKeys | undefined>(undefined);
-
-	useEffect(() => {
-		const fetchKeys = async () => {
-			if (isUserAuthenticated) {
-				const result = (await getKeys({})) as UserKeys;
-				setUserKeys(result);
-			} else {
-				try {
-					const { getAllKeys } = await import("~/lib/secure-local-keys");
-					const localKeys = await getAllKeys();
-					const formattedKeys: UserKeys = {
-						openaiKey: localKeys.openaiKey,
-						anthropicKey: localKeys.anthropicKey,
-						googleKey: localKeys.googleKey,
-						mistralKey: localKeys.mistralKey,
-						xaiKey: localKeys.xaiKey,
-						perplexityKey: localKeys.perplexityKey,
-						exaKey: localKeys.exaKey,
-						firecrawlKey: localKeys.firecrawlKey,
-					};
-					setUserKeys(formattedKeys);
-				} catch (error) {
-					console.error("Failed to get local keys:", error);
-					setUserKeys({});
-				}
-			}
-		};
-
-		fetchKeys();
-
-		const handleApiKeysChanged = async () => {
-			await fetchKeys();
+	const isModelSelected = useCallback((model: LLMGatewayModel) => {
+		if (selectedModelId === model.id || selectedModelId === model.name) return true;
+		
+		if (selectedModelId.includes('/')) {
+			const firstSlashIndex = selectedModelId.indexOf('/');
+			const provider = selectedModelId.substring(0, firstSlashIndex);
+			const modelName = selectedModelId.substring(firstSlashIndex + 1);
 			
-			try {
-				const { getBestAvailableModel } = await import("~/lib/models/model-utils");
-				const bestModel = await getBestAvailableModel(undefined, isUserAuthenticated);
-				
-				if (bestModel && (bestModel !== selectedModelId || !selectedModelId)) {
-					setSelectedModelId(bestModel);
-				}
-			} catch (error) {
-				console.error("Failed to auto-select model:", error);
-			}
-		};
-
-		window.addEventListener("apiKeysChanged", handleApiKeysChanged);
-		return () => {
-			window.removeEventListener("apiKeysChanged", handleApiKeysChanged);
-		};
-	}, [getKeys, isUserAuthenticated, selectedModelId, setSelectedModelId]);
-
-	const handleModelSelect = (model: ModelConfig) => {
-		const locked = isModelLockedSync(model.id, userKeys, isUserAuthenticated);
-
-		if (locked) {
-			if (!isUserAuthenticated) {
-				setSelectedProModel(model.id);
-			} else {
-				const provider = providers.find((p) => p.id === model.providerId);
-				toast.error(`${model.name} requires a ${provider?.name || model.provider} API key. Please add one in Settings.`);
-			}
-			return;
+			if (!provider || !modelName) return false;
+			
+			return !!model.providers?.some(p => 
+				p.providerId === provider && (
+					p.modelName === modelName || 
+					p.modelName.endsWith(`/${modelName}`) ||
+					modelName === p.modelName
+				)
+			);
 		}
+		
+		return false;
+	}, [selectedModelId]);	const isProviderSelected = useCallback((model: LLMGatewayModel, providerId: string) => {
+		if (!selectedModelId.includes('/')) return false;
+		
+		const firstSlashIndex = selectedModelId.indexOf('/');
+		const selectedProvider = selectedModelId.substring(0, firstSlashIndex);
+		const selectedModelName = selectedModelId.substring(firstSlashIndex + 1);
+		
+		const provider = model.providers?.find(p => p.providerId === providerId);
+		return selectedProvider === providerId && 
+			   provider && 
+			   provider.modelName === selectedModelName;
+	}, [selectedModelId]);
 
-		setSelectedModelId(model.id);
+	const toggleModelExpanded = useCallback((modelId: string) => {
+		setExpandedModels(prev => {
+			const newSet = new Set(prev);
+			if (newSet.has(modelId)) {
+				newSet.delete(modelId);
+			} else {
+				newSet.add(modelId);
+			}
+			return newSet;
+		});
+	}, []);
+
+	const handleModelSelect = useCallback((model: LLMGatewayModel, providerId?: string) => {
+		const providerToUse = providerId || model.providers?.[0]?.providerId;
+		const selectedProvider = model.providers?.find(p => p.providerId === providerToUse);
+		
+		const modelName = selectedProvider?.modelName || model.name;
+		const modelString = providerToUse ? `${providerToUse}/${modelName}` : model.id;
+		setSelectedModelId(modelString);
+		
+		if (providerToUse && setSelectedProvider) {
+			setSelectedProvider(providerToUse);
+		}
+		
+		setSelectedModel(modelString, providerToUse);
+		
 		if (isMobile) {
 			setIsDrawerOpen(false);
 		} else {
 			setIsDropdownOpen(false);
 		}
-	};
+	}, [isMobile, setSelectedModelId, setSelectedProvider]);
 
-	const renderModelItemWithSubmenu = (model: ModelConfig) => {
-		const provider = providers.find((p) => p.id === model.providerId);
-		
-		const locked = isModelLockedSync(model.id, userKeys, isUserAuthenticated);
-
-		return (
-            <DropdownMenuSub key={`dropdown-${model.id}`}>
-                <DropdownMenuSubTrigger
-					className={cn(
-						"flex w-full items-center justify-between px-3 py-2 group",
-						!locked && "hover:bg-accent cursor-pointer",
-						selectedModelId === model.id && "bg-accent",
-						locked && "cursor-not-allowed opacity-40 hover:bg-transparent grayscale",
-					)}
-					onClick={() => {
-						if (locked) return;
-						handleModelSelect(model);
-					}}
-				>
-					<div className="flex items-center gap-3 flex-1 min-w-0">
-						{provider?.icon && <provider.icon className="size-4 flex-shrink-0" />}
-						<div className="flex-1 min-w-0">
-							<div className="text-sm font-medium truncate">{model.name}</div>
-							<div className="text-xs text-muted-foreground truncate">
-								{model.provider} • {model.contextWindow?.toLocaleString()} tokens
-							</div>
-						</div>
-					</div>
-					<div className="flex items-center gap-2 flex-shrink-0">
-						<div className="flex items-center gap-1">
-							{model.vision && <Eye className="size-3 text-green-500" />}
-							{model.audio && <SpeakerHigh className="size-3 text-blue-500" />}
-							{model.reasoningText && <Brain className="size-3 text-purple-500" />}
-							{model.tools && <Wrench className="size-3 text-orange-500" />}
-						</div>
-						
-						{locked && (
-							<div className="flex items-center gap-0.5 rounded-full border border-red-200 bg-red-50 px-1.5 py-0.5 font-medium text-[10px] text-red-600 dark:border-red-800 dark:bg-red-950 dark:text-red-400">
-								<Key className="size-2" />
-								<span>API Key Required</span>
-							</div>
-						)}
-					</div>
-				</DropdownMenuSubTrigger>
-                <DropdownMenuPortal>
-					<DropdownMenuSubContent 
-						className="z-50 min-w-[320px] overflow-hidden rounded-md border bg-popover p-0 text-popover-foreground shadow-md data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2"
-						sideOffset={2}
-						alignOffset={-5}
-						avoidCollisions={false}
-						sticky="always"
-						style={{ position: 'fixed' }}
-					>
-						<div 
-							className={cn(
-								"p-3 border-b",
-								!locked && "cursor-pointer hover:bg-accent/50",
-								locked && "cursor-not-allowed opacity-40 grayscale"
-							)}
-							onClick={() => {
-								if (locked) return;
-								handleModelSelect(model);
-							}}
-						>
-							<div className="flex items-center gap-2">
-								{provider?.icon && <provider.icon className="size-5" />}
-								<div>
-									<div className="font-medium text-sm">{model.name}</div>
-									<div className="text-xs text-muted-foreground">
-										{model.provider} • {model.modelFamily}
-									</div>
-								</div>
-							</div>
-						</div>
-
-						<div className="p-3 border-b">
-							<p className="text-xs text-muted-foreground leading-relaxed">
-								{model.description}
-							</p>
-						</div>
-
-						<div className="p-3 border-b space-y-2">
-							<div className="flex justify-between items-center">
-								<span className="text-xs text-muted-foreground">Context</span>
-								<span className="text-xs font-medium">
-									{model.contextWindow?.toLocaleString()} tokens
-								</span>
-							</div>
-							<div className="flex justify-between items-center">
-								<span className="text-xs text-muted-foreground">Input Pricing</span>
-								<span className="text-xs font-medium">
-									${model.inputCost} / {model.priceUnit}
-								</span>
-							</div>
-							<div className="flex justify-between items-center">
-								<span className="text-xs text-muted-foreground">Output Pricing</span>
-								<span className="text-xs font-medium">
-									${model.outputCost} / {model.priceUnit}
-								</span>
-							</div>
-						</div>
-
-						<div className="p-3 border-b">
-							<div className="grid grid-cols-2 gap-2">
-								<div className="flex items-center gap-1.5">
-									<Eye className={cn("size-3", model.vision ? "text-green-500" : "text-muted-foreground")} />
-									<span className="text-xs">Vision</span>
-									<span className={cn("text-xs", model.vision ? "text-green-500" : "text-muted-foreground")}>
-										{model.vision ? "✓" : "✗"}
-									</span>
-								</div>
-								<div className="flex items-center gap-1.5">
-									<SpeakerHigh className={cn("size-3", model.audio ? "text-green-500" : "text-muted-foreground")} />
-									<span className="text-xs">Audio</span>
-									<span className={cn("text-xs", model.audio ? "text-green-500" : "text-muted-foreground")}>
-										{model.audio ? "✓" : "✗"}
-									</span>
-								</div>
-								<div className="flex items-center gap-1.5">
-									<Wrench className={cn("size-3", model.tools ? "text-green-500" : "text-muted-foreground")} />
-									<span className="text-xs">Tools</span>
-									<span className={cn("text-xs", model.tools ? "text-green-500" : "text-muted-foreground")}>
-										{model.tools ? "✓" : "✗"}
-									</span>
-								</div>
-								<div className="flex items-center gap-1.5">
-									<Brain className={cn("size-3", model.reasoningText ? "text-green-500" : "text-muted-foreground")} />
-									<span className="text-xs">Reasoning</span>
-									<span className={cn("text-xs", model.reasoningText ? "text-green-500" : "text-muted-foreground")}>
-										{model.reasoningText ? "✓" : "✗"}
-									</span>
-								</div>
-							</div>
-						</div>
-
-						{model.tags && model.tags.length > 0 && (
-							<div className="p-3">
-								<div className="flex flex-wrap gap-1">
-									{model.tags.slice(0, 4).map((tag) => (
-										<span key={tag} className="px-1.5 py-0.5 bg-muted rounded text-xs">
-											{tag}
-										</span>
-									))}
-								</div>
-							</div>
-						)}
-					</DropdownMenuSubContent>
-				</DropdownMenuPortal>
-            </DropdownMenuSub>
-        );
-	};
-
-	const renderSimpleModelItem = (model: ModelConfig) => {
-		const provider = providers.find((p) => p.id === model.providerId);
-		
-		const locked = isModelLockedSync(model.id, userKeys, isUserAuthenticated);
-
-		return (
-            <div
-				key={`simple-${model.id}`}
-				className={cn(
-					"flex w-full items-center justify-between px-3 py-2 group",
-					!locked && "hover:bg-accent cursor-pointer",
-					selectedModelId === model.id && "bg-accent",
-					locked && "cursor-not-allowed opacity-40 hover:bg-transparent grayscale",
-				)}
-				onClick={() => {
-					if (locked) return;
-					handleModelSelect(model);
-				}}
-			>
-                <div className="flex items-center gap-3 flex-1 min-w-0">
-					{provider?.icon && <provider.icon className="size-5 flex-shrink-0" />}
-					<div className="flex-1 min-w-0">
-						<div className="text-sm font-medium truncate">{model.name}</div>
-						<div className="text-xs text-muted-foreground truncate">
-							{model.provider} • {model.contextWindow?.toLocaleString()} tokens
-						</div>
-					</div>
-				</div>
-                <div className="flex items-center gap-2 flex-shrink-0">
-					<div className="hidden sm:flex items-center gap-1">
-						{model.vision && (
-							<Tooltip>
-								<TooltipTrigger>
-									<Eye className="size-3 text-green-500" />
-								</TooltipTrigger>
-								<TooltipContent>Vision support</TooltipContent>
-							</Tooltip>
-						)}
-						{model.audio && (
-							<Tooltip>
-								<TooltipTrigger>
-									<SpeakerHigh className="size-3 text-blue-500" />
-								</TooltipTrigger>
-								<TooltipContent>Audio support</TooltipContent>
-							</Tooltip>
-						)}
-						{model.reasoningText && (
-							<Tooltip>
-								<TooltipTrigger>
-									<Brain className="size-3 text-purple-500" />
-								</TooltipTrigger>
-								<TooltipContent>Reasoning model</TooltipContent>
-							</Tooltip>
-						)}
-						{model.tools && (
-							<Tooltip>
-								<TooltipTrigger>
-									<Wrench className="size-3 text-orange-500" />
-								</TooltipTrigger>
-								<TooltipContent>Tool support</TooltipContent>
-							</Tooltip>
-						)}
-					</div>
-
-					{locked && (
-						<div className="flex items-center gap-0.5 rounded-full border border-red-200 bg-red-50 px-1.5 py-0.5 font-medium text-[10px] text-red-600 dark:border-red-800 dark:bg-red-950 dark:text-red-400">
-							<Key className="size-2" />
-							<span>API Key Required</span>
-						</div>
-					)}
-				</div>
-            </div>
-        );
-	};
-
-	const filteredModels = models
-		.filter((model) =>
-			model.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-			model.provider.toLowerCase().includes(searchQuery.toLowerCase()) ||
-			model.tags?.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()))
-		)
-		.sort((a, b) => {
-			const aLocked = isModelLockedSync(a.id, userKeys, isUserAuthenticated);
-			const bLocked = isModelLockedSync(b.id, userKeys, isUserAuthenticated);
+	const filteredModels = useMemo(() => 
+		models.filter((model) => {
+			const query = searchQuery.toLowerCase();
+			return (
+				model.name.toLowerCase().includes(query) ||
+				model.family?.toLowerCase().includes(query) ||
+				model.description?.toLowerCase().includes(query) ||
+				model.id.toLowerCase().includes(query) ||
+				model.providers?.some(p => p.providerId.toLowerCase().includes(query)) ||
+				model.supported_parameters?.some(p => p.toLowerCase().includes(query))
+			);
+		}).sort((a, b) => {
+			const aActive = !a.deactivated_at && !a.deprecated_at;
+			const bActive = !b.deactivated_at && !b.deprecated_at;
+			if (aActive && !bActive) return -1;
+			if (!aActive && bActive) return 1;
 			
-			if (aLocked !== bLocked) {
-				return aLocked ? 1 : -1;
+			const aProviders = a.providers?.length || 0;
+			const bProviders = b.providers?.length || 0;
+			if (aProviders !== bProviders) return bProviders - aProviders;
+			
+			return (b.context_length || 0) - (a.context_length || 0);
+		}), [models, searchQuery]);
+
+	const formatPrice = useCallback((price: string | undefined) => {
+		if (!price || price === "undefined" || price === "null") return "Free";
+		const num = parseFloat(price);
+		if (isNaN(num) || num === 0) return "Free";
+		if (num < 0.001) return `$${(num * 1000000).toFixed(2)}/1M`;
+		if (num < 1) return `$${(num * 1000).toFixed(2)}/1K`;
+		return `$${num.toFixed(2)}`;
+	}, []);
+
+	const getStatusText = useCallback((model: LLMGatewayModel) => {
+		if (!model) return "Unknown";
+		if (model.deactivated_at) return "Deactivated";
+		if (model.deprecated_at) return "Deprecated";
+		return "Active";
+	}, []);
+
+	const getDisplayText = useCallback(() => {
+		if (!selectedModelId) return "Select model";
+		
+		if (selectedModelId.includes('/')) {
+			const firstSlashIndex = selectedModelId.indexOf('/');
+			const provider = selectedModelId.substring(0, firstSlashIndex);
+			const modelName = selectedModelId.substring(firstSlashIndex + 1);
+			
+			const matchingModel = models.find(model => 
+				model.providers?.some(p => 
+					p.providerId === provider && p.modelName === modelName
+				)
+			);
+			
+			if (matchingModel) {
+				return matchingModel.name;
 			}
 			
-			if (a.provider !== b.provider) {
-				return a.provider.localeCompare(b.provider);
-			}
-			
-			return a.name.localeCompare(b.name);
-		});
-
-	const getPlaceholderText = () => {
-		if (searchQuery) {
-			return `Search ${filteredModels.length} models...`;
+			const modelPart = modelName?.split('/').pop();
+			return modelPart || selectedModelId;
 		}
-		return `Search ${models.length} models...`;
-	};
+		
+		const model = models.find(m => m.id === selectedModelId || m.name === selectedModelId);
+		return model ? model.name : selectedModelId;
+	}, [selectedModelId, models]);
 
-	if (isLoadingModels) {
-		return null;
-	}
-
-	const trigger = (
-		<div className="flex items-center gap-1">
-			<Button
-				variant="outline"
-				className={cn("justify-between", className)}
-				disabled={isLoadingModels}
-			>
-				<div className="flex items-center gap-2">
-					{currentProvider?.icon && <currentProvider.icon className="size-5" />}
-					<span>{currentModel?.name || "Select model"}</span>
-				</div>
-				<CaretDown className="size-4 opacity-50" />
-			</Button>
-		</div>
-	);
-
-	const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+	const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
 		e.stopPropagation();
 		setSearchQuery(e.target.value);
-	};
+	}, []);
 
-	if (isMobile) {
-		return (
-			<Drawer open={isDrawerOpen} onOpenChange={setIsDrawerOpen}>
-				<DrawerTrigger asChild>{trigger}</DrawerTrigger>
-				<DrawerContent>
-					<DrawerHeader>
-						<DrawerTitle>Select Model</DrawerTitle>
-					</DrawerHeader>
-					<div className="px-4 pb-2">
-						<div className="relative">
-							<MagnifyingGlass className="absolute top-2.5 left-2.5 h-4 w-4 text-muted-foreground" />
-							<Input
-								ref={searchInputRef}
-								placeholder={`Search ${filteredModels.length} models...`}
-								className="pl-8"
-								value={searchQuery}
-								onChange={handleSearchChange}
-								onClick={(e) => e.stopPropagation()}
-							/>
+	const renderModelTooltip = useCallback((model: LLMGatewayModel) => (
+		<div className="w-80 space-y-0 bg-popover text-popover-foreground">
+			<div className="p-4 pb-3">
+				<div className="flex items-start justify-between gap-3">
+					<div className="flex-1 min-w-0">
+						<div className="font-semibold text-sm text-foreground">{model.name}</div>
+						<div className="text-xs text-muted-foreground mt-1 leading-relaxed">
+							{model.description || "No description available"}
 						</div>
 					</div>
-					<div className="flex h-full flex-col space-y-0.5 overflow-y-auto px-4 pb-6">
-						{isLoadingModels ? (
-							<div className="flex h-full flex-col items-center justify-center p-6 text-center">
-								<p className="mb-2 text-muted-foreground text-sm">
-									Loading models...
-								</p>
+					<span className={cn(
+						"text-xs px-2 py-1 rounded-full font-medium flex-shrink-0",
+						model.deactivated_at 
+							? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300" 
+							: model.deprecated_at 
+							? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300" 
+							: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300"
+					)}>
+						{getStatusText(model)}
+					</span>
+				</div>
+			</div>
+
+			<Separator />
+
+			<div className="p-4 py-3">
+				<div className="grid grid-cols-2 gap-4 text-xs">
+					<div>
+						<div className="font-medium mb-2 text-foreground">Architecture</div>
+						<div className="space-y-1.5 text-muted-foreground">
+							<div><span className="font-medium">Input:</span> {model.architecture?.input_modalities?.join(", ") || "text"}</div>
+							<div><span className="font-medium">Output:</span> {model.architecture?.output_modalities?.join(", ") || "text"}</div>
+							<div><span className="font-medium">Tokenizer:</span> {model.architecture?.tokenizer || "GPT"}</div>
+						</div>
+					</div>
+					
+					<div>
+						<div className="font-medium mb-2 text-foreground">Features</div>
+						<div className="space-y-1.5">
+							<div className="flex items-center gap-2 text-muted-foreground">
+								{model.providers?.[0]?.streaming ? 
+									<CheckCircle className="size-3 text-green-500 flex-shrink-0" /> : 
+									<XCircle className="size-3 text-red-500 flex-shrink-0" />
+								}
+								<span>Streaming</span>
 							</div>
-						) : filteredModels.length > 0 ? (
-							filteredModels.map((model) => renderSimpleModelItem(model))
-						) : (
-							<div className="flex h-full flex-col items-center justify-center p-6 text-center">
-								<p className="mb-2 text-muted-foreground text-sm">
-									No results found.
-								</p>
-								<a
-									href="https://github.com/montekkundan/chaichat/issues/new?title=Model%20Request%3A%20"
-									target="_blank"
-									rel="noopener noreferrer"
-									className="text-muted-foreground text-sm underline"
+							<div className="flex items-center gap-2 text-muted-foreground">
+								{model.providers?.[0]?.vision ? 
+									<CheckCircle className="size-3 text-green-500 flex-shrink-0" /> : 
+									<XCircle className="size-3 text-red-500 flex-shrink-0" />
+								}
+								<span>Vision</span>
+							</div>
+							<div className="flex items-center gap-2 text-muted-foreground">
+								{model.providers?.[0]?.tools ? 
+									<CheckCircle className="size-3 text-green-500 flex-shrink-0" /> : 
+									<XCircle className="size-3 text-red-500 flex-shrink-0" />
+								}
+								<span>Function Calling</span>
+							</div>
+							<div className="flex items-center gap-2 text-muted-foreground">
+								{model.json_output ? 
+									<CheckCircle className="size-3 text-green-500 flex-shrink-0" /> : 
+									<XCircle className="size-3 text-red-500 flex-shrink-0" />
+								}
+								<span>JSON Output</span>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+
+			{model.providers && model.providers.length > 0 && (
+				<>
+					<Separator />
+					<div className="p-4 py-3">
+						<div className="font-medium text-xs mb-3 text-foreground">
+							Available Providers ({model.providers.length})
+						</div>
+						<div className="space-y-2">
+							{model.providers.slice(0, 3).map((provider, idx) => (
+								<div 
+									key={idx} 
+									className={cn(
+										"text-xs bg-muted/50 rounded-md px-3 py-2 cursor-pointer hover:bg-muted transition-colors",
+										isProviderSelected(model, provider.providerId) && "ring-2 ring-primary bg-primary/10"
+									)}
+									onClick={(e) => {
+										e.stopPropagation();
+										handleModelSelect(model, provider.providerId);
+									}}
 								>
-									Request a new model
-								</a>
+									<div className="font-medium text-foreground">{provider.providerId}</div>
+									<div className="text-muted-foreground mt-0.5">
+										{formatPrice(provider.pricing?.prompt || "0")}/1K tokens
+									</div>
+								</div>
+							))}
+							{model.providers.length > 3 && (
+								<div className="text-xs text-muted-foreground pl-3">
+									+{model.providers.length - 3} more providers (click model to see all)
+								</div>
+							)}
+						</div>
+					</div>
+				</>
+			)}
+
+			{model.supported_parameters && model.supported_parameters.length > 0 && (
+				<>
+					<Separator />
+					<div className="p-4 py-3">
+						<div className="font-medium text-xs mb-3 text-foreground">Supported Parameters</div>
+						<div className="flex flex-wrap gap-1.5">
+							{model.supported_parameters.slice(0, 8).map((param, idx) => (
+								<Badge key={idx} variant="outline" className="text-xs h-5 px-2">
+									{param}
+								</Badge>
+							))}
+							{model.supported_parameters.length > 8 && (
+								<Badge variant="outline" className="text-xs h-5 px-2">
+									+{model.supported_parameters.length - 8}
+								</Badge>
+							)}
+						</div>
+					</div>
+				</>
+			)}
+
+			{(model.deprecated_at || model.deactivated_at) && (
+				<>
+					<Separator />
+					<div className="p-4 py-3">
+						<div className={cn(
+							"flex items-center gap-2 text-xs p-2 rounded-md",
+							model.deactivated_at 
+								? "bg-red-50 text-red-700 border border-red-200 dark:bg-red-900/20 dark:text-red-300 dark:border-red-800" 
+								: "bg-yellow-50 text-yellow-700 border border-yellow-200 dark:bg-yellow-900/20 dark:text-yellow-300 dark:border-yellow-800"
+						)}>
+							<Info className="size-3 flex-shrink-0" />
+							<span>
+								{model.deactivated_at 
+									? "This model has been deactivated and is no longer available."
+									: "This model is deprecated and may be removed in the future."
+								}
+							</span>
+						</div>
+					</div>
+				</>
+			)}
+		</div>
+	), [getStatusText, isProviderSelected, handleModelSelect, formatPrice]);
+
+	const renderModelItem = useCallback((model: LLMGatewayModel) => (
+		<TooltipProvider key={model.id}>
+			<Tooltip delayDuration={300}>
+				<TooltipTrigger asChild>
+					<div className="w-full">
+						<div className="flex w-full items-center justify-between gap-2">
+							<div
+								className={cn(
+									"flex w-full items-center justify-between px-3 py-2 cursor-pointer hover:bg-accent transition-colors flex-1 rounded-md",
+									isModelSelected(model) && "bg-accent border border-primary/30",
+									model.deactivated_at && "opacity-60"
+								)}
+								onClick={() => handleModelSelect(model)}
+							>
+								<div className="flex items-center gap-2 min-w-0 flex-1">
+									<div className="text-sm font-medium truncate">{model.name}</div>
+									{isModelSelected(model) && (
+										<div className="size-2 rounded-full bg-primary flex-shrink-0" />
+									)}
+								</div>
+								<div className="text-xs text-muted-foreground">
+									{formatPrice(model.pricing?.prompt || "0")}/1K
+								</div>
+							</div>
+							
+							{model.providers && model.providers.length > 1 && (
+								<Button
+									variant="ghost"
+									size="sm"
+									className="h-8 w-8 p-0 hover:bg-accent/50"
+									onClick={(e) => {
+										e.stopPropagation();
+										toggleModelExpanded(model.id);
+									}}
+								>
+									<CaretDown 
+										className={cn(
+											"size-3 transition-transform",
+											expandedModels.has(model.id) && "rotate-180"
+										)} 
+									/>
+								</Button>
+							)}
+						</div>
+						
+						{expandedModels.has(model.id) && 
+						 model.providers && model.providers.length > 1 && (
+							<div className="ml-4 border-l border-border pl-3 space-y-1">
+								{model.providers.map((provider, idx) => (
+									<div
+										key={idx}
+										className={cn(
+											"flex items-center justify-between px-2 py-1 text-xs cursor-pointer hover:bg-accent/50 rounded transition-colors",
+											isProviderSelected(model, provider.providerId) && "bg-accent/70 ring-1 ring-primary/50"
+										)}
+										onClick={(e) => {
+											e.stopPropagation();
+											handleModelSelect(model, provider.providerId);
+										}}
+									>
+										<span className="font-medium">{provider.providerId}</span>
+										<span className="text-muted-foreground">
+											{formatPrice(provider.pricing?.prompt || "0")}/1K
+										</span>
+									</div>
+								))}
 							</div>
 						)}
 					</div>
-				</DrawerContent>
-			</Drawer>
+				</TooltipTrigger>
+				<TooltipContent side="right" className="p-0 bg-popover border border-border">
+					{renderModelTooltip(model)}
+				</TooltipContent>
+			</Tooltip>
+		</TooltipProvider>
+	), [isModelSelected, handleModelSelect, formatPrice, expandedModels, toggleModelExpanded, isProviderSelected, renderModelTooltip]);
+
+	const trigger = useMemo(() => (
+		<Button variant="outline" className={cn("justify-between", className)}>
+			<div className="flex items-center gap-2 min-w-0 flex-1">
+				<div className="text-sm font-medium truncate">
+					{getDisplayText()}
+				</div>
+			</div>
+			<CaretDown className="size-4 opacity-50 ml-2 flex-shrink-0" />
+		</Button>
+	), [className, getDisplayText]);
+
+	if (isLoading) {
+		return (
+			<Button variant="outline" className={cn("justify-between", className)} disabled>
+				<span>Loading models...</span>
+				<CaretDown className="size-4 opacity-50" />
+			</Button>
 		);
 	}
 
-	return (
-		<div>
-			<Tooltip>
-				<DropdownMenu
-					open={isDropdownOpen}
-					onOpenChange={(open) => {
-						setIsDropdownOpen(open);
-						if (!open) {
-							setSearchQuery("");
-						}
-					}}
-				>
-					<TooltipTrigger asChild>
-						<DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
-					</TooltipTrigger>
-					<TooltipContent>Switch model ⌘⇧P</TooltipContent>
-					<DropdownMenuContent
-						className="flex h-[400px] w-[400px] flex-col space-y-0.5 overflow-visible px-0 pt-0"
-						align="start"
-						sideOffset={4}
-						forceMount
-						side="top"
-					>
-						<div className="sticky top-0 z-10 rounded-t-md border-b bg-background px-0 pt-0 pb-0">
+	if (error) {
+		return (
+			<Button variant="outline" className={cn("justify-between", className)} disabled>
+				<span className="text-red-500">Error loading models</span>
+				<CaretDown className="size-4 opacity-50" />
+			</Button>
+		);
+	}
+
+	if (isMobile) {
+		return (
+			<TooltipProvider>
+				<Drawer open={isDrawerOpen} onOpenChange={(open) => {
+					setIsDrawerOpen(open);
+					if (!open) {
+						setExpandedModels(new Set());
+					}
+				}}>
+					<DrawerTrigger asChild>{trigger}</DrawerTrigger>
+					<DrawerContent>
+						<DrawerHeader>
+							<DrawerTitle>Select Model</DrawerTitle>
+						</DrawerHeader>
+						<div className="px-4 pb-2">
 							<div className="relative">
 								<MagnifyingGlass className="absolute top-2.5 left-2.5 h-4 w-4 text-muted-foreground" />
 								<Input
 									ref={searchInputRef}
 									placeholder={`Search ${filteredModels.length} models...`}
-									className="rounded-b-none border border-none pl-8 shadow-none focus-visible:ring-0 dark:bg-popover"
+									className="pl-8"
 									value={searchQuery}
 									onChange={handleSearchChange}
 									onClick={(e) => e.stopPropagation()}
-									onFocus={(e) => e.stopPropagation()}
-									onKeyDown={(e) => e.stopPropagation()}
 								/>
 							</div>
 						</div>
-						<div className="flex h-full flex-col space-y-0.5 overflow-y-auto px-1 pt-1 pb-0">
-							{isLoadingModels ? (
-								<div className="flex h-full flex-col items-center justify-center p-6 text-center">
-									<p className="mb-2 text-muted-foreground text-sm">
-										Loading models...
-									</p>
-								</div>
-							) : filteredModels.length > 0 ? (
-								filteredModels.map((model) => renderModelItemWithSubmenu(model))
+						<div className="flex h-full flex-col space-y-0.5 overflow-y-auto px-4 pb-6">
+							{filteredModels.length > 0 ? (
+								filteredModels.map((model) => (
+									<div key={model.id} className="w-full">
+										<div className="flex w-full items-center justify-between gap-2">
+											<div
+												className={cn(
+													"flex w-full items-center justify-between px-3 py-2 cursor-pointer hover:bg-accent transition-colors rounded-md flex-1",
+													isModelSelected(model) && "bg-accent border border-primary/30",
+													model.deactivated_at && "opacity-60"
+												)}
+												onClick={() => handleModelSelect(model)}
+											>
+												<div className="flex items-center gap-2 min-w-0 flex-1">
+													<div className="text-sm font-medium truncate">{model.name}</div>
+													{isModelSelected(model) && (
+														<div className="size-2 rounded-full bg-primary flex-shrink-0" />
+													)}
+												</div>
+												<div className="text-xs text-muted-foreground">
+													{formatPrice(model.pricing?.prompt || "0")}/1K
+												</div>
+											</div>
+											
+											{model.providers && model.providers.length > 1 && (
+												<Button
+													variant="ghost"
+													size="sm"
+													className="h-8 w-8 p-0 hover:bg-accent/50"
+													onClick={(e) => {
+														e.stopPropagation();
+														toggleModelExpanded(model.id);
+													}}
+												>
+													<CaretDown 
+														className={cn(
+															"size-3 transition-transform",
+															expandedModels.has(model.id) && "rotate-180"
+														)} 
+													/>
+												</Button>
+											)}
+										</div>
+										
+										{expandedModels.has(model.id) && 
+										 model.providers && model.providers.length > 1 && (
+											<div className="ml-4 mt-1 border-l border-border pl-3 space-y-1">
+												{model.providers.map((provider, idx) => (
+													<div
+														key={idx}
+														className={cn(
+															"flex items-center justify-between px-2 py-1 text-xs cursor-pointer hover:bg-accent/50 rounded transition-colors",
+															isProviderSelected(model, provider.providerId) && "bg-accent/70 ring-1 ring-primary/50"
+														)}
+														onClick={(e) => {
+															e.stopPropagation();
+															handleModelSelect(model, provider.providerId);
+														}}
+													>
+														<span className="font-medium">{provider.providerId}</span>
+														<span className="text-muted-foreground">
+															{formatPrice(provider.pricing?.prompt || "0")}/1K
+														</span>
+													</div>
+												))}
+											</div>
+										)}
+									</div>
+								))
 							) : (
 								<div className="flex h-full flex-col items-center justify-center p-6 text-center">
-									<p className="mb-1 text-muted-foreground text-sm">
+									<p className="mb-2 text-muted-foreground text-sm">
 										No results found.
 									</p>
-									<a
-										href="https://github.com/montekkundan/chaichat/issues/new?title=Model%20Request%3A%20"
-										target="_blank"
-										rel="noopener noreferrer"
-										className="text-muted-foreground text-sm underline"
-									>
-										Request a new model
-									</a>
 								</div>
 							)}
 						</div>
-					</DropdownMenuContent>
-				</DropdownMenu>
-			</Tooltip>
-		</div>
+					</DrawerContent>
+				</Drawer>
+			</TooltipProvider>
+		);
+	}
+
+	return (
+		<TooltipProvider>
+			<DropdownMenu
+				open={isDropdownOpen}
+				onOpenChange={(open) => {
+					setIsDropdownOpen(open);
+					if (!open) {
+						setSearchQuery("");
+						setExpandedModels(new Set());
+					}
+				}}
+			>
+				<DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
+				<DropdownMenuContent
+					className="flex h-[400px] w-[400px] flex-col space-y-0.5 overflow-visible px-0 pt-0"
+					align="start"
+					sideOffset={4}
+					forceMount
+					side="top"
+				>
+					<div className="sticky top-0 z-10 rounded-t-md border-b bg-background px-0 pt-0 pb-0">
+						<div className="relative">
+							<MagnifyingGlass className="absolute top-2.5 left-2.5 h-4 w-4 text-muted-foreground" />
+							<Input
+								ref={searchInputRef}
+								placeholder={`Search ${models.length} models...`}
+								className="rounded-b-none border border-none pl-8 shadow-none focus-visible:ring-0 dark:bg-popover"
+								value={searchQuery}
+								onChange={handleSearchChange}
+								onClick={(e) => e.stopPropagation()}
+								onFocus={(e) => e.stopPropagation()}
+								onKeyDown={(e) => e.stopPropagation()}
+							/>
+						</div>
+					</div>
+					<div className="flex h-full flex-col space-y-0.5 overflow-y-auto px-1 pt-1 pb-0">
+						{filteredModels.length > 0 ? (
+							<>
+								{searchQuery && (
+									<div className="px-3 py-2 text-xs text-muted-foreground border-b">
+										Showing {filteredModels.length} of {models.length} models
+									</div>
+								)}
+								{filteredModels.map(renderModelItem)}
+							</>
+						) : (
+							<div className="flex h-full flex-col items-center justify-center p-6 text-center">
+								<p className="mb-1 text-muted-foreground text-sm">
+									No results found.
+								</p>
+								{searchQuery && (
+									<p className="text-xs text-muted-foreground">
+										Try searching for a different model or provider.
+									</p>
+								)}
+							</div>
+						)}
+					</div>
+				</DropdownMenuContent>
+			</DropdownMenu>
+		</TooltipProvider>
 	);
 }

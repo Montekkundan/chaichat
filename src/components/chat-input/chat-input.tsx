@@ -22,23 +22,13 @@ import {
 	TooltipTrigger,
 } from "~/components/ui/tooltip";
 import { filterValidFiles } from "~/lib/file-upload/validation";
-import { getBestAvailableModel } from "~/lib/models/model-utils";
-import { getModelInfo } from "~/lib/models";
-import { shouldShowSearchToggle, getSearchCapabilities } from "~/lib/models/search-utils";
 import { FileList } from "./file-list";
 import { ModelSelector } from "./model-selector";
 
 // TODO cleanup: use all user keys
 
 type UserKeys = {
-	openaiKey?: string;
-	anthropicKey?: string;
-	googleKey?: string;
-	mistralKey?: string;
-	xaiKey?: string;
-	perplexityKey?: string;
-	exaKey?: string;
-	firecrawlKey?: string;
+	llmGatewayApiKey?: string;
 };
 
 type ChatInputProps = {
@@ -84,8 +74,7 @@ export function ChatInput({
 	position = "centered",
 	disabled = false,
 }: ChatInputProps) {
-	const selectModelConfig = getModelInfo(selectedModel);
-	const hasToolSupport = Boolean(selectModelConfig?.tools);
+	const hasToolSupport = true; // Assume all models support tools via LLM Gateway
 	
 	// User keys state for search capabilities
 	const getKeys = useAction(api.userKeys.getKeys);
@@ -99,19 +88,9 @@ export function ChatInput({
 				setUserKeys(result);
 			} else {
 				try {
-					const { getAllKeys } = await import("~/lib/secure-local-keys");
+					const { getAllKeys } = await import("~/lib/local-keys");
 					const localKeys = await getAllKeys();
-					const formattedKeys: UserKeys = {
-						openaiKey: localKeys.openaiKey,
-						anthropicKey: localKeys.anthropicKey,
-						googleKey: localKeys.googleKey,
-						mistralKey: localKeys.mistralKey,
-						xaiKey: localKeys.xaiKey,
-						perplexityKey: localKeys.perplexityKey,
-						exaKey: localKeys.exaKey,
-						firecrawlKey: localKeys.firecrawlKey,
-					};
-					setUserKeys(formattedKeys);
+					setUserKeys(localKeys);
 				} catch (error) {
 					setUserKeys({});
 				}
@@ -121,20 +100,15 @@ export function ChatInput({
 		loadKeys();
 	}, [isUserAuthenticated, getKeys]);
 	
-	// Determine if search is available for current model
-	const allowWebSearch = selectModelConfig && userKeys 
-		? shouldShowSearchToggle(selectModelConfig, userKeys)
-		: false;
+	// For now, enable search for all models - LLM Gateway will handle capabilities
+	const allowWebSearch = true;
 
 	// Helper to check if a string is only whitespace characters
 	const isOnlyWhitespace = (text: string) => !/[^\s]/.test(text);
 
 	// Determine if the current model supports file/image attachments.
 	// Prefer explicit `attachments` flag, otherwise fall back to models that have vision capability.
-	const modelAllowsAttachments =
-		selectModelConfig?.attachments ?? Boolean(selectModelConfig?.vision);
-
-	// -------- UploadThing setup (must come before handlers that use startUpload) --------
+	const supportsAttachments = true; // Assume all models support attachments via LLM Gateway	// -------- UploadThing setup (must come before handlers that use startUpload) --------
 	const uploadHelpers = generateReactHelpers<UploadRouter>();
 	const { useUploadThing } = uploadHelpers;
 	const { startUpload, isUploading } = useUploadThing("chatFiles");
@@ -210,17 +184,20 @@ export function ChatInput({
 		setIsSearchEnabled((prev) => !prev);
 	};
 
-	// Track if user has any API keys available
-	const [hasApiKeys, setHasApiKeys] = useState(true); // Default to true to avoid flash
+	// Track if user has any API keys available - check for LLM Gateway key
+	const [hasApiKeys, setHasApiKeys] = useState(false); // Default to false
 
 	useEffect(() => {
 		const checkApiKeys = async () => {
 			try {
-				const bestModel = await getBestAvailableModel(
-					undefined,
-					isUserAuthenticated,
-				);
-				setHasApiKeys(!!bestModel);
+				if (isUserAuthenticated) {
+					const result = (await getKeys({})) as UserKeys;
+					setHasApiKeys(!!result?.llmGatewayApiKey);
+				} else {
+					const { getAllKeys } = await import("~/lib/local-keys");
+					const localKeys = await getAllKeys();
+					setHasApiKeys(!!localKeys?.llmGatewayApiKey);
+				}
 			} catch (error) {
 				console.error("Failed to check API keys:", error);
 				setHasApiKeys(false);
@@ -238,9 +215,7 @@ export function ChatInput({
 		return () => {
 			window.removeEventListener("apiKeysChanged", handleApiKeysChanged);
 		};
-	}, [isUserAuthenticated]);
-
-	const handleSend = useCallback(async () => {
+	}, [isUserAuthenticated, getKeys]);	const handleSend = useCallback(async () => {
 		if (isSubmitting || disabled) {
 			return;
 		}
@@ -329,7 +304,7 @@ export function ChatInput({
 	const [showCookieModal, setShowCookieModal] = useState(false);
 
 	// Uploads are disabled when the selected model doesn't support attachments
-	const uploadDisabled = !modelAllowsAttachments;
+	const uploadDisabled = !supportsAttachments;
 
 	const handleLocalFileChange = async (
 		e: React.ChangeEvent<HTMLInputElement>,
@@ -402,7 +377,7 @@ export function ChatInput({
             selectedAgent={agentCommand.selectedAgent}
             removeSelectedAgent={agentCommand.removeSelectedAgent}
           /> */}
-				{modelAllowsAttachments && (
+				{supportsAttachments && (
 					<FileList files={files} onFileRemove={handleFileRemove} />
 				)}
 				{!hasApiKeys ? (
@@ -410,7 +385,7 @@ export function ChatInput({
 						<TooltipTrigger asChild>
 							<div>
 								<PromptInputTextarea
-									placeholder="Please add API keys to start chatting"
+									placeholder="Please add your LLM Gateway API key to start chatting"
 									onKeyDown={handleKeyDown}
 									onChange={(e) => onValueChange(e.target.value)}
 									className="min-h-[44px] cursor-not-allowed pt-3 pl-4 text-base leading-[1.3] sm:text-base md:text-base"
@@ -421,8 +396,7 @@ export function ChatInput({
 						</TooltipTrigger>
 						<TooltipContent side="top">
 							<div className="text-xs">
-								Please add API keys using the "Manage API Keys" button in the
-								sidebar
+								Please add your LLM Gateway API key
 							</div>
 						</TooltipContent>
 					</Tooltip>
@@ -438,8 +412,8 @@ export function ChatInput({
 				)}
 				<PromptInputActions className="mt-5 w-full justify-between px-3 pb-3">
 					<div className="flex items-center gap-2">
-						{/* Upload files */}
-						{modelAllowsAttachments && (
+						{/* TODO: Implement file upload functionality */}
+						{/* {supportsAttachments && (
 							<PromptInputAction tooltip="Attach files">
 								<label
 									className={`flex h-8 w-8 items-center justify-center rounded-2xl ${uploadDisabled ? "cursor-not-allowed opacity-40" : "cursor-pointer hover:bg-muted/40"}`}
@@ -471,29 +445,16 @@ export function ChatInput({
 									)}
 								</label>
 							</PromptInputAction>
-						)}
+						)} */}
 						<ModelSelector
 							selectedModelId={selectedModel}
 							setSelectedModelId={onSelectModel}
-							isUserAuthenticated={isUserAuthenticated}
 							className="rounded-full"
 						/>
-						{allowWebSearch && (
+						{/* TODO: Implement web search functionality */}
+						{/* {allowWebSearch && (
 							<PromptInputAction
-								tooltip={
-									(() => {
-										if (!selectModelConfig || !userKeys) return "Search";
-										
-										const capabilities = getSearchCapabilities(selectModelConfig, userKeys);
-										const methods = Object.values(capabilities.searchMethods);
-										
-										if (isSearchEnabled) {
-											return `Disable search (${methods.join(", ")})`;
-										} else {
-											return `Enable search (${methods.join(", ")})`;
-										}
-									})()
-								}
+								tooltip={isSearchEnabled ? "Disable web search" : "Enable web search"}
 							>
 								<Button
 									variant={isSearchEnabled ? "secondary" : "outline"}
@@ -516,12 +477,12 @@ export function ChatInput({
 									</motion.span>
 								</Button>
 							</PromptInputAction>
-						)}
+						)} */}
 					</div>
 					<PromptInputAction
 						tooltip={
 							!hasApiKeys
-								? "Please add API keys"
+								? "Please add your LLM Gateway API key"
 								: status === "streaming"
 									? "Stop"
 									: "Send"

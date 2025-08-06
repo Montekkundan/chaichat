@@ -1,128 +1,30 @@
 "use client";
 
+import { ExternalLink, Key, Eye, EyeOff } from "lucide-react";
 import { useUser } from "@clerk/nextjs";
-import { Eye, EyeOff, Key, X, Filter, ChevronDown, ChevronUp, CircleX, ExternalLink } from "lucide-react";
-import { useAction, useMutation } from "convex/react";
-import { useConvex } from "convex/react";
-import { useEffect, useState, useMemo, useRef, useId } from "react";
+import { useState, useEffect } from "react";
+import { useMutation, useAction } from "convex/react";
+import { api } from "@/convex/_generated/api";
+import { Button } from "~/components/ui/button";
+import { Input } from "~/components/ui/input";
+import { Badge } from "~/components/ui/badge";
 import { toast } from "sonner";
 import { cn } from "~/lib/utils";
-import { api } from "~/../convex/_generated/api";
-import { Button } from "~/components/ui/button";
-import { ProviderStatusIndicator } from "~/components/debug/provider-debug-panel";
-import { Input } from "~/components/ui/input";
-import { Label } from "~/components/ui/label";
-import { Checkbox } from "~/components/ui/checkbox";
-import { Badge } from "~/components/ui/badge";
-import { Popover, PopoverContent, PopoverTrigger } from "~/components/ui/popover";
 import {
-	Select,
-	SelectContent,
-	SelectItem,
-	SelectTrigger,
-	SelectValue,
-} from "~/components/ui/select";
-import {
-	Table,
-	TableBody,
-	TableCell,
-	TableHead,
-	TableHeader,
-	TableRow,
-} from "~/components/ui/table";
-import { Pagination, PaginationContent, PaginationItem } from "~/components/ui/pagination";
-import {
-	type ColumnDef,
-	type ColumnFiltersState,
-	type FilterFn,
-	type PaginationState,
-	type Row,
-	type SortingState,
-	type VisibilityState,
-	flexRender,
-	getCoreRowModel,
-	getFacetedUniqueValues,
-	getFilteredRowModel,
-	getPaginationRowModel,
-	getSortedRowModel,
-	useReactTable,
-} from "@tanstack/react-table";
-import {
-	type ProviderId,
 	getAllKeys,
-	removeLocalKey,
-	removeSessionKey,
 	setLocalKey,
 	setSessionKey,
-	getLocalKey,
-	getSessionKey,
-	migrateFromPlaintextStorage,
-} from "~/lib/secure-local-keys";
-import { getProviderConfigs, type ProviderConfig } from "~/lib/models/providers";
-
-type ApiKeyItem = {
-	id: ProviderId;
-	name: string;
-	icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
-	placeholder: string;
-	currentKey: string;
-	hasKey: boolean;
-	status: "Active" | "Missing" | "Invalid";
-	apiDocs?: string;
-};
-
-// Custom filter function for multi-column searching
-const multiColumnFilterFn: FilterFn<ApiKeyItem> = (row, columnId, filterValue) => {
-	const searchableRowContent = `${row.original.name} ${row.original.id}`.toLowerCase();
-	const searchTerm = (filterValue ?? "").toLowerCase();
-	return searchableRowContent.includes(searchTerm);
-};
-
-const statusFilterFn: FilterFn<ApiKeyItem> = (row, columnId, filterValue: string[]) => {
-	if (!filterValue?.length) return true;
-	const status = row.getValue(columnId) as string;
-	return filterValue.includes(status);
-};
+	removeLocalKey,
+	removeSessionKey,
+} from "~/lib/local-keys";
 
 export function ApiKeyManager() {
 	const { user } = useUser();
-	const convex = useConvex();
 	const isLoggedIn = !!user?.id;
-	const id = useId();
-	const inputRef = useRef<HTMLInputElement>(null);
-
-	// Core state
-	const [keys, setKeys] = useState<Record<string, string>>({});
-	const [showKeys, setShowKeys] = useState<Record<string, boolean>>({});
+	const [llmGatewayKey, setLlmGatewayKey] = useState("");
+	const [showKey, setShowKey] = useState(false);
 	const [isLoading, setIsLoading] = useState(true);
 	const [useSessionStorage, setUseSessionStorage] = useState(false);
-	const [providers, setProviders] = useState<ProviderConfig[]>([]);
-
-	// Use ref for initialization to survive component remounting
-	const initializationRef = useRef<{
-		initialized: boolean;
-		promise: Promise<void> | null;
-	}>({ initialized: false, promise: null });
-
-	// Track unsaved changes for auto-save on unmount
-	const unsavedChangesRef = useRef<Record<string, string>>({});
-	
-	// Debounce timers for auto-save
-	const autoSaveTimersRef = useRef<Record<string, NodeJS.Timeout>>({});
-
-	// Table state
-	const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
-	const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
-	const [pagination, setPagination] = useState<PaginationState>({
-		pageIndex: 0,
-		pageSize: 10,
-	});
-	const [sorting, setSorting] = useState<SortingState>([
-		{
-			id: "name",
-			desc: false,
-		},
-	]);
 
 	// Convex mutations for logged-in users
 	const storeKeyMutation = useMutation(api.userKeys.storeKey);
@@ -130,513 +32,117 @@ export function ApiKeyManager() {
 	const getKeysAction = useAction(api.userKeys.getKeys);
 
 	useEffect(() => {
-		if (initializationRef.current.initialized || initializationRef.current.promise) {
-			return;
-		}
-
-		const initializeComponent = async () => {
+		const loadExistingKey = async () => {
 			try {
 				setIsLoading(true);
-				await migrateFromPlaintextStorage();
-				const providerConfigs = await getProviderConfigs();
-				setProviders(providerConfigs);
-				await loadExistingKeys(providerConfigs, isLoggedIn);
+				if (isLoggedIn) {
+					const convexKeys = await getKeysAction({});
+					if (convexKeys?.llmGatewayApiKey) {
+						setLlmGatewayKey(convexKeys.llmGatewayApiKey);
+					}
+				} else {
+					const localKeys = getAllKeys();
+					if (localKeys.llmGatewayApiKey) {
+						setLlmGatewayKey(localKeys.llmGatewayApiKey);
+					}
+				}
 			} catch (error) {
-				console.error("ApiKeyManager: Initialization failed:", error);
+				console.error("Failed to load existing key:", error);
 			} finally {
 				setIsLoading(false);
-				initializationRef.current.initialized = true;
-				initializationRef.current.promise = null;
 			}
 		};
 
-		initializationRef.current.promise = initializeComponent();
-	}, []);
+		loadExistingKey();
+	}, [isLoggedIn, getKeysAction]);
 
-	useEffect(() => {
-		const currentProviders = providers;
-		const currentIsLoggedIn = isLoggedIn;
-		const currentUseSessionStorage = useSessionStorage;
-		
-		return () => {
-			Object.values(autoSaveTimersRef.current).forEach(timer => {
-				if (timer) clearTimeout(timer);
-			});
-			autoSaveTimersRef.current = {};
-			
-			const unsavedChanges = unsavedChangesRef.current;
-			if (Object.keys(unsavedChanges).length > 0) {
-				for (const [provider, value] of Object.entries(unsavedChanges)) {
-					const providerConfig = currentProviders.find((p) => p.id === provider);
-					const keyName = providerConfig?.keyName;
-					
-					if (!keyName) {
-						continue;
-					}
-					
-					const trimmedValue = value.trim();
-					
-					if (trimmedValue) {
-						if (currentIsLoggedIn) {
-							storeKeyMutation({ provider: provider as ProviderId, apiKey: trimmedValue }).catch(err => {
-								console.error(`Failed to auto-save ${provider}:`, err);
-							});
-						} else {
-							if (currentUseSessionStorage) {
-								setSessionKey(keyName as ProviderId, trimmedValue).catch(err => {
-									console.error(`Failed to auto-save ${provider}:`, err);
-								});
-							} else {
-								setLocalKey(keyName as ProviderId, trimmedValue).catch(err => {
-									console.error(`Failed to auto-save ${provider}:`, err);
-								});
-							}
-						}
-					}
-				}
-				unsavedChangesRef.current = {};
-				
-				// Dispatch event to notify other components if any keys were saved
-				if (Object.keys(unsavedChanges).length > 0) {
-					window.dispatchEvent(new CustomEvent('apiKeysChanged'));
-				}
-			}
-		};
-	}, [providers, isLoggedIn, useSessionStorage, storeKeyMutation]);
-
-	const loadExistingKeys = async (providerConfigs: ProviderConfig[], loggedIn: boolean) => {
+	const handleRemoveKey = async () => {
 		try {
-			if (loggedIn) {
-				const convexKeys = await getKeysAction({});
-				const formattedKeys: Record<string, string> = {};
-				if (convexKeys) {
-					const keyToProviders: Record<string, string[]> = {};
-					for (const provider of providerConfigs) {
-						if (provider.requiresApiKey && provider.keyName) {
-							if (!keyToProviders[provider.keyName]) {
-								keyToProviders[provider.keyName] = [];
-							}
-							keyToProviders[provider.keyName]!.push(provider.id);
-						}
-					}
-
-					for (const [key, value] of Object.entries(convexKeys)) {
-						if (value && typeof value === 'string') {
-							const providerIds = keyToProviders[key];
-							if (providerIds) {
-								for (const providerId of providerIds) {
-									formattedKeys[providerId] = value;
-								}
-							} else {
-								const provider = key.replace("Key", "");
-								formattedKeys[provider] = value;
-							}
-						}
-					}
-				}
-				setKeys(formattedKeys);
-			} else {
-				const localKeys = await getAllKeys();
-				const formattedKeys: Record<string, string> = {};
-				const keyToProviders: Record<string, string[]> = {};
-				
-				for (const provider of providerConfigs) {
-					if (provider.requiresApiKey && provider.keyName) {
-						if (!keyToProviders[provider.keyName]) {
-							keyToProviders[provider.keyName] = [];
-						}
-						keyToProviders[provider.keyName]!.push(provider.id);
-					}
-				}
-
-				for (const [key, value] of Object.entries(localKeys)) {
-					if (value && typeof value === 'string') {
-						const providerIds = keyToProviders[key];
-						if (providerIds) {
-							for (const providerId of providerIds) {
-								formattedKeys[providerId] = value;
-							}
-						} else {
-							const provider = key.replace("Key", "");
-							formattedKeys[provider] = value;
-						}
-					}
-				}
-				setKeys(formattedKeys);
-			}
-		} catch (error) {
-			console.error("ApiKeyManager: Failed to load existing keys:", error);
-			setKeys({});
-		}
-	};
-
-	// Transform providers to table data
-	const data = useMemo((): ApiKeyItem[] => {
-		return providers
-			.filter((p) => p.requiresApiKey)
-			.map((provider) => {
-				const currentKey = keys[provider.id] || "";
-				const hasKey = Boolean(currentKey);
-				const status: "Active" | "Missing" | "Invalid" = hasKey ? "Active" : "Missing";
-
-				return {
-					id: provider.id as ProviderId,
-					name: provider.name,
-					icon: provider.icon,
-					placeholder: provider.placeholder,
-					currentKey,
-					hasKey,
-					status,
-					apiDocs: provider.apiDocs,
-				};
-			});
-	}, [providers, keys]);
-
-	// Check if any provider has apiDocs URLs
-	const hasAnyUrls = useMemo(() => {
-		return data.some(item => item.apiDocs);
-	}, [data]);
-
-	const handleSaveKey = async (provider: ProviderId, key: string) => {
-		const trimmedKey = key.trim();
-
-		if (!trimmedKey) {
-			await handleRemoveKey(provider);
-			return;
-		}
-
-		try {
-			const providerConfig = providers.find((p) => p.id === provider);
-			const providerName = providerConfig?.name || provider;
-			const keyName = providerConfig?.keyName;
-
-			if (!keyName) {
-				console.error(`ApiKeyManager: No keyName found for provider ${provider}`);
-				toast.error("Invalid provider configuration");
-				return;
-			}
-
 			if (isLoggedIn) {
-				await storeKeyMutation({ provider, apiKey: trimmedKey });
-				toast.success(`${providerName} API key saved securely`);
+				await removeKeyMutation({ provider: "llmgateway" as any });
 			} else {
-				const storageProviderKey = keyName.replace(/Key$/, '');
-				
-				if (useSessionStorage) {
-					await setSessionKey(storageProviderKey as ProviderId, trimmedKey);
-					toast.success(`${providerName} API key saved for this session`);
-				} else {
-					await setLocalKey(storageProviderKey as ProviderId, trimmedKey);
-					toast.success(`${providerName} API key saved locally (encrypted)`);
-				}
+				removeLocalKey("llmgateway");
+				removeSessionKey("llmgateway");
 			}
 
-			setKeys((prev) => ({ ...prev, [provider]: trimmedKey }));
+			setLlmGatewayKey("");
+			toast.success("LLM Gateway API key removed");
 
 			// Dispatch event to notify other components
 			window.dispatchEvent(new CustomEvent('apiKeysChanged'));
 		} catch (error) {
-			console.error("ApiKeyManager: Failed to save API key:", error);
-			toast.error("Failed to save API key");
-		}
-	};
-
-	const handleRemoveKey = async (provider: ProviderId) => {
-		try {
-			const providerConfig = providers.find((p) => p.id === provider);
-			const providerName = providerConfig?.name || provider;
-			const keyName = providerConfig?.keyName;
-
-			if (!keyName) {
-				console.error(`ApiKeyManager: No keyName found for provider ${provider}`);
-				toast.error("Invalid provider configuration");
-				return;
-			}
-
-			if (isLoggedIn) {
-				// Remove from Convex for logged users
-				await removeKeyMutation({ provider });
-			} else {
-				// Remove from local storage for non-logged users
-				removeLocalKey(keyName as ProviderId);
-				removeSessionKey(keyName as ProviderId);
-			}
-
-			setKeys((prev) => {
-				const newKeys = { ...prev };
-				delete newKeys[provider];
-				return newKeys;
-			});
-
-			toast.success(`${providerName} API key removed`);
-
-			// Dispatch event to notify other components
-			window.dispatchEvent(new CustomEvent('apiKeysChanged'));
-		} catch (error) {
-			console.error("ApiKeyManager: Failed to remove API key:", error);
+			console.error("Failed to remove API key:", error);
 			toast.error("Failed to remove API key");
 		}
 	};
 
-	const toggleKeyVisibility = (provider: ProviderId) => {
-		setShowKeys((prev) => ({ ...prev, [provider]: !prev[provider] }));
+	const toggleKeyVisibility = () => {
+		setShowKey((prev) => !prev);
 	};
 
-	const handleDeleteSelectedRows = () => {
-		// This function is no longer used since we removed checkboxes
-	};
-
-	// Table columns definition
-	const columns: ColumnDef<ApiKeyItem>[] = [
-		{
-			header: "Provider",
-			accessorKey: "name",
-			cell: ({ row }) => {
-				const IconComponent = row.original.icon;
-				return (
-					<div className="flex items-center gap-3 font-medium">
-						<IconComponent className="h-5 w-5" />
-						<span>{row.getValue("name")}</span>
-						<ProviderStatusIndicator providerName={row.original.name} />
-					</div>
-				);
-			},
-			size: 200,
-			filterFn: multiColumnFilterFn,
-			enableHiding: false,
-		},
-		{
-			header: "Status",
-			accessorKey: "status",
-			cell: ({ row }) => (
-				<Badge
-					className={cn(
-						row.getValue("status") === "Missing" &&
-							"bg-muted-foreground/60 text-primary-foreground",
-						row.getValue("status") === "Active" && "bg-green-600 text-white"
-					)}
-				>
-					{row.getValue("status")}
-				</Badge>
-			),
-			size: 100,
-			filterFn: statusFilterFn,
-		},
-		// Conditionally include Links column only if URLs are available
-		...(hasAnyUrls ? [{
-			header: "Links",
-			accessorKey: "apiDocs",
-			cell: ({ row }: { row: Row<ApiKeyItem> }) => {
-				const apiDocs = row.original.apiDocs;
-				
-				if (!apiDocs) {
-					return (
-						<div className="text-muted-foreground text-xs">
-							-
-						</div>
-					);
-				}
-
-				return (
-					<div className="flex gap-1">
-						<Button
-							variant="ghost"
-							size="sm"
-							className="h-8 w-8 p-0"
-							onClick={() => window.open(apiDocs, '_blank')}
-							title="API Documentation"
-						>
-							<ExternalLink className="h-4 w-4" />
-						</Button>
-					</div>
-				);
-			},
-			size: 80,
-			enableSorting: false,
-		}] : []),
-		{
-			header: "API Key",
-			accessorKey: "currentKey",
-			cell: ({ row }) => {
-				const provider = row.original.id;
-				const currentKey = row.original.currentKey;
-				const isVisible = showKeys[provider] || false;
-
-				return (
-					<div className="flex gap-2 items-center min-w-0">
-						<div className="relative flex-1 min-w-0">
-							<Input
-								type={isVisible ? "text" : "password"}
-								placeholder={row.original.placeholder}
-								value={currentKey}
-								onChange={(e) => {
-									const newValue = e.target.value;
-									setKeys((prev) => ({
-										...prev,
-										[provider]: newValue,
-									}));
-									
-									if (autoSaveTimersRef.current[provider]) {
-										clearTimeout(autoSaveTimersRef.current[provider]);
-									}
-									
-									if (newValue.trim() !== currentKey.trim()) {
-										unsavedChangesRef.current[provider] = newValue.trim();
-										
-										if (newValue.trim()) {
-											autoSaveTimersRef.current[provider] = setTimeout(() => {
-												handleSaveKey(provider, newValue.trim());
-												delete unsavedChangesRef.current[provider];
-												delete autoSaveTimersRef.current[provider];
-											}, 1500);
-										}
-									} else {
-										delete unsavedChangesRef.current[provider];
-									}
-								}}
-								onPaste={(e) => {
-									setTimeout(() => {
-										const value = e.currentTarget.value.trim();
-										if (value && value !== currentKey.trim()) {
-											handleSaveKey(provider, value);
-											delete unsavedChangesRef.current[provider];
-										}
-									}, 100);
-								}}
-								onBlur={(e) => {
-									const value = e.target.value.trim();
-									if (value !== currentKey.trim()) {
-										handleSaveKey(provider, value);
-										delete unsavedChangesRef.current[provider];
-									}
-								}}
-								onKeyDown={(e) => {
-									if (e.key === "Enter") {
-										const value = e.currentTarget.value.trim();
-										handleSaveKey(provider, value);
-										delete unsavedChangesRef.current[provider];
-									}
-								}}
-								className="pr-24 text-sm"
-							/>
-							<div className="absolute top-1/2 right-2 -translate-y-1/2 flex gap-1">
-								<Button
-									type="button"
-									variant="ghost"
-									size="sm"
-									className="h-6 w-6 p-0"
-									onClick={() => toggleKeyVisibility(provider)}
-								>
-									{isVisible ? (
-										<EyeOff className="size-3" />
-									) : (
-										<Eye className="size-3" />
-									)}
-								</Button>
-								{currentKey && (
-									<Button
-										type="button"
-										variant="ghost"
-										size="sm"
-										className="h-6 w-6 p-0 text-destructive hover:text-destructive"
-										onClick={() => handleRemoveKey(provider)}
-									>
-										<X className="size-3" />
-									</Button>
-								)}
-							</div>
-						</div>
-					</div>
-				);
-			},
-			size: 300,
-			enableSorting: false,
-		},
-	];
-
-	const table = useReactTable({
-		data,
-		columns,
-		getCoreRowModel: getCoreRowModel(),
-		getSortedRowModel: getSortedRowModel(),
-		onSortingChange: setSorting,
-		enableSortingRemoval: false,
-		getPaginationRowModel: getPaginationRowModel(),
-		onPaginationChange: setPagination,
-		onColumnFiltersChange: setColumnFilters,
-		onColumnVisibilityChange: setColumnVisibility,
-		getFilteredRowModel: getFilteredRowModel(),
-		getFacetedUniqueValues: getFacetedUniqueValues(),
-		state: {
-			sorting,
-			pagination,
-			columnFilters,
-			columnVisibility,
-		},
-	});
-
-	// Get unique status values
-	const uniqueStatusValues = useMemo(() => {
-		const statusColumn = table.getColumn("status");
-		if (!statusColumn) return [];
-		const values = Array.from(statusColumn.getFacetedUniqueValues().keys());
-		return values.sort();
-	}, [table.getColumn("status")?.getFacetedUniqueValues()]);
-
-	// Get counts for each status
-	const statusCounts = useMemo(() => {
-		const statusColumn = table.getColumn("status");
-		if (!statusColumn) return new Map();
-		return statusColumn.getFacetedUniqueValues();
-	}, [table.getColumn("status")?.getFacetedUniqueValues()]);
-
-	const selectedStatuses = useMemo(() => {
-		const filterValue = table.getColumn("status")?.getFilterValue() as string[];
-		return filterValue ?? [];
-	}, [table.getColumn("status")?.getFilterValue()]);
-
-	const handleStatusChange = (checked: boolean, value: string) => {
-		const filterValue = table.getColumn("status")?.getFilterValue() as string[];
-		const newFilterValue = filterValue ? [...filterValue] : [];
-
-		if (checked) {
-			newFilterValue.push(value);
-		} else {
-			const index = newFilterValue.indexOf(value);
-			if (index > -1) {
-				newFilterValue.splice(index, 1);
-			}
+	const handleKeyChange = async (value: string) => {
+		setLlmGatewayKey(value);
+		
+		// Auto-save when user types or pastes
+		const trimmedKey = value.trim();
+		
+		if (!trimmedKey) {
+			await handleRemoveKey();
+			return;
 		}
 
-		table
-			.getColumn("status")
-			?.setFilterValue(newFilterValue.length ? newFilterValue : undefined);
+		try {
+			if (isLoggedIn) {
+				await storeKeyMutation({ 
+					provider: "llmgateway" as any, 
+					apiKey: trimmedKey 
+				});
+			} else {
+				if (useSessionStorage) {
+					await setSessionKey("llmgateway", trimmedKey);
+				} else {
+					await setLocalKey("llmgateway", trimmedKey);
+				}
+			}
+
+			window.dispatchEvent(new CustomEvent('apiKeysChanged'));
+		} catch (error) {
+			console.error("Failed to save API key:", error);
+		}
 	};
 
 	if (isLoading) {
 		return (
 			<div className="rounded-lg border bg-card p-6">
-				<div className="text-center text-muted-foreground">Loading API keys...</div>
+				<div className="text-center text-muted-foreground">Loading API key...</div>
 			</div>
 		);
 	}
+
+	const hasKey = Boolean(llmGatewayKey);
+	const status = hasKey ? "Active" : "Missing";
 
 	return (
 		<div className="space-y-4">
 			<div className="mb-4">
 				<div className="mb-2 flex items-center gap-2">
 					<Key className="size-5" />
-					<h2 className="font-semibold text-xl">API Key Management</h2>
+					<h3 className="text-lg font-semibold">LLM Gateway API Key</h3>
 				</div>
 				<p className="mb-3 text-foreground text-sm">
-					{isLoggedIn
-						? "Your API keys are stored securely in your account and synced across devices."
-						: "Your API keys are encrypted and stored locally in your browser for privacy."}
+					Configure your LLM Gateway API key to access all supported AI models through a unified interface.
 				</p>
 
 				{!isLoggedIn && (
-					<div className="mt-3 rounded-lg bg-muted/50 p-3">
-						<div className="mb-2 flex items-center gap-2">
+					<div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-950">
+						<div className="flex items-center gap-2 text-amber-800 dark:text-amber-200">
+							<Key className="size-4" />
+							<span className="text-sm font-medium">Storage Options</span>
+						</div>
+						<p className="mt-1 text-amber-700 text-xs dark:text-amber-300">
+							Keys are stored locally. Use session storage for temporary use or local storage for persistence.
+						</p>
+						<div className="mt-2 flex items-center gap-2">
 							<input
 								type="checkbox"
 								id="session-storage"
@@ -644,283 +150,83 @@ export function ApiKeyManager() {
 								onChange={(e) => setUseSessionStorage(e.target.checked)}
 								className="rounded"
 							/>
-							<Label htmlFor="session-storage" className="text-sm">
-								Use session storage (keys deleted when browser closes)
-							</Label>
+							<label htmlFor="session-storage" className="text-amber-700 text-xs dark:text-amber-300">
+								Use session storage (temporary)
+							</label>
 						</div>
-						<p className="text-muted-foreground text-xs">
-							Recommended for shared computers. Uncheck to persist keys between sessions.
-						</p>
 					</div>
 				)}
 			</div>
 
-			{/* Filters */}
-			<div className="flex flex-wrap items-center justify-between gap-3">
-				<div className="flex items-center gap-3">
-					{/* Filter by provider name */}
-					<div className="relative">
-						<Input
-							id={`${id}-input`}
-							ref={inputRef}
-							className={cn(
-								"peer min-w-60 ps-9",
-								Boolean(table.getColumn("name")?.getFilterValue()) && "pe-9"
-							)}
-							value={(table.getColumn("name")?.getFilterValue() ?? "") as string}
-							onChange={(e) => table.getColumn("name")?.setFilterValue(e.target.value)}
-							placeholder="Filter by provider name..."
-							type="text"
-							aria-label="Filter by provider name"
-						/>
-						<div className="pointer-events-none absolute inset-y-0 start-0 flex items-center justify-center ps-3 text-muted-foreground/80 peer-disabled:opacity-50">
-							<Filter size={16} strokeWidth={2} aria-hidden="true" />
-						</div>
-						{Boolean(table.getColumn("name")?.getFilterValue()) && (
-							<button
-								className="absolute inset-y-0 end-0 flex h-full w-9 items-center justify-center rounded-e-lg text-muted-foreground/80 outline-offset-2 transition-colors hover:text-foreground focus:z-10 focus-visible:outline-2 focus-visible:outline-ring/70 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50"
-								aria-label="Clear filter"
-								onClick={() => {
-									table.getColumn("name")?.setFilterValue("");
-									if (inputRef.current) {
-										inputRef.current.focus();
-									}
-								}}
+			{/* LLM Gateway Key Configuration */}
+			<div className="rounded-lg border bg-card p-4">
+				<div className="flex items-center justify-between mb-3">
+					<div className="flex items-center gap-3">
+						<div className="flex items-center gap-2">
+							<span className="font-medium">LLM Gateway</span>
+							<Badge
+								className={cn(
+									status === "Missing" &&
+										"bg-muted-foreground/60 text-primary-foreground",
+									status === "Active" && "bg-green-600 text-white"
+								)}
 							>
-								<CircleX size={16} strokeWidth={2} aria-hidden="true" />
-							</button>
-						)}
+								{status}
+							</Badge>
+						</div>
 					</div>
-					{/* Filter by status */}
-					<Popover>
-						<PopoverTrigger asChild>
-							<Button variant="outline">
-								<Filter
-									className="-ms-1 me-2 opacity-60"
-									size={16}
-									strokeWidth={2}
-									aria-hidden="true"
-								/>
-								Status
-								{selectedStatuses.length > 0 && (
-									<span className="-me-1 ms-3 inline-flex h-5 max-h-full items-center rounded border border-border bg-background px-1 font-[inherit] text-[0.625rem] font-medium text-muted-foreground/70">
-										{selectedStatuses.length}
-									</span>
+					<div className="flex gap-1">
+						<Button
+							variant="ghost"
+							size="sm"
+							className="h-8 w-8 p-0"
+							onClick={() => window.open('https://docs.llmgateway.io', '_blank')}
+							title="API Documentation"
+						>
+							<ExternalLink className="h-4 w-4" />
+						</Button>
+					</div>
+				</div>
+
+				<div className="flex gap-2 items-center">
+					<div className="relative flex-1">
+						<Input
+							type={showKey ? "text" : "password"}
+							placeholder="Enter your LLM Gateway API key"
+							value={llmGatewayKey}
+							onChange={(e) => handleKeyChange(e.target.value)}
+							className="pr-20 text-sm"
+						/>
+						<div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1">
+							<Button
+								type="button"
+								variant="ghost"
+								size="sm"
+								className="h-6 w-6 p-0"
+								onClick={toggleKeyVisibility}
+								title={showKey ? "Hide key" : "Show key"}
+							>
+								{showKey ? (
+									<EyeOff className="h-3 w-3" />
+								) : (
+									<Eye className="h-3 w-3" />
 								)}
 							</Button>
-						</PopoverTrigger>
-						<PopoverContent className="min-w-36 p-3" align="start">
-							<div className="space-y-3">
-								<div className="text-xs font-medium text-muted-foreground">
-									Filters
-								</div>
-								<div className="space-y-3">
-									{uniqueStatusValues.map((value, i) => (
-										<div key={value} className="flex items-center gap-2">
-											<Checkbox
-												id={`${id}-${i}`}
-												checked={selectedStatuses.includes(value)}
-												onCheckedChange={(checked: boolean) =>
-													handleStatusChange(checked, value)
-												}
-											/>
-											<Label
-												htmlFor={`${id}-${i}`}
-												className="flex grow justify-between gap-2 font-normal"
-											>
-												{value}{" "}
-												<span className="ms-2 text-xs text-muted-foreground">
-													{statusCounts.get(value)}
-												</span>
-											</Label>
-										</div>
-									))}
-								</div>
-							</div>
-						</PopoverContent>
-					</Popover>
+						</div>
+					</div>
 				</div>
-			</div>
 
-			{/* Table */}
-			<div className="overflow-hidden rounded-lg border border-border bg-background">
-				<Table className="table-fixed">
-					<TableHeader>
-						{table.getHeaderGroups().map((headerGroup) => (
-							<TableRow key={headerGroup.id} className="hover:bg-transparent">
-								{headerGroup.headers.map((header) => {
-									return (
-										<TableHead
-											key={header.id}
-											style={{ width: `${header.getSize()}px` }}
-											className="h-11"
-										>
-											{header.isPlaceholder ? null : header.column.getCanSort() ? (
-												<div
-													className={cn(
-														header.column.getCanSort() &&
-															"flex h-full cursor-pointer select-none items-center justify-between gap-2"
-													)}
-													onClick={header.column.getToggleSortingHandler()}
-													onKeyDown={(e) => {
-														// Enhanced keyboard handling for sorting
-														if (
-															header.column.getCanSort() &&
-															(e.key === "Enter" || e.key === " ")
-														) {
-															e.preventDefault();
-															header.column.getToggleSortingHandler()?.(e);
-														}
-													}}
-													tabIndex={header.column.getCanSort() ? 0 : undefined}
-												>
-													{flexRender(
-														header.column.columnDef.header,
-														header.getContext()
-													)}
-													{{
-														asc: (
-															<ChevronUp
-																className="shrink-0 opacity-60"
-																size={16}
-																strokeWidth={2}
-																aria-hidden="true"
-															/>
-														),
-														desc: (
-															<ChevronDown
-																className="shrink-0 opacity-60"
-																size={16}
-																strokeWidth={2}
-																aria-hidden="true"
-															/>
-														),
-													}[header.column.getIsSorted() as string] ?? null}
-												</div>
-											) : (
-												flexRender(
-													header.column.columnDef.header,
-													header.getContext()
-												)
-											)}
-										</TableHead>
-									);
-								})}
-							</TableRow>
-						))}
-					</TableHeader>
-					<TableBody>
-						{table.getRowModel().rows?.length ? (
-							table.getRowModel().rows.map((row) => (
-								<TableRow key={row.id} data-state={row.getIsSelected() && "selected"}>
-									{row.getVisibleCells().map((cell) => (
-										<TableCell key={cell.id} className="py-3">
-											{flexRender(cell.column.columnDef.cell, cell.getContext())}
-										</TableCell>
-									))}
-								</TableRow>
-							))
-						) : (
-							<TableRow>
-								<TableCell colSpan={columns.length} className="h-24 text-center">
-									No API key providers found.
-								</TableCell>
-							</TableRow>
-						)}
-					</TableBody>
-				</Table>
-			</div>
-
-			{/* Pagination */}
-			<div className="flex items-center justify-between gap-8">
-				{/* Results per page */}
-				<div className="flex items-center gap-3">
-					<Label htmlFor={`${id}-pagination`} className="max-sm:sr-only">
-						Rows per page
-					</Label>
-					<Select
-						value={table.getState().pagination.pageSize.toString()}
-						onValueChange={(value) => {
-							table.setPageSize(Number(value));
-						}}
+				<p className="mt-2 text-xs text-muted-foreground">
+					Get your API key from{" "}
+					<a 
+						href="https://llmgateway.io" 
+						target="_blank" 
+						rel="noopener noreferrer"
+						className="underline hover:no-underline"
 					>
-						<SelectTrigger id={`${id}-pagination`} className="w-fit whitespace-nowrap">
-							<SelectValue placeholder="Select number of results" />
-						</SelectTrigger>
-						<SelectContent>
-							{[5, 10, 25, 50].map((pageSize) => (
-								<SelectItem key={pageSize} value={pageSize.toString()}>
-									{pageSize}
-								</SelectItem>
-							))}
-						</SelectContent>
-					</Select>
-				</div>
-				{/* Page number information */}
-				<div className="flex grow justify-end whitespace-nowrap text-sm text-muted-foreground">
-					<p className="whitespace-nowrap text-sm text-muted-foreground" aria-live="polite">
-						<span className="text-foreground">
-							{table.getState().pagination.pageIndex *
-								table.getState().pagination.pageSize +
-								1}
-							-
-							{Math.min(
-								Math.max(
-									table.getState().pagination.pageIndex *
-										table.getState().pagination.pageSize +
-										table.getState().pagination.pageSize,
-									0
-								),
-								table.getRowCount()
-							)}
-						</span>{" "}
-						of <span className="text-foreground">{table.getRowCount().toString()}</span>
-					</p>
-				</div>
-
-				{/* Pagination buttons */}
-				<div>
-					<Pagination>
-						<PaginationContent>
-							{/* Previous page button */}
-							<PaginationItem>
-								<Button
-									size="icon"
-									variant="outline"
-									className="disabled:pointer-events-none disabled:opacity-50"
-									onClick={() => table.previousPage()}
-									disabled={!table.getCanPreviousPage()}
-									aria-label="Go to previous page"
-								>
-									<ChevronDown
-										className="rotate-90"
-										size={16}
-										strokeWidth={2}
-										aria-hidden="true"
-									/>
-								</Button>
-							</PaginationItem>
-							{/* Next page button */}
-							<PaginationItem>
-								<Button
-									size="icon"
-									variant="outline"
-									className="disabled:pointer-events-none disabled:opacity-50"
-									onClick={() => table.nextPage()}
-									disabled={!table.getCanNextPage()}
-									aria-label="Go to next page"
-								>
-									<ChevronDown
-										className="-rotate-90"
-										size={16}
-										strokeWidth={2}
-										aria-hidden="true"
-									/>
-								</Button>
-							</PaginationItem>
-						</PaginationContent>
-					</Pagination>
-				</div>
+						llmgateway.io
+					</a>
+				</p>
 			</div>
 		</div>
 	);

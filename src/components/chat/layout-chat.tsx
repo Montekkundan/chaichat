@@ -6,7 +6,7 @@ import { SettingsDialog } from "~/components/settings-dialog";
 import  ThemeToggle from "~/components/ui/theme-toggle";
 import { useSidebar } from "~/components/ui/sidebar";
 
-export function LayoutChat({ children }: { children: React.ReactNode }) {
+export function LayoutMain({ children }: { children: React.ReactNode }) {
 	const { state } = useSidebar();
 	const collapsed = state === "collapsed";
 	const [settingsOpen, setSettingsOpen] = useState(false);
@@ -51,7 +51,7 @@ export function LayoutChat({ children }: { children: React.ReactNode }) {
 			
 			{/* Settings and Theme Toggle Bar */}
 			<div className="fixed top-2 right-2 z-50 max-sm:hidden">
-				<div className="flex flex-row items-center gap-0.5 rounded-md rounded-bl-xl bg-sidebar p-1 text-muted-foreground transition-all">
+				<div className="flex flex-row items-center gap-0.5 rounded-md rounded-bl-xl bg-sidebar text-muted-foreground transition-all">
 					<button
 						type="button"
 						aria-label="Open settings"

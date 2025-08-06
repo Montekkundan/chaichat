@@ -1,43 +1,13 @@
 import { mutation, query, action } from "./_generated/server";
 import { v } from "convex/values";
 
-// Simplified API key storage for logged-in users only
-// Keys are stored in plaintext since we removed expensive AWS KMS
+// Simplified API key storage for LLM Gateway only
+// Keys are stored in plaintext for simplicity
 // For non-logged users, keys will be stored in localStorage/sessionStorage
 
 export const storeKey = mutation({
   args: {
-    provider: v.union(
-      v.literal("openai"),
-      v.literal("anthropic"),
-      v.literal("google"),
-      v.literal("mistral"),
-      v.literal("xai"),
-      v.literal("perplexity"),
-      v.literal("deepinfra"),
-      v.literal("deepseek"),
-      v.literal("groq"),
-      v.literal("huggingface"),
-      v.literal("requesty"),
-      v.literal("githubModels"),
-      v.literal("githubCopilot"),
-      v.literal("inference"),
-      v.literal("together"),
-      v.literal("aws"),
-      v.literal("openrouter"),
-      v.literal("alibaba"),
-      v.literal("fireworks"),
-      v.literal("venice"),
-      v.literal("llama"),
-      v.literal("morph"),
-      v.literal("vercel"),
-      v.literal("upstage"),
-      v.literal("v0"),
-      v.literal("azure"),
-      v.literal("wandb"),
-      v.literal("exa"),
-      v.literal("firecrawl")
-    ),
+    provider: v.literal("llmgateway"),
     apiKey: v.string(),
   },
   handler: async (ctx, { provider, apiKey }) => {
@@ -57,13 +27,13 @@ export const storeKey = mutation({
     if (existingUser) {
       // Update existing user
       await ctx.db.patch(existingUser._id, {
-        [`${provider}Key`]: apiKey,
+        llmGatewayApiKey: apiKey,
       });
     } else {
       // Create new user record
       await ctx.db.insert("users", {
         userId,
-        [`${provider}Key`]: apiKey,
+        llmGatewayApiKey: apiKey,
       });
     }
   },
@@ -94,74 +64,16 @@ export const getKeys = action({
       return {};
     }
 
-    // Return keys directly (no decryption needed)
+    // Return LLM Gateway key only
     return {
-      openaiKey: user.openaiKey,
-      anthropicKey: user.anthropicKey,
-      googleKey: user.googleKey,
-      mistralKey: user.mistralKey,
-      xaiKey: user.xaiKey,
-      perplexityKey: user.perplexityKey,
-      deepinfraKey: user.deepinfraKey,
-      deepseekKey: user.deepseekKey,
-      groqKey: user.groqKey,
-      huggingfaceKey: user.huggingfaceKey,
-      requestyKey: user.requestyKey,
-      githubModelsKey: user.githubModelsKey,
-      githubCopilotKey: user.githubCopilotKey,
-      inferenceKey: user.inferenceKey,
-      togetherKey: user.togetherKey,
-      awsKey: user.awsKey,
-      openrouterKey: user.openrouterKey,
-      alibabaKey: user.alibabaKey,
-      fireworksKey: user.fireworksKey,
-      veniceKey: user.veniceKey,
-      llamaKey: user.llamaKey,
-      morphKey: user.morphKey,
-      vercelKey: user.vercelKey,
-      upstageKey: user.upstageKey,
-      v0Key: user.v0Key,
-      azureKey: user.azureKey,
-      exaKey: user.exaKey,
-      firecrawlKey: user.firecrawlKey,
-      wandbKey: user.wandbKey,
+      llmGatewayApiKey: user.llmGatewayApiKey,
     };
   },
 });
 
 export const removeKey = mutation({
   args: {
-    provider: v.union(
-      v.literal("openai"),
-      v.literal("anthropic"),
-      v.literal("google"),
-      v.literal("mistral"),
-      v.literal("xai"),
-      v.literal("perplexity"),
-      v.literal("deepinfra"),
-      v.literal("deepseek"),
-      v.literal("groq"),
-      v.literal("huggingface"),
-      v.literal("requesty"),
-      v.literal("githubModels"),
-      v.literal("githubCopilot"),
-      v.literal("inference"),
-      v.literal("together"),
-      v.literal("aws"),
-      v.literal("openrouter"),
-      v.literal("alibaba"),
-      v.literal("fireworks"),
-      v.literal("venice"),
-      v.literal("llama"),
-      v.literal("morph"),
-      v.literal("vercel"),
-      v.literal("upstage"),
-      v.literal("v0"),
-      v.literal("azure"),
-      v.literal("wandb"),
-      v.literal("exa"),
-      v.literal("firecrawl")
-    ),
+    provider: v.literal("llmgateway"),
   },
   handler: async (ctx, { provider }) => {
     const identity = await ctx.auth.getUserIdentity();
@@ -177,7 +89,7 @@ export const removeKey = mutation({
 
     if (user) {
       await ctx.db.patch(user._id, {
-        [`${provider}Key`]: undefined,
+        llmGatewayApiKey: undefined,
       });
     }
   },
@@ -194,35 +106,7 @@ export const getUserKeysForAPI = action({
     }
 
     return {
-      openaiKey: user.openaiKey,
-      anthropicKey: user.anthropicKey,
-      googleKey: user.googleKey,
-      mistralKey: user.mistralKey,
-      xaiKey: user.xaiKey,
-      perplexityKey: user.perplexityKey,
-      deepinfraKey: user.deepinfraKey,
-      deepseekKey: user.deepseekKey,
-      groqKey: user.groqKey,
-      huggingfaceKey: user.huggingfaceKey,
-      requestyKey: user.requestyKey,
-      githubModelsKey: user.githubModelsKey,
-      githubCopilotKey: user.githubCopilotKey,
-      inferenceKey: user.inferenceKey,
-      togetherKey: user.togetherKey,
-      awsKey: user.awsKey,
-      openrouterKey: user.openrouterKey,
-      alibabaKey: user.alibabaKey,
-      fireworksKey: user.fireworksKey,
-      veniceKey: user.veniceKey,
-      llamaKey: user.llamaKey,
-      morphKey: user.morphKey,
-      vercelKey: user.vercelKey,
-      upstageKey: user.upstageKey,
-      v0Key: user.v0Key,
-      azureKey: user.azureKey,
-      exaKey: user.exaKey,
-      firecrawlKey: user.firecrawlKey,
-      wandbKey: user.wandbKey,
+      llmGatewayApiKey: user.llmGatewayApiKey,
     };
   },
 }); 

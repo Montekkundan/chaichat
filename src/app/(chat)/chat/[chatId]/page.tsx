@@ -1,6 +1,6 @@
 import { currentUser } from "@clerk/nextjs/server";
 import Chat from "~/components/chat/chat";
-import { LayoutChat } from "~/components/chat/layout-chat";
+import { LayoutMain } from "~/components/chat/layout-chat";
 import { MessagesProvider } from "~/lib/providers/messages-provider";
 
 export default async function Page({
@@ -16,10 +16,10 @@ export default async function Page({
 	const firstName = user?.firstName || undefined;
 
 	return (
-		<LayoutChat>
+		<LayoutMain>
 			<MessagesProvider chatId={chatId}>
 				<Chat initialName={firstName} />
 			</MessagesProvider>
-		</LayoutChat>
+		</LayoutMain>
 	);
 }

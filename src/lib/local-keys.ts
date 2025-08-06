@@ -1,10 +1,7 @@
-export type ProviderId = "openai" | "anthropic" | "google" | "mistral";
+export type ProviderId = "llmgateway";
 
 export interface UserKeys {
-	openaiKey?: string;
-	anthropicKey?: string;
-	googleKey?: string;
-	mistralKey?: string;
+	llmGatewayApiKey?: string;
 }
 
 const LOCAL_KEYS_PREFIX = "chaichat_keys_";
@@ -91,20 +88,14 @@ export function removeSessionKey(provider: ProviderId): void {
 // Get all local keys
 export function getAllLocalKeys(): UserKeys {
 	return {
-		openaiKey: getLocalKey("openai"),
-		anthropicKey: getLocalKey("anthropic"),
-		googleKey: getLocalKey("google"),
-		mistralKey: getLocalKey("mistral"),
+		llmGatewayApiKey: getLocalKey("llmgateway"),
 	};
 }
 
 // Get all session keys
 export function getAllSessionKeys(): UserKeys {
 	return {
-		openaiKey: getSessionKey("openai"),
-		anthropicKey: getSessionKey("anthropic"),
-		googleKey: getSessionKey("google"),
-		mistralKey: getSessionKey("mistral"),
+		llmGatewayApiKey: getSessionKey("llmgateway"),
 	};
 }
 
@@ -114,16 +105,13 @@ export function getAllKeys(): UserKeys {
 	const sessionKeys = getAllSessionKeys();
 
 	return {
-		openaiKey: sessionKeys.openaiKey || localKeys.openaiKey,
-		anthropicKey: sessionKeys.anthropicKey || localKeys.anthropicKey,
-		googleKey: sessionKeys.googleKey || localKeys.googleKey,
-		mistralKey: sessionKeys.mistralKey || localKeys.mistralKey,
+		llmGatewayApiKey: sessionKeys.llmGatewayApiKey || localKeys.llmGatewayApiKey,
 	};
 }
 
 // Clear all keys from both storages
 export function clearAllKeys(): void {
-	const providers: ProviderId[] = ["openai", "anthropic", "google", "mistral"];
+	const providers: ProviderId[] = ["llmgateway"];
 
 	for (const provider of providers) {
 		removeLocalKey(provider);
