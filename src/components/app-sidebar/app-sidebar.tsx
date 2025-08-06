@@ -2,18 +2,16 @@
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { useUser } from "@clerk/nextjs";
-import { FilesIcon, HouseLineIcon } from "@phosphor-icons/react";
+import { CashRegisterIcon, FilesIcon, HouseLineIcon } from "@phosphor-icons/react";
 import { useMutation } from "convex/react";
 import {
 	BookOpen,
-	// Settings,
 	Bot,
 	Frame,
 	MessageSquare,
 	Plus,
 	Settings2,
 	SquareTerminal,
-	// User,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -141,8 +139,10 @@ export function AppSidebar({
 			// 	onClick: () => router.push("/playground"),
 			// },
 			// {
-			// 	title: "Tasks",
-			// 	icon: List,
+			// 	title: "Registry",
+			// 	icon: <CashRegisterIcon size={16} />,
+			// 	activeIcon: <CashRegisterIcon size={16} weight="duotone" />,
+			// 	onClick: () => router.push("/registry"),
 			// },
 		],
 		navMain: [

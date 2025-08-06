@@ -10,7 +10,6 @@ function loadGoogleFont(fontFamily: string, weights: string[] = ["400"]) {
 	if (existing) {
 		document.fonts.ready.then(() => {
 			document.fonts.load(`400 16px "${fontFamily}"`).catch(() => {
-				// Silently handle font loading errors
 			});
 		});
 		return;
@@ -25,11 +24,9 @@ function loadGoogleFont(fontFamily: string, weights: string[] = ["400"]) {
 			document.fonts
 				.load(`400 16px "${fontFamily}"`)
 				.then(() => {
-					// Force a style recalculation to apply the new font
 					document.body.style.fontFamily = document.body.style.fontFamily || "";
 				})
 				.catch(() => {
-					// Silently handle font loading errors
 				});
 		});
 	};
@@ -37,7 +34,6 @@ function loadGoogleFont(fontFamily: string, weights: string[] = ["400"]) {
 	document.head.appendChild(link);
 }
 
-// Helper function to extract font family name from font-family value
 function extractFontFamily(fontFamilyValue: string): string | null {
 	if (!fontFamilyValue) return null;
 	const firstFont = fontFamilyValue.split(",")[0]?.trim();
@@ -116,10 +112,8 @@ export interface TweakcnStyles {
 	spacing: string;
 }
 
-// Helper function to apply a single style to an element
 function applyStyleToElement(element: HTMLElement, key: string, value: string) {
 	const currentStyle = element.getAttribute("style") || "";
-	// Remove the existing variable definitions with the same name
 	const cleanedStyle = currentStyle
 		.replace(new RegExp(`--${key}:\\s*[^;]+;?`, "g"), "")
 		.trim();
@@ -127,7 +121,6 @@ function applyStyleToElement(element: HTMLElement, key: string, value: string) {
 	element.setAttribute("style", `${cleanedStyle}--${key}: ${value};`);
 }
 
-// Helper function to update theme class
 function updateThemeClass(root: HTMLElement, mode: "light" | "dark") {
 	if (mode === "light") {
 		root.classList.remove("dark");
@@ -136,7 +129,6 @@ function updateThemeClass(root: HTMLElement, mode: "light" | "dark") {
 	}
 }
 
-// Track if we're in a reset state to prevent re-applying themes
 let isResetting = false;
 let lastAppliedTime = 0;
 let lastThemeState: TweakcnThemeState | null = null;
@@ -152,14 +144,12 @@ export function applyTweakcnTheme(
 
 	const now = Date.now();
 
-	// Check if this is just a mode change (light/dark toggle)
 	const isModeChangeOnly =
 		lastThemeState &&
 		lastThemeState.preset === themeState.preset &&
 		lastThemeState.currentMode !== themeState.currentMode &&
 		JSON.stringify(lastThemeState.styles) === JSON.stringify(themeState.styles);
 
-	// Allow instant updates for mode changes or when explicitly requested
 	if (
 		!bypassThrottle &&
 		!isModeChangeOnly &&
@@ -175,7 +165,6 @@ export function applyTweakcnTheme(
 
 	if (!root) return;
 
-	// Apply mode-specific styles
 	const currentStyles = themeStyles[mode];
 	for (const [key, value] of Object.entries(currentStyles)) {
 		if (typeof value === "string") {
@@ -183,7 +172,6 @@ export function applyTweakcnTheme(
 		}
 	}
 
-	// Only load fonts if this is not just a mode change (to prevent jitter)
 	if (!isModeChangeOnly) {
 		try {
 			if (currentStyles) {
@@ -217,7 +205,6 @@ export function applyTweakcnTheme(
 					}
 				}
 
-				// Force font refresh after loading (only for new themes, not mode changes)
 				Promise.all(fontPromises).then(() => {
 					setTimeout(() => {
 						const fontSansValue = currentStyles["font-sans"];
@@ -253,7 +240,6 @@ export function applyTweakcnTheme(
 		}
 	}
 
-	// Store the applied theme info
 	localStorage.setItem("chai-tweakcn-theme", JSON.stringify(themeState));
 }
 
@@ -271,7 +257,6 @@ export function getStoredTweakcnTheme(): TweakcnThemeState | null {
 	}
 }
 
-// Custom event for theme reset
 const THEME_RESET_EVENT = "tweakcn-theme-reset";
 
 export const TWEAKCN_THEME_RESET_EVENT = THEME_RESET_EVENT;
@@ -284,6 +269,7 @@ export function resetToDefaultTheme() {
 	const root = document.documentElement;
 
 	localStorage.removeItem("chai-tweakcn-theme");
+	localStorage.removeItem("chai-tweakcn-theme-url");
 	root.removeAttribute("style");
 
 	window.dispatchEvent(new CustomEvent(THEME_RESET_EVENT));
@@ -291,6 +277,9 @@ export function resetToDefaultTheme() {
 	setTimeout(() => {
 		if (localStorage.getItem("chai-tweakcn-theme")) {
 			localStorage.removeItem("chai-tweakcn-theme");
+		}
+		if (localStorage.getItem("chai-tweakcn-theme-url")) {
+			localStorage.removeItem("chai-tweakcn-theme-url");
 		}
 		isResetting = false;
 	}, 500);

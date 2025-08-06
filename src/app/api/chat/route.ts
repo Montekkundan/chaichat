@@ -1,6 +1,11 @@
-import { convertToModelMessages, streamText, type UIMessage } from "ai";
-import { createDynamicProvider } from "~/lib/openproviders";
-import { getProviderKeyMap } from "~/lib/models/providers";
+import { convertToModelMessages, generateText, streamText, type UIMessage } from "ai";
+import { createLLMGateway, llmgateway } from "@llmgateway/ai-sdk-provider";
+import { currentUser } from "@clerk/nextjs/server";
+import { ConvexHttpClient } from "convex/browser";
+import { api } from "@/convex/_generated/api";
+import { env } from "../../../env";
+
+const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
 export const maxDuration = 60;
 
@@ -12,34 +17,9 @@ type ChatRequest = {
 	userApiKeys?: Record<string, string | undefined>;
 };
 
-function extractProviderFromModelId(modelId: string): string | null {
-	try {
-		const fs = require('fs');
-		const path = require('path');
-		const modelsPath = path.join(process.cwd(), 'public', 'models.json');
-		
-		if (fs.existsSync(modelsPath)) {
-			const modelsData = JSON.parse(fs.readFileSync(modelsPath, 'utf8'));
-			const { filterModelsJsonByTested } = require('~/lib/models/tested-providers');
-			const filteredData = filterModelsJsonByTested(modelsData);
-			const model = filteredData?.models?.find((m: any) => m.id === modelId);
-			
-			if (model?.provider) {
-				return model.provider
-					.toLowerCase()
-					.replace(/[^a-z0-9]/g, '-')
-					.replace(/-+/g, '-')
-					.replace(/^-|-$/g, '');
-			}
-		}
-	} catch (error) {
-		console.warn('Failed to extract provider from models.json:', error);
-	}
-	
-	return null;
-}
-
 export async function POST(req: Request) {
+	let modelToUse = "openai/gpt-4o";
+	
 	try {
 		const body = await req.json();
 		
@@ -58,40 +38,67 @@ export async function POST(req: Request) {
 			);
 		}
 
-		const providerId = extractProviderFromModelId(model);
-		const keyMap = await getProviderKeyMap();
-		const keyField = keyMap[providerId || ""];
-		const apiKey = keyField ? userApiKeys[keyField] : undefined;
-		const modelInstance = await createDynamicProvider(model, apiKey);
+		const convertedMessages = convertToModelMessages(messages);
 		
-		if (!modelInstance) {
+		modelToUse = model || "openai/gpt-4o";
+
+		let apiKey: string | undefined;
+		
+		if (userApiKeys?.llmGatewayApiKey) {
+			apiKey = userApiKeys.llmGatewayApiKey;
+		} else {
+			try {
+				const user = await currentUser();
+				if (user?.id) {
+					const convexKeys = await convex.action(api.userKeys.getUserKeysForAPI, { 
+						userId: user.id 
+					});
+					if (convexKeys?.llmGatewayApiKey) {
+						apiKey = convexKeys.llmGatewayApiKey;
+					}
+				}
+			} catch (error) {
+				console.warn("Failed to get user API key from Convex:", error);
+			}
+		}
+
+		if (!apiKey) {
 			return new Response(
-				JSON.stringify({ error: `Failed to create model instance for: ${model}` }),
-				{ status: 500, headers: { "Content-Type": "application/json" } }
+				JSON.stringify({ 
+					error: "No LLM Gateway API key configured. Please add your API key in settings.",
+					code: "NO_API_KEY"
+				}),
+				{ status: 401, headers: { "Content-Type": "application/json" } }
 			);
 		}
 
-		const convertedMessages = convertToModelMessages(messages);
+		const llmGatewayProvider = createLLMGateway({
+			apiKey: apiKey,
+			compatibility: 'strict'
+		});
 		
-		if (providerId === "google" && (!convertedMessages || convertedMessages.length === 0)) {
-			return new Response(
-				JSON.stringify({ error: "No valid messages provided for Google Gemini" }),
-				{ status: 400, headers: { "Content-Type": "application/json" } }
-			);
-		}
-		
-		const result = streamText({
-			model: modelInstance,
+		const response = await streamText({
+			model: llmGatewayProvider(modelToUse),
 			system,
 			messages: convertedMessages,
 			temperature,
 		});
-		
-		return result.toUIMessageStreamResponse();
-		
+
+		return response.toUIMessageStreamResponse();
+
 	} catch (err: unknown) {
 		console.error("Chat API error:", err);
 		const errorMessage = err instanceof Error ? err.message : "Unknown error occurred";
+		
+		if (errorMessage.includes("not supported") || errorMessage.includes("Bad Request")) {
+			return new Response(
+				JSON.stringify({ 
+					error: `Model "${modelToUse}" is not supported by the LLM Gateway. Please select a different model.`,
+					code: "MODEL_NOT_SUPPORTED"
+				}),
+				{ status: 400, headers: { "Content-Type": "application/json" } }
+			);
+		}
 		
 		if (errorMessage.includes("429") || errorMessage.includes("rate limit")) {
 			return new Response(

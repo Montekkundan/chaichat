@@ -15,6 +15,7 @@ import {
 } from "react";
 import { toast } from "~/components/ui/toast";
 import { type Chat, type Message, db } from "~/db";
+import { getSelectedModel, setSelectedModel } from "~/lib/local-model-storage";
 
 interface CacheContextType {
 	chats: Chat[];
@@ -50,6 +51,10 @@ interface CacheContextType {
 	}) => Promise<string>;
 	switchMessageVersion: (messageId: string) => Promise<void>;
 	markAsOriginalVersion: (messageId: string) => Promise<void>;
+
+	// Model persistence
+	getDefaultModel: () => string | null;
+	setDefaultModel: (modelId: string, providerId?: string) => void;
 
 	// Cache state
 	isLoading: boolean;
@@ -410,12 +415,6 @@ export function CacheProvider({
 				} catch {
 					/* ignore */
 				}
-
-				console.log(
-					`Deleted chat ${chatId} and ${messagesToDelete.length} messages`,
-				);
-
-				// If user is currently viewing this chat, redirect home
 				if (
 					typeof window !== "undefined" &&
 					window.location.pathname.includes(chatId)
@@ -924,6 +923,16 @@ export function CacheProvider({
 		}
 	}, [user?.id]);
 
+	// Model persistence functions
+	const getDefaultModel = useCallback((): string | null => {
+		const savedModel = getSelectedModel();
+		return savedModel?.modelId || null;
+	}, []);
+
+	const setDefaultModel = useCallback((modelId: string, providerId?: string): void => {
+		setSelectedModel(modelId, providerId);
+	}, []);
+
 	return (
 		<CacheContext.Provider
 			value={{
@@ -937,6 +946,8 @@ export function CacheProvider({
 				addMessage,
 				switchMessageVersion,
 				markAsOriginalVersion,
+				getDefaultModel,
+				setDefaultModel,
 				isLoading,
 				isSyncing,
 				refreshCache,

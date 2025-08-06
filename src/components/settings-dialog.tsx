@@ -6,7 +6,6 @@ import * as React from "react";
 
 import { useTheme } from "next-themes";
 import { ApiKeyManager } from "~/components/api-key-manager";
-import { ProviderDebugPanel } from "~/components/debug/provider-debug-panel";
 import { Button } from "~/components/ui/button";
 import {
 	Dialog,
@@ -40,11 +39,10 @@ const data = {
 	nav: [
 		{ name: "API Keys", icon: Key, id: "api-keys" },
 		{ name: "Appearance", icon: GearIcon, id: "appearance" },
-		{ name: "Developer", icon: Bug, id: "developer" },
 	],
 };
 
-type SettingsSection = "api-keys" | "appearance" | "developer";
+type SettingsSection = "api-keys" | "appearance";
 
 export function SettingsDialog({
 	open,
@@ -61,13 +59,39 @@ export function SettingsDialog({
 	const [isTweakcnActive, setIsTweakcnActive] = React.useState(false);
 	const [themeUrl, setThemeUrl] = React.useState("");
 	const [isLoading, setIsLoading] = React.useState(false);
+	const [isRestoringUrl, setIsRestoringUrl] = React.useState(true);
+	const [isUserAction, setIsUserAction] = React.useState(false);
 
 	const apiKeyManagerComponent = React.useMemo(() => <ApiKeyManager />, []);
 
 	React.useEffect(() => {
-		const storedTheme = getStoredTweakcnTheme();
-		setTweakcnTheme(storedTheme);
-		setIsTweakcnActive(isTweakcnThemeActive());
+		// Let the theme provider handle initial restoration
+		// Just sync the component state with what's stored
+		const syncWithStoredTheme = () => {
+			const storedTheme = getStoredTweakcnTheme();
+			const isActive = isTweakcnThemeActive();
+			
+			setTweakcnTheme(storedTheme);
+			setIsTweakcnActive(isActive);
+			
+			// Restore the theme URL from localStorage if available
+			try {
+				const storedUrl = localStorage.getItem("chai-tweakcn-theme-url");
+				if (storedUrl && storedTheme) {
+					setThemeUrl(storedUrl);
+				}
+			} catch (error) {
+				console.error("Failed to restore theme URL:", error);
+			}
+			
+			// Mark restoration as complete
+			setIsRestoringUrl(false);
+		};
+
+		// Initial sync after a brief delay to let theme provider initialize
+		const timeoutId = setTimeout(syncWithStoredTheme, 150);
+
+		return () => clearTimeout(timeoutId);
 	}, []);
 
 	React.useEffect(() => {
@@ -112,6 +136,7 @@ export function SettingsDialog({
 		}
 
 		setIsLoading(true);
+		setIsUserAction(true); // Mark as user action
 		try {
 			const theme = await fetchTweakcnTheme(themeUrl);
 			if (theme) {
@@ -122,6 +147,14 @@ export function SettingsDialog({
 				setTweakcnTheme(syncedTheme);
 				applyTweakcnTheme(syncedTheme);
 				setIsTweakcnActive(true);
+				
+				// Persist the theme URL
+				try {
+					localStorage.setItem("chai-tweakcn-theme-url", themeUrl);
+				} catch (error) {
+					console.error("Failed to store theme URL:", error);
+				}
+				
 				toast({ title: "Theme fetched and applied!", status: "success" });
 			} else {
 				toast({
@@ -136,15 +169,24 @@ export function SettingsDialog({
 			});
 		} finally {
 			setIsLoading(false);
+			setIsUserAction(false); // Reset the flag
 		}
 	};
 
 	React.useEffect(() => {
+		// Don't process empty URLs during restoration phase
 		if (!themeUrl.trim()) {
-			if (tweakcnTheme) {
+			// Only reset theme if we're not in the restoration phase and there was a theme active
+			if (!isRestoringUrl && tweakcnTheme) {
 				resetToDefaultTheme();
 				setTweakcnTheme(null);
 				setIsTweakcnActive(false);
+				// Also clear the stored URL
+				try {
+					localStorage.removeItem("chai-tweakcn-theme-url");
+				} catch (error) {
+					console.error("Failed to clear theme URL:", error);
+				}
 				toast({ title: "Theme reset to default", status: "success" });
 			}
 			return;
@@ -166,25 +208,41 @@ export function SettingsDialog({
 					setTweakcnTheme(syncedTheme);
 					applyTweakcnTheme(syncedTheme);
 					setIsTweakcnActive(true);
-					toast({ title: "Theme automatically applied!", status: "success" });
+					
+					// Persist the theme URL
+					try {
+						localStorage.setItem("chai-tweakcn-theme-url", themeUrl);
+					} catch (error) {
+						console.error("Failed to store theme URL:", error);
+					}
+					
+					// Only show toast for user-initiated actions, not during restoration
+					if (isUserAction) {
+						toast({ title: "Theme automatically applied!", status: "success" });
+					}
 				} else {
+					if (isUserAction) {
+						toast({
+							title: "Failed to fetch theme - invalid JSON response",
+							status: "error",
+						});
+					}
+				}
+			} catch (error) {
+				if (isUserAction) {
 					toast({
-						title: "Failed to fetch theme - invalid JSON response",
+						title: "Error fetching theme - please check the URL",
 						status: "error",
 					});
 				}
-			} catch (error) {
-				toast({
-					title: "Error fetching theme - please check the URL",
-					status: "error",
-				});
 			} finally {
 				setIsLoading(false);
+				setIsUserAction(false); // Reset the flag
 			}
 		}, 1000);
 
 		return () => clearTimeout(timeoutId);
-	}, [themeUrl, resolvedTheme, tweakcnTheme]);
+	}, [themeUrl, resolvedTheme, isRestoringUrl]); // Added isRestoringUrl, removed tweakcnTheme to prevent infinite loop
 
 	const handleApplyTweakcnTheme = () => {
 		if (tweakcnTheme) {
@@ -204,6 +262,18 @@ export function SettingsDialog({
 
 	const handleResetTheme = () => {
 		resetToDefaultTheme();
+		setTweakcnTheme(null);
+		setIsTweakcnActive(false);
+		setThemeUrl("");
+		setIsRestoringUrl(false); // Ensure we're not in restoration mode
+		
+		// Clear the stored URL
+		try {
+			localStorage.removeItem("chai-tweakcn-theme-url");
+		} catch (error) {
+			console.error("Failed to clear theme URL:", error);
+		}
+		
 		toast({ title: "Theme reset to default", status: "success" });
 	};
 
@@ -304,7 +374,10 @@ export function SettingsDialog({
 											id="theme-url"
 											placeholder="https://tweakcn.com/r/themes/twitter.json"
 											value={themeUrl}
-											onChange={(e) => setThemeUrl(e.target.value)}
+											onChange={(e) => {
+												setThemeUrl(e.target.value);
+												setIsUserAction(true); // Mark as user action
+											}}
 											className="flex-1"
 										/>
 										{isLoading && (
@@ -334,23 +407,6 @@ export function SettingsDialog({
 									)}
 								</div>
 							</div>
-						</div>
-					</div>
-				);
-			case "developer":
-				return (
-					<div className="space-y-6">
-						<div>
-							<h3 className="font-semibold text-lg">Developer Tools</h3>
-							<p
-								className="text-sm"
-								style={{ color: "var(--foreground)", opacity: 0.8 }}
-							>
-								Debug and development utilities
-							</p>
-						</div>
-						<div className="space-y-4">
-							<ProviderDebugPanel />
 						</div>
 					</div>
 				);

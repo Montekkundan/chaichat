@@ -19,7 +19,7 @@ type ConversationProps = {
 
 const getTextContent = (parts: MessageType["parts"]) => {
 	if (!parts || !Array.isArray(parts)) {
-		console.log("No parts or parts is not an array:", parts);
+		console.warn("No parts or parts is not an array:", parts);
 		return "";
 	}
 	const textParts = parts.filter((part) => part.type === "text");

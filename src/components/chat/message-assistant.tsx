@@ -9,7 +9,6 @@ import {
 	MessageContent,
 } from "~/components/prompt-kit/message";
 import { cn } from "~/lib/utils";
-import { formatModelAndProvider } from "~/lib/models/model-info";
 import { Reasoning } from "./reasoning";
 import { SearchImages } from "./search-images";
 import { SourcesList } from "./sources-list";
@@ -163,10 +162,18 @@ export const MessageAssistant = React.memo(function MessageAssistant({
 
 							{/* Model information display */}
 							{model && (
-								<div className="flex items-center justify-start">
-									<span className="text-xs px-2">
-										{formatModelAndProvider(model)}
-									</span>
+								<div className="flex items-center justify-center rounded-full bg-muted/40 px-2 py-1 text-xs text-muted-foreground">
+									{model.includes('/') ? (
+										<>
+											<span className="font-medium">{model.split('/')[0]}</span>
+											<span className="mx-1">/</span>
+											<span>{model.split('/')[1]}</span>
+											<span className="mx-1">/</span>
+											<span className="ml-1">{model.split('/')[2]}</span>
+										</>
+									) : (
+										<span>{model}</span>
+									)}
 								</div>
 							)}
 						</MessageActions>

@@ -12,14 +12,11 @@ import {
 	useState,
 	type ReactNode,
 } from "react";
-import { useAction, useMutation, useQuery } from "convex/react";
-import { api } from "@/convex/_generated/api";
-import type { Id } from "@/convex/_generated/dataModel";
 import { userSessionManager } from "~/lib/user-session-manager";
 import { useRouter } from "next/navigation";
-import { useCache, OPTIMISTIC_PREFIX } from "~/lib/providers/cache-provider";
-import { migrateFromPlaintextStorage, getAllKeys } from "~/lib/secure-local-keys";
-import { getBestAvailableModel } from "~/lib/models/model-utils";
+import { useCache } from "~/lib/providers/cache-provider";
+import { getAllKeys } from "~/lib/local-keys";
+import { getSelectedModel, setSelectedModel as saveSelectedModel } from "~/lib/local-model-storage";
 import { SYSTEM_PROMPT_DEFAULT } from "~/lib/config";
 
 type UploadedFile = {
@@ -108,64 +105,34 @@ export function MessagesProvider({
 	const cache = useCache();
 	const router = useRouter();
 	const [isSubmitting, setIsSubmitting] = useState(false);
-	const [selectedModel, setSelectedModel] = useState("");
+	const [selectedModel, setSelectedModel] = useState(() => {
+		// Initialize with saved model from localStorage or fallback to default
+		if (typeof window !== "undefined") {
+			const savedModel = getSelectedModel();
+			if (savedModel?.modelId) {
+				return savedModel.modelId;
+			}
+		}
+		return "openai/gpt-4o-mini"; // Default model with provider
+	});
 	const [quotaExceeded, setQuotaExceeded] = useState(false);
 	const [rateLimited, setRateLimited] = useState(false);
 	const currentUserId = user?.id ?? userSessionManager.getStorageUserId();
 
-	// Migrate from old storage format
-	useEffect(() => {
-		if (!user?.id && typeof window !== "undefined") {
-			migrateFromPlaintextStorage().catch(console.error);
-		}
-	}, [user?.id]);
-
-	// Initialize model selection
-	useEffect(() => {
-		const initializeModel = async () => {
-			try {
-				const bestModel = await getBestAvailableModel(
-					undefined,
-					!!user?.id,
-				);
-				if (bestModel && !selectedModel) {
-					setSelectedModel(bestModel);
-				}
-			} catch (error) {
-				console.error("Failed to initialize model:", error);
-			}
-		};
-
-		if (!selectedModel) {
-			initializeModel();
-		}
-	}, [user?.id, selectedModel]);
-
-	// Listen for API key changes
-	useEffect(() => {
-		const handleApiKeysChanged = async () => {
-			try {
-				const bestModel = await getBestAvailableModel(
-					undefined,
-					!!user?.id,
-				);
-				if (bestModel && bestModel !== selectedModel) {
-					setSelectedModel(bestModel);
-				}
-			} catch (error) {
-				console.error("Failed to handle API keys change:", error);
-			}
-		};
-
-		window.addEventListener("apiKeysChanged", handleApiKeysChanged);
-		return () => {
-			window.removeEventListener("apiKeysChanged", handleApiKeysChanged);
-		};
-	}, [user?.id, selectedModel]);
-
 	const selectedModelRef = useRef(selectedModel);
 	useEffect(() => {
 		selectedModelRef.current = selectedModel;
+	}, [selectedModel]);
+
+	// Save selected model to localStorage whenever it changes
+	useEffect(() => {
+		if (selectedModel && typeof window !== "undefined") {
+			// Extract provider from the model string if it contains a slash
+			const providerToUse = selectedModel.includes('/') 
+				? selectedModel.split('/')[0] 
+				: undefined;
+			saveSelectedModel(selectedModel, providerToUse);
+		}
 	}, [selectedModel]);
 
 	// Get user API keys for BYOK
@@ -209,12 +176,25 @@ export function MessagesProvider({
 			},
 		}),
 		onFinish: async ({ message }) => {
+			const currentModel = selectedModelRef.current || "openai/gpt-4o-mini";
+			
 			if (message.role === "assistant") {
-				const currentModel = selectedModelRef.current || "gpt-4o";
 				const textContent = getTextContent(message.parts);
 				
+				// Add model information to the message immediately
 				const extendedMessage = message as ExtendedMessage;
-				extendedMessage.model = currentModel;
+				extendedMessage.model = currentModel;				
+				// Force UI update by updating the messages state
+				setMessages((prevMessages) => {
+					const updatedMessages = [...prevMessages];
+					const lastMessageIndex = updatedMessages.length - 1;
+					
+					if (lastMessageIndex >= 0 && updatedMessages[lastMessageIndex] && updatedMessages[lastMessageIndex].role === "assistant") {
+						(updatedMessages[lastMessageIndex] as ExtendedMessage).model = currentModel;
+					}
+					
+					return updatedMessages;
+				});
 				
 				try {
 					// Persist assistant message to cache
@@ -274,6 +254,23 @@ export function MessagesProvider({
 
 	// State for input management
 	const [input, setInput] = useState("");
+
+	// Ensure all messages have model information when they change
+	useEffect(() => {
+		setMessages((prevMessages) => {
+			let hasChanges = false;
+			const updatedMessages = prevMessages.map((msg) => {
+				const extMsg = msg as ExtendedMessage;
+				if (!extMsg.model && selectedModel) {
+					hasChanges = true;
+					return { ...extMsg, model: selectedModel };
+				}
+				return extMsg;
+			});
+			
+			return hasChanges ? updatedMessages : prevMessages;
+		});
+	}, [selectedModel, setMessages]);
 
 	// Load existing messages when chatId changes
 	useEffect(() => {
@@ -383,9 +380,28 @@ export function MessagesProvider({
 				}
 
 				// Send message using AI SDK v5
-				await chatSendMessage({ 
+				const messageResult = await chatSendMessage({ 
 					text: message,
 				});
+
+				// Add model information to the user message that was just added
+				// We need to use a timeout to ensure the message has been added by the AI SDK
+				setTimeout(() => {
+					setMessages((prevMessages) => {
+						const updatedMessages = [...prevMessages];
+						
+						// Find the most recent user message and add model info if it doesn't have it
+						for (let i = updatedMessages.length - 1; i >= 0; i--) {
+							const msg = updatedMessages[i] as ExtendedMessage;
+							if (msg && msg.role === "user" && !msg.model) {
+								msg.model = selectedModel;
+								break;
+							}
+						}
+						
+						return updatedMessages;
+					});
+				}, 100); // Small delay to ensure the message is in the state
 
 			} catch (error) {
 				console.error("Failed to send message:", error);

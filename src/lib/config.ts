@@ -16,10 +16,6 @@ export const TESTED_PROVIDERS: string[] = [
 	// "xAI",
 ];
 
-// Environment variable to enable all providers (for development/testing)
-// Set ENABLE_ALL_PROVIDERS=true to bypass the tested providers filter
-export const ENABLE_ALL_PROVIDERS = process.env.ENABLE_ALL_PROVIDERS === "true";
-
 // --- App SEO / metadata ---
 export const APP_NAME = "ChaiChat";
 export const APP_DESCRIPTION =
