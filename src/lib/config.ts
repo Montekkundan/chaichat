@@ -23,3 +23,18 @@ export const APP_DESCRIPTION =
 export const APP_URL =
 	process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 export const APP_OG_IMAGE = "/images/og.png";
+
+// Helper function to generate dynamic OG image URLs
+export const generateOGImageURL = (params: {
+	title?: string;
+	type?: 'default' | 'chat' | 'playground' | 'registry';
+	description?: string;
+}) => {
+	const searchParams = new URLSearchParams();
+	
+	if (params.title) searchParams.set('title', params.title);
+	if (params.type) searchParams.set('type', params.type);
+	if (params.description) searchParams.set('description', params.description);
+	
+	return `${APP_URL}/api/og?${searchParams.toString()}`;
+};

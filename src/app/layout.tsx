@@ -10,7 +10,7 @@ import { ThemeProvider } from "~/components/providers/theme-provider";
 import { ThemeScript } from "~/components/theme-script";
 import { Toaster } from "~/components/ui/sonner";
 import { UserSessionHandler } from "~/components/user-session-handler";
-import { APP_DESCRIPTION, APP_NAME, APP_OG_IMAGE, APP_URL } from "~/lib/config";
+import { APP_DESCRIPTION, APP_NAME, APP_URL, generateOGImageURL } from "~/lib/config";
 import { CacheProvider } from "~/lib/providers/cache-provider";
 import { ChatsProvider } from "~/lib/providers/chats-provider";
 
@@ -27,7 +27,11 @@ export const metadata: Metadata = {
 		type: "website",
 		images: [
 			{
-				url: `${APP_URL}${APP_OG_IMAGE}`,
+				url: generateOGImageURL({
+					title: APP_NAME,
+					type: 'default',
+					description: APP_DESCRIPTION,
+				}),
 				width: 1200,
 				height: 630,
 				alt: APP_NAME,
@@ -38,7 +42,11 @@ export const metadata: Metadata = {
 		card: "summary_large_image",
 		title: APP_NAME,
 		description: APP_DESCRIPTION,
-		images: [`${APP_URL}${APP_OG_IMAGE}`],
+		images: [generateOGImageURL({
+			title: APP_NAME,
+			type: 'default',
+			description: APP_DESCRIPTION,
+		})],
 	},
 };
 

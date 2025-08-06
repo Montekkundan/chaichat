@@ -30,6 +30,7 @@ import {
 	SidebarMenuItem,
 	SidebarProvider,
 } from "~/components/ui/sidebar";
+import { ChatTitlesCookieManager } from "~/lib/chat-titles-cookie";
 import {
 	type LocalChat,
 	type LocalMessage,
@@ -73,6 +74,11 @@ export function HistoryDialog({
 			if (!isLoggedIn) {
 				const localChats = await localChatStorage.getChats();
 				setChats(localChats);
+				
+				// Sync all chat titles to cookies
+				localChats.forEach(chat => {
+					ChatTitlesCookieManager.setChatTitle(chat.id, chat.name);
+				});
 			} else {
 				const [cacheChats, localChats] = await Promise.all([
 					Promise.resolve(
@@ -98,6 +104,11 @@ export function HistoryDialog({
 					(a, b) => b.createdAt - a.createdAt,
 				);
 				setChats(mergedChats);
+				
+				// Sync all chat titles to cookies
+				mergedChats.forEach(chat => {
+					ChatTitlesCookieManager.setChatTitle(chat.id || chat._id, chat.name);
+				});
 			}
 		};
 
@@ -171,6 +182,9 @@ export function HistoryDialog({
 
 	const handleChatSelect = async (chat: LocalChat) => {
 		setSelectedChat(chat);
+		
+		// Sync chat title to cookies when selected
+		ChatTitlesCookieManager.setChatTitle(chat.id, chat.name);
 
 		if (!chatMessages.has(chat.id)) {
 			try {
@@ -338,6 +352,8 @@ export function HistoryDialog({
 						href={`/chat/${selectedChat.id}`}
 						className="text-primary text-sm hover:underline"
 						onClick={() => {
+							// Sync chat title to cookies when navigating to full conversation
+							ChatTitlesCookieManager.setChatTitle(selectedChat.id, selectedChat.name);
 							onOpenChange(false);
 						}}
 					>

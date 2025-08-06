@@ -15,6 +15,7 @@ import {
 } from "react";
 import { toast } from "~/components/ui/toast";
 import { type Chat, type Message, db } from "~/db";
+import { ChatTitlesCookieManager } from "~/lib/chat-titles-cookie";
 import { getSelectedModel, setSelectedModel } from "~/lib/local-model-storage";
 
 interface CacheContextType {
@@ -235,6 +236,11 @@ export function CacheProvider({
 			}));
 			const value = encodeURIComponent(JSON.stringify(minimal));
 			document.cookie = `cc_chats=${value}; path=/; max-age=604800; SameSite=Lax`;
+			
+			// Also save chat titles to our dedicated chat titles cookie
+			chats.forEach(chat => {
+				ChatTitlesCookieManager.setChatTitle(chat._id, chat.name);
+			});
 		} catch {
 			// ignore
 		}

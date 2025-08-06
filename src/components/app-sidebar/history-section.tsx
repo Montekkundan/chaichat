@@ -24,6 +24,7 @@ import {
 	SidebarMenuSubButton,
 	SidebarMenuSubItem,
 } from "~/components/ui/sidebar";
+import { ChatTitlesCookieManager } from "~/lib/chat-titles-cookie";
 import { type LocalChat, localChatStorage } from "~/lib/local-chat-storage";
 import { useCache } from "~/lib/providers/cache-provider";
 import { userSessionManager } from "~/lib/user-session-manager";
@@ -52,6 +53,11 @@ export function HistorySection() {
 				const count = await localChatStorage.getChatCount(storageUserId);
 				setRecentChats(chats);
 				setChatCount(count);
+				
+				// Sync chat titles to cookies for server-side access
+				chats.forEach(chat => {
+					ChatTitlesCookieManager.setChatTitle(chat.id, chat.name);
+				});
 			} else {
 				const [cacheChats, localChats] = await Promise.all([
 					Promise.resolve(cache.chats.slice(0, 3)),
@@ -76,6 +82,11 @@ export function HistorySection() {
 				);
 				setRecentChats(mergedChats.slice(0, 3));
 				setChatCount(cache.chats.length);
+				
+				// Sync chat titles to cookies for server-side access
+				mergedChats.forEach(chat => {
+					ChatTitlesCookieManager.setChatTitle(chat.id || chat._id, chat.name);
+				});
 			}
 		};
 
@@ -122,6 +133,11 @@ export function HistorySection() {
 		setChatToDelete(null);
 	};
 
+	const handleChatClick = (chatId: string, chatName: string) => {
+		// Ensure the chat title is always synced to cookies when clicked
+		ChatTitlesCookieManager.setChatTitle(chatId, chatName);
+	};
+
 	return (
 		<>
 			<SidebarGroup>
@@ -146,7 +162,10 @@ export function HistorySection() {
 									{recentChats.map((subItem) => (
 										<SidebarMenuSubItem key={subItem.id} className="group/chat">
 											<SidebarMenuSubButton asChild>
-												<Link href={`/chat/${subItem.id}`}>
+												<Link 
+													href={`/chat/${subItem.id}`}
+													onClick={() => handleChatClick(subItem.id, subItem.name)}
+												>
 													<span>{subItem.name}</span>
 												</Link>
 											</SidebarMenuSubButton>
