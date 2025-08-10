@@ -85,7 +85,7 @@ const createTextParts = (content: string): UIMessage["parts"] => [
 ];
 
 // v5 helper - create file parts from attachments
-const createFileParts = (attachments: UploadedFile[]) => 
+const _createFileParts = (attachments: UploadedFile[]) => 
 	attachments.map((att) => ({
 		type: "file" as const,
 		url: att.url,
@@ -136,20 +136,19 @@ export function MessagesProvider({
 	}, [selectedModel]);
 
 	// Get user API keys for BYOK
-	const getUserApiKeys = useCallback(async () => {
-		if (user?.id) {
-			// For authenticated users, keys should come from server
-			return {};
-		} else {
-			// For anonymous users, get from local secure storage
-			try {
-				return await getAllKeys();
-			} catch (error) {
-				console.error("Failed to get API keys:", error);
-				return {};
-			}
-		}
-	}, [user?.id]);
+    const getUserApiKeys = useCallback(async () => {
+        if (user?.id) {
+            // For authenticated users, keys should come from server
+            return {};
+        }
+        // For anonymous users, get from local secure storage
+        try {
+            return await getAllKeys();
+        } catch (error) {
+            console.error("Failed to get API keys:", error);
+            return {};
+        }
+    }, [user?.id]);
 
 	const {
 		messages,
@@ -330,7 +329,7 @@ export function MessagesProvider({
 		async (
 			message: string,
 			attachments: UploadedFile[] = [],
-			search = false,
+            _search = false,
 		) => {
 			if (!currentUserId) {
 				return;
@@ -380,7 +379,7 @@ export function MessagesProvider({
 				}
 
 				// Send message using AI SDK v5
-				const messageResult = await chatSendMessage({ 
+                const _messageResult = await chatSendMessage({ 
 					text: message,
 				});
 
@@ -409,7 +408,7 @@ export function MessagesProvider({
 				setIsSubmitting(false);
 			}
 		},
-		[currentUserId, chatId, isSubmitting, selectedModel, chatSendMessage, cache, createNewChat, router],
+        [currentUserId, chatId, isSubmitting, selectedModel, chatSendMessage, cache, createNewChat, router, setMessages],
 	);
 
 	// Handle automatic message sending from query parameter
@@ -435,7 +434,7 @@ export function MessagesProvider({
 	}, [chatId, messages.length, isSubmitting, selectedModel, sendMessage]);
 
 	const regenerate = useCallback(
-		async (messageId: string, model: string) => {
+        async (_messageId: string, _model: string) => {
 			// Regeneration will be implemented in a future update
 		},
 		[],

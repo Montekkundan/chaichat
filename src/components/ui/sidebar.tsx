@@ -61,10 +61,12 @@ function SidebarProvider({
 	className,
 	style,
 	children,
+	toggleSidebarShortcut=true,
 	...props
 }: React.ComponentProps<"div"> & {
 	defaultOpen?: boolean;
 	open?: boolean;
+	toggleSidebarShortcut?: boolean;
 	onOpenChange?: (open: boolean) => void;
 }) {
 	const isMobile = useIsMobile();
@@ -72,7 +74,10 @@ function SidebarProvider({
 
 	// This is the internal state of the sidebar.
 	// We use openProp and setOpenProp for control from outside the component.
-	const [_open, _setOpen] = React.useState(defaultOpen);
+    // Important: keep initial render stable between server and client
+    // to avoid hydration mismatches. We do NOT read from window/cookies
+    // until after mount; we start with the provided SSR-friendly default.
+    const [_open, _setOpen] = React.useState<boolean>(defaultOpen);
 	const open = openProp ?? _open;
 	const setOpen = React.useCallback(
 		(value: boolean | ((value: boolean) => boolean)) => {
@@ -89,30 +94,59 @@ function SidebarProvider({
 		[setOpenProp, open],
 	);
 
+
 	// Helper to toggle the sidebar.
 	const toggleSidebar = React.useCallback(() => {
-		return isMobile ? setOpenMobile((open) => !open) : setOpen((open) => !open);
+    return isMobile ? setOpenMobile((open) => !open) : setOpen((open) => !open);
 	}, [isMobile, setOpen]);
 
-	// Adds a keyboard shortcut to toggle the sidebar.
-	React.useEffect(() => {
-		const handleKeyDown = (event: KeyboardEvent) => {
-			if (
-				event.key === SIDEBAR_KEYBOARD_SHORTCUT &&
-				(event.metaKey || event.ctrlKey)
-			) {
-				event.preventDefault();
-				toggleSidebar();
-			}
-		};
+	if (toggleSidebarShortcut) {
+		// Adds a keyboard shortcut to toggle the sidebar.
+		React.useEffect(() => {
+			const handleKeyDown = (event: KeyboardEvent) => {
+				if (
+					event.key === SIDEBAR_KEYBOARD_SHORTCUT &&
+					(event.metaKey || event.ctrlKey)
+				) {
+					event.preventDefault();
+					toggleSidebar();
+				}
+			};
 
-		window.addEventListener("keydown", handleKeyDown);
-		return () => window.removeEventListener("keydown", handleKeyDown);
-	}, [toggleSidebar]);
+			window.addEventListener("keydown", handleKeyDown);
+			return () => window.removeEventListener("keydown", handleKeyDown);
+		}, [toggleSidebar]);
+	}
+	
 
 	// We add a state so that we can do data-state="expanded" or "collapsed".
 	// This makes it easier to style the sidebar with Tailwind classes.
-	const state = open ? "expanded" : "collapsed";
+  const state = open ? "expanded" : "collapsed";
+
+  // After mount, reconcile with persisted state (cookie/sessionStorage)
+  React.useEffect(() => {
+    try {
+      if (typeof window !== "undefined") {
+        // Force-open one-shot flag for playground
+        if (window.location.pathname.startsWith("/playground")) {
+          const force = sessionStorage.getItem("cc_force_open_playground_sidebar");
+          if (force) {
+            setOpen(true);
+            if (isMobile) setOpenMobile(true);
+            sessionStorage.removeItem("cc_force_open_playground_sidebar");
+            return;
+          }
+        }
+
+        const match = document.cookie.match(new RegExp(`${SIDEBAR_COOKIE_NAME}=([^;]+)`));
+        if (match) {
+          _setOpen(match[1] === "true");
+        }
+      }
+    } catch {}
+  }, [isMobile, setOpen]);
+
+  React.useEffect(() => {}, []);
 
 	const contextValue = React.useMemo<SidebarContextProps>(
 		() => ({
@@ -219,7 +253,7 @@ function Sidebar({
 			<div
 				data-slot="sidebar-gap"
 				className={cn(
-					"relative w-(--sidebar-width) bg-transparent transition-[width] duration-75 ease-linear",
+					"relative w-(--sidebar-width) bg-transparent transition-[width] duration-[40ms] ease-linear",
 					"group-data-[collapsible=offcanvas]:w-0",
 					"group-data-[side=right]:rotate-180",
 					variant === "floating" || variant === "inset"
@@ -230,7 +264,7 @@ function Sidebar({
 			<div
 				data-slot="sidebar-container"
 				className={cn(
-					"fixed inset-y-0 z-10 hidden h-svh w-(--sidebar-width) transition-[left,right,width] duration-75 ease-linear md:flex",
+					"fixed inset-y-0 z-10 hidden h-svh w-(--sidebar-width) transition-[left,right,width] duration-[40ms] ease-linear md:flex",
 					side === "left"
 						? "left-0 group-data-[collapsible=offcanvas]:left-[calc(var(--sidebar-width)*-1)]"
 						: "right-0 group-data-[collapsible=offcanvas]:right-[calc(var(--sidebar-width)*-1)]",
@@ -406,7 +440,7 @@ function SidebarGroupLabel({
 			data-slot="sidebar-group-label"
 			data-sidebar="group-label"
 			className={cn(
-				"flex h-8 shrink-0 items-center rounded-md px-2 font-medium text-sidebar-foreground/70 text-xs outline-hidden ring-sidebar-ring transition-[margin,opacity] duration-75 ease-linear focus-visible:ring-2 [&>svg]:size-4 [&>svg]:shrink-0",
+				"flex h-8 shrink-0 items-center rounded-md px-2 font-medium text-sidebar-foreground/70 text-xs outline-hidden ring-sidebar-ring transition-[margin,opacity] duration-[40ms] ease-linear focus-visible:ring-2 [&>svg]:size-4 [&>svg]:shrink-0",
 				"group-data-[collapsible=icon]:-mt-8 group-data-[collapsible=icon]:opacity-0",
 				className,
 			)}

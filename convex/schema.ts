@@ -45,4 +45,20 @@ export default defineSchema({
     .index("by_user", ["userId"])
     .index("by_parent", ["parentMessageId"])
     .index("by_chat_active_time", ["chatId", "isActive"]),
+  // Playground entities (separate from normal chats)
+  playgrounds: defineTable({
+    userId: v.string(),
+    name: v.string(),
+    createdAt: v.number(),
+    columns: v.array(v.object({ id: v.string(), modelId: v.string() })),
+  }).index("by_user", ["userId"]),
+  playgroundMessages: defineTable({
+    playgroundId: v.id("playgrounds"),
+    columnId: v.string(),
+    userId: v.string(),
+    role: v.union(v.literal("user"), v.literal("assistant"), v.literal("system")),
+    content: v.string(),
+    model: v.string(),
+    createdAt: v.number(),
+  }).index("by_playground", ["playgroundId"]).index("by_user", ["userId"]),
 });

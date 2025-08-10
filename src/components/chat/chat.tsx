@@ -157,47 +157,6 @@ export default function Chat({ initialName }: ChatProps = {}) {
 				</div>
 			</div>
 			<div className="absolute inset-0 overflow-y-scroll sm:pt-3.5">
-				<div className="fixed top-0 right-0 z-20 h-16 w-28 max-sm:hidden">
-					<div
-						className={`group -mb-8 pointer-events-none absolute top-3.5 z-10 h-32 w-full origin-top transition-all ease-snappy${
-							collapsed ? " -translate-y-3.5 scale-y-0" : ""
-						}`}
-						style={{
-							boxShadow: "10px -10px 8px 2px var(--sidebar)",
-						}}
-					>
-						<svg
-							className="-right-8 absolute h-9 origin-top-left skew-x-[30deg] overflow-visible"
-							viewBox="0 0 128 32"
-							aria-hidden="true"
-							role="presentation"
-						>
-							<line
-								stroke="var(--sidebar)"
-								strokeWidth="2px"
-								shapeRendering="optimizeQuality"
-								vectorEffect="non-scaling-stroke"
-								strokeLinecap="round"
-								strokeMiterlimit="10"
-								x1="1"
-								y1="0"
-								x2="128"
-								y2="0"
-							/>
-							<path
-								stroke="var(--chat-border)"
-								className="translate-y-[0.5px]"
-								fill="var(--sidebar)"
-								shapeRendering="optimizeQuality"
-								strokeWidth="1px"
-								strokeLinecap="round"
-								strokeMiterlimit="10"
-								vectorEffect="non-scaling-stroke"
-								d="M0,0c5.9,0,10.7,4.8,10.7,10.7v10.7c0,5.9,4.8,10.7,10.7,10.7H128V0"
-							/>
-						</svg>
-					</div>
-				</div>
 				{showOnboarding ? (
 					<div className="mx-auto flex w-full max-w-3xl flex-col space-y-12 px-4 pt-safe-offset-10 pb-10">
 						<div className="flex h-[calc(100vh-20rem)] items-start justify-center">

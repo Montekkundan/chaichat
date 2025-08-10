@@ -2,7 +2,7 @@
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { useUser } from "@clerk/nextjs";
-import { CashRegisterIcon, FilesIcon, HouseLineIcon } from "@phosphor-icons/react";
+import { FilesIcon, HouseLineIcon } from "@phosphor-icons/react";
 import { useMutation } from "convex/react";
 import {
 	BookOpen,
@@ -133,11 +133,11 @@ export function AppSidebar({
 				activeIcon: <HouseLineIcon size={16} weight="duotone" />,
 				onClick: () => router.push("/"),
 			},
-			// {
-			// 	title: "Playground",
-			// 	icon: <SquareTerminal size={16} />,
-			// 	onClick: () => router.push("/playground"),
-			// },
+			{
+				title: "Playground",
+				icon: <SquareTerminal size={16} />,
+				onClick: () => router.push("/playground"),
+			},
 			// {
 			// 	title: "Registry",
 			// 	icon: <CashRegisterIcon size={16} />,
@@ -197,11 +197,7 @@ export function AppSidebar({
 					{
 						title: "Tutorials",
 						url: "#",
-					},
-					// {
-					//   title: "Changelog",
-					//   url: "#",
-					// },
+					}
 				],
 			},
 			{
@@ -238,7 +234,7 @@ export function AppSidebar({
 	};
 
 	return (
-		<Sidebar collapsible={collapsible || "icon"} {...props}>
+		<Sidebar className="z-21" collapsible={collapsible || "icon"} {...props}>
 			<SidebarHeader>
 				<SidebarMenu>
 					<SidebarMenuItem>

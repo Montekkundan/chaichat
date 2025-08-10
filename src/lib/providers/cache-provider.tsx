@@ -238,9 +238,9 @@ export function CacheProvider({
 			document.cookie = `cc_chats=${value}; path=/; max-age=604800; SameSite=Lax`;
 			
 			// Also save chat titles to our dedicated chat titles cookie
-			chats.forEach(chat => {
+			for (const chat of chats) {
 				ChatTitlesCookieManager.setChatTitle(chat._id, chat.name);
-			});
+			}
 		} catch {
 			// ignore
 		}

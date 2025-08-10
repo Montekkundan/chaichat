@@ -1,5 +1,4 @@
 import { api } from "@/convex/_generated/api";
-import type { Id } from "@/convex/_generated/dataModel";
 import { currentUser } from "@clerk/nextjs/server";
 import { fetchQuery } from "convex/nextjs";
 import type { Metadata } from "next";
@@ -11,9 +10,9 @@ import { ChatTitlesCookieManager } from "~/lib/chat-titles-cookie";
 import { APP_NAME, generateOGImageURL } from "~/lib/config";
 import { MessagesProvider } from "~/lib/providers/messages-provider";
 
-function truncateTitle(title: string, maxLength: number = 50): string {
+function truncateTitle(title: string, maxLength = 50): string {
 	if (title.length <= maxLength) return title;
-	return title.slice(0, maxLength).trim() + "...";
+	return `${title.slice(0, maxLength).trim()}...`;
 }
 
 export async function generateMetadata({
@@ -85,8 +84,8 @@ export async function generateMetadata({
 }
 
 export default async function Page({
-	params,
-	searchParams,
+    params,
+    searchParams: _searchParams,
 }: {
 	params: Promise<{ chatId: string }>;
 	searchParams?: Promise<{ model?: string }>;

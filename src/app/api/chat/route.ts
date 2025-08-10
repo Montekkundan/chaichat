@@ -1,13 +1,108 @@
-import { convertToModelMessages, generateText, streamText, type UIMessage } from "ai";
-import { createLLMGateway, llmgateway } from "@llmgateway/ai-sdk-provider";
+import {
+  convertToModelMessages,
+  streamText,
+  wrapLanguageModel,
+  simulateStreamingMiddleware,
+  createUIMessageStream,
+  JsonToSseTransformStream,
+  extractReasoningMiddleware,
+  type UIMessage,
+} from "ai";
+import { createLLMGateway } from "@llmgateway/ai-sdk-provider";
 import { currentUser } from "@clerk/nextjs/server";
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "@/convex/_generated/api";
-import { env } from "../../../env";
+import { env } from "~/env";
+import type { LLMGatewayModel } from "~/types/llmgateway";
 
-const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
+const convex = new ConvexHttpClient(env.NEXT_PUBLIC_CONVEX_URL);
 
+
+// todo make simpler 
 export const maxDuration = 60;
+
+let llmGatewayModelsCache:
+  | { data: LLMGatewayModel[]; timestamp: number }
+  | null = null;
+
+async function getLLMGatewayModels(): Promise<LLMGatewayModel[]> {
+  const now = Date.now();
+  if (llmGatewayModelsCache && now - llmGatewayModelsCache.timestamp < 5 * 60 * 1000) {
+    return llmGatewayModelsCache.data;
+  }
+  try {
+    const res = await fetch("https://api.llmgateway.io/v1/models", { cache: "no-store" });
+    const json = (await res.json()) as { data?: LLMGatewayModel[] };
+    const models = Array.isArray(json.data) ? json.data : [];
+    llmGatewayModelsCache = { data: models, timestamp: now };
+    return models;
+  } catch {
+    return [];
+  }
+}
+
+function parseProviderAndModel(modelId: string): { providerId?: string; modelName: string } {
+  if (!modelId.includes("/")) {
+    return { modelName: modelId };
+  }
+  const firstSlash = modelId.indexOf("/");
+  const providerId = modelId.slice(0, firstSlash);
+  const modelName = modelId.slice(firstSlash + 1);
+  return { providerId, modelName };
+}
+
+async function isStreamingSupportedByProviderModel(modelId: string): Promise<boolean | undefined> {
+  const models = await getLLMGatewayModels();
+  const { providerId, modelName } = parseProviderAndModel(modelId);
+
+  const match = models.find((m) => m?.id === modelName || m?.name === modelName || m?.id === modelId || m?.name === modelId);
+  if (!match) return undefined;
+  const providers = Array.isArray(match?.providers) ? match.providers : [];
+  if (providerId) {
+    const p = providers.find((prov) => prov?.providerId === providerId && (prov?.modelName === modelName || prov?.modelName === modelId));
+    if (p && typeof p.streaming === "boolean") return p.streaming;
+    return undefined;
+  }
+  const anyStreaming = providers.some((prov) => prov?.streaming === true);
+  const allFalse = providers.every((prov) => prov?.streaming === false);
+  if (anyStreaming) return true;
+  if (allFalse) return false;
+  return undefined;
+}
+
+function requiresDefaultTemperatureOne(modelId: string): boolean {
+  const { providerId, modelName } = parseProviderAndModel(modelId);
+  if ((providerId === "openai" || !providerId) && typeof modelName === "string") {
+    return modelName === "o3" || modelName.startsWith("o3-");
+  }
+  return false;
+}
+
+function normalizeTemperatureForModel(modelId: string, requested: number | undefined): number | undefined {
+  if (requiresDefaultTemperatureOne(modelId)) {
+    return 1;
+  }
+  return requested;
+}
+
+async function getReasoningParams(modelId: string): Promise<Record<string, unknown>> {
+  const { providerId, modelName } = parseProviderAndModel(modelId);
+  const models = await getLLMGatewayModels();
+  const match = models.find((m) => m?.id === modelName || m?.name === modelName || m?.id === modelId || m?.name === modelId);
+  const supported = new Set((match?.supported_parameters ?? []).map((p) => p.toLowerCase()));
+
+  // OpenAI O-series supports structured reasoning via `reasoning` param
+  if ((providerId === "openai" || !providerId) && modelName?.startsWith("o3") && (supported.has("reasoning") || supported.has("internal_reasoning"))) {
+    return { reasoning: { effort: "medium" } };
+  }
+
+  // DeepSeek R1 often exposes hidden thinking; some gateways toggle via include_reasoning/internal_reasoning
+  if ((providerId === "deepseek" || modelName?.toLowerCase().includes("r1")) && (supported.has("include_reasoning") || supported.has("internal_reasoning"))) {
+    return { include_reasoning: true };
+  }
+
+  return {};
+}
 
 type ChatRequest = {
 	messages: UIMessage[];
@@ -72,25 +167,110 @@ export async function POST(req: Request) {
 			);
 		}
 
-		const llmGatewayProvider = createLLMGateway({
+        const llmGatewayProvider = createLLMGateway({
 			apiKey: apiKey,
 			compatibility: 'strict'
 		});
-		
-		const response = await streamText({
-			model: llmGatewayProvider(modelToUse),
-			system,
-			messages: convertedMessages,
-			temperature,
-		});
 
-		return response.toUIMessageStreamResponse();
+        let shouldUseSimulatedStreaming = false;
+        try {
+            const supportsStreaming = await isStreamingSupportedByProviderModel(modelToUse);
+            if (supportsStreaming === false) {
+                shouldUseSimulatedStreaming = true;
+            }
+        } catch {
+        }
+
+        try {
+            const baseModel = llmGatewayProvider(modelToUse);
+            // Always extract <think> reasoning on the server so the UI never sees it as plain text
+            const withReasoning = wrapLanguageModel({
+              model: baseModel,
+              middleware: extractReasoningMiddleware({ tagName: 'think' }),
+            });
+            const modelForRequest = shouldUseSimulatedStreaming
+              ? wrapLanguageModel({ model: withReasoning, middleware: simulateStreamingMiddleware() })
+              : withReasoning;
+
+            const effectiveTemperature = normalizeTemperatureForModel(modelToUse, temperature);
+
+            const reasoningParams = await getReasoningParams(modelToUse);
+            const result = await streamText({
+                model: modelForRequest,
+                system,
+                messages: convertedMessages,
+                temperature: effectiveTemperature,
+                ...(reasoningParams as Record<string, unknown>),
+            });
+
+            const stream = createUIMessageStream({
+              execute: ({ writer }) => {
+                result.consumeStream();
+                writer.merge(
+                  result.toUIMessageStream({
+                    sendReasoning: true,
+                  }),
+                );
+              },
+            });
+
+            return new Response(stream.pipeThrough(new JsonToSseTransformStream()));
+        } catch (streamErr: unknown) {
+            const errMsg = streamErr instanceof Error ? streamErr.message : String(streamErr);
+            // biome-ignore lint/suspicious/noExplicitAny: inspecting provider error shape
+            const responseBody: string | undefined = (streamErr as any)?.responseBody;
+            const lowerMsg = (errMsg || "").toLowerCase();
+            const lowerBody = (responseBody || "").toLowerCase();
+
+            const indicatesNoStreaming =
+                lowerMsg.includes("does not support streaming") ||
+                lowerMsg.includes("not support streaming") ||
+                lowerMsg.includes("streaming is not supported") ||
+                lowerBody.includes("does not support streaming") ||
+                lowerBody.includes("not support streaming") ||
+                lowerBody.includes("streaming is not supported");
+
+            if (indicatesNoStreaming) {
+                const simulatedStreamingModel = wrapLanguageModel({
+                  model: wrapLanguageModel({
+                    model: llmGatewayProvider(modelToUse),
+                    middleware: extractReasoningMiddleware({ tagName: 'think' }),
+                  }),
+                  middleware: simulateStreamingMiddleware(),
+                });
+
+                const effectiveTemperature = normalizeTemperatureForModel(modelToUse, temperature);
+                const reasoningParams = await getReasoningParams(modelToUse);
+                const result = await streamText({
+                    model: simulatedStreamingModel,
+                    system,
+                    messages: convertedMessages,
+                    temperature: effectiveTemperature,
+                    ...(reasoningParams as Record<string, unknown>),
+                });
+
+                const stream = createUIMessageStream({
+                  execute: ({ writer }) => {
+                    result.consumeStream();
+                    writer.merge(
+                      result.toUIMessageStream({
+                        sendReasoning: true,
+                      }),
+                    );
+                  },
+                });
+
+                return new Response(stream.pipeThrough(new JsonToSseTransformStream()));
+            }
+
+            throw streamErr;
+        }
 
 	} catch (err: unknown) {
 		console.error("Chat API error:", err);
 		const errorMessage = err instanceof Error ? err.message : "Unknown error occurred";
 		
-		if (errorMessage.includes("not supported") || errorMessage.includes("Bad Request")) {
+        if (errorMessage.includes("not supported") || errorMessage.includes("Bad Request")) {
 			return new Response(
 				JSON.stringify({ 
 					error: `Model "${modelToUse}" is not supported by the LLM Gateway. Please select a different model.`,

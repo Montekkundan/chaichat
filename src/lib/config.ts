@@ -1,5 +1,7 @@
 export const SYSTEM_PROMPT_DEFAULT =
-	"You are ChaiChat, a helpful assistant. You are able to answer questions and help with tasks.";
+	"You are ChaiChat, a helpful assistant. You are able to answer questions and help with tasks. " +
+	"If you include internal reasoning, start your response with <think> and stream ALL reasoning inside it. " +
+	"Close reasoning with </think> before the final answer. After </think>, write only the final answer.";
 
 export const MODEL_DEFAULT = "gpt-4o";
 

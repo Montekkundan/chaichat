@@ -4,12 +4,7 @@ import { useUser } from "@clerk/nextjs";
 import { GitBranch, History, MessageSquare, Search, Trash } from "lucide-react";
 import Link from "next/link";
 import * as React from "react";
-import { Message } from "~/components/chat/message";
-import {
-	ChatContainerContent,
-	ChatContainerRoot,
-} from "~/components/prompt-kit/chat-container";
-import { ScrollButton } from "~/components/prompt-kit/scroll-button";
+import { Conversation } from "~/components/chat/conversation";
 import { Button } from "~/components/ui/button";
 import {
 	Dialog,
@@ -38,12 +33,7 @@ import {
 } from "~/lib/local-chat-storage";
 import { useCache } from "~/lib/providers/cache-provider";
 
-const getTextContent = (parts: { type: string; text: string }[]) => {
-	return parts
-		.filter((part) => part.type === "text")
-		.map((part) => part.text)
-		.join("");
-};
+// removed: legacy text extraction helper; rendering now handled by Conversation component
 
 export function HistoryDialog({
 	open,
@@ -76,9 +66,9 @@ export function HistoryDialog({
 				setChats(localChats);
 				
 				// Sync all chat titles to cookies
-				localChats.forEach(chat => {
+				for (const chat of localChats) {
 					ChatTitlesCookieManager.setChatTitle(chat.id, chat.name);
-				});
+				}
 			} else {
 				const [cacheChats, localChats] = await Promise.all([
 					Promise.resolve(
@@ -105,10 +95,10 @@ export function HistoryDialog({
 				);
 				setChats(mergedChats);
 				
-				// Sync all chat titles to cookies
-				mergedChats.forEach(chat => {
-					ChatTitlesCookieManager.setChatTitle(chat.id || chat._id, chat.name);
-				});
+                // Sync all chat titles to cookies
+                for (const chat of mergedChats) {
+                    ChatTitlesCookieManager.setChatTitle(chat.id, chat.name);
+                }
 			}
 		};
 
@@ -267,19 +257,21 @@ export function HistoryDialog({
 		setChatToDelete(null);
 	};
 
-	const convertToMessageFormat = (localMessage: LocalMessage) => ({
+    const convertToMessageFormat = (localMessage: LocalMessage) => ({
 		id: localMessage._id,
 		role: localMessage.role as "user" | "assistant" | "system",
 		parts: [
 			{
 				type: "text" as const,
 				text: localMessage.content,
-			}
+			},
 		],
-		createdAt: new Date(localMessage.createdAt),
+        // Provide both so downstream sorters can use either
+        createdAt: localMessage.createdAt,
 		_creationTime: localMessage._creationTime,
 		model: localMessage.model,
 		convexId: localMessage._id,
+		content: localMessage.content,
 	});
 
 	const renderContent = () => {
@@ -308,43 +300,13 @@ export function HistoryDialog({
 				</div>
 
 				<div className="relative min-h-0 flex-1">
-					<ChatContainerRoot className="h-full">
-						<ChatContainerContent
-							className="flex w-full flex-col items-center pt-4 pb-4"
-							style={{
-								scrollbarGutter: "stable both-edges",
-								scrollbarWidth: "none",
-							}}
-						>
-							{messages.map((localMessage, index) => {
-								const message = convertToMessageFormat(localMessage);
-								const isLast = index === messages.length - 1;
-
-								return (
-									<Message
-										key={message.id}
-										id={message.id}
-										message={message}
-										variant={message.role}
-										parts={message.parts}
-										isLast={isLast}
-										onDelete={() => {}}
-										onEdit={() => {}}
-										onReload={() => {}}
-										hasScrollAnchor={isLast}
-										status="ready"
-										model={message.model}
-									>
-										{getTextContent(message.parts)}
-									</Message>
-								);
-							})}
-						</ChatContainerContent>
-
-						<div className="absolute right-4 bottom-4 z-10">
-							<ScrollButton className="shadow-sm" size="sm" />
-						</div>
-					</ChatContainerRoot>
+					<Conversation
+						messages={messages.map(convertToMessageFormat)}
+						status="ready"
+						onDelete={() => {}}
+						onEdit={() => {}}
+						onReload={() => {}}
+					/>
 				</div>
 
 				<div className="flex-shrink-0 border-t p-4">

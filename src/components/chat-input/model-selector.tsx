@@ -1,6 +1,6 @@
 "use client";
 
-import { CaretDown, MagnifyingGlass, Info, CheckCircle, XCircle } from "@phosphor-icons/react";
+import { CaretDown, MagnifyingGlass, Info, CheckCircle, XCircle, SlidersHorizontal } from "@phosphor-icons/react";
 import { useEffect, useState, useRef, useMemo, useCallback } from "react";
 import { Button } from "~/components/ui/button";
 import {
@@ -16,6 +16,11 @@ import {
 	DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
 import {
+	Popover,
+	PopoverContent,
+	PopoverTrigger,
+} from "~/components/ui/popover";
+import {
 	Tooltip,
 	TooltipContent,
 	TooltipProvider,
@@ -23,197 +28,104 @@ import {
 } from "~/components/ui/tooltip";
 import { Badge } from "~/components/ui/badge";
 import { Input } from "~/components/ui/input";
+import { Switch } from "~/components/ui/switch";
+import { Label } from "~/components/ui/label";
 import { Separator } from "~/components/ui/separator";
 import { useBreakpoint } from "~/hooks/use-breakpoint";
 import { cn } from "~/lib/utils";
 import { getSelectedModel, setSelectedModel, removeSelectedModel, type SelectedModelData } from "~/lib/local-model-storage";
+import { useLLMModels } from "~/hooks/use-models";
 
 type ModelSelectorProps = {
 	selectedModelId: string;
 	setSelectedModelId: (modelId: string) => void;
-	selectedProvider?: string;
-	setSelectedProvider?: (providerId: string) => void;
 	className?: string;
 	isUserAuthenticated?: boolean;
 };
 
-type LLMGatewayModel = {
-	id: string;
-	name: string;
-	created?: number;
-	description?: string;
-	family?: string;
-	architecture?: {
-		input_modalities?: string[];
-		output_modalities?: string[];
-		tokenizer?: string;
-	};
-	top_provider?: {
-		is_moderated?: boolean;
-	};
-	providers?: Array<{
-		providerId: string;
-		modelName: string;
-		pricing?: {
-			prompt?: string;
-			completion?: string;
-			image?: string;
-		};
-		streaming?: boolean;
-		vision?: boolean;
-		cancellation?: boolean;
-		tools?: boolean;
-	}>;
-	pricing?: {
-		prompt?: string;
-		completion?: string;
-		image?: string;
-		request?: string;
-		input_cache_read?: string;
-		input_cache_write?: string;
-		web_search?: string;
-		internal_reasoning?: string;
-	};
-	context_length?: number;
-	per_request_limits?: {
-		[key: string]: string;
-	};
-	supported_parameters?: string[];
-	json_output?: boolean;
-	deprecated_at?: string;
-	deactivated_at?: string;
-};
+import type { LLMGatewayModel } from "~/types/llmgateway";
+
+type ModelStatusFilter = "any" | "active" | "deprecated" | "deactivated";
 
 export function ModelSelector({
 	selectedModelId,
 	setSelectedModelId,
-	selectedProvider,
-	setSelectedProvider,
 	className,
-	isUserAuthenticated,
+	isUserAuthenticated: _isUserAuthenticated,
 }: ModelSelectorProps) {
-	const [models, setModels] = useState<LLMGatewayModel[]>([]);
-	const [isLoading, setIsLoading] = useState(true);
-	const [error, setError] = useState<string | null>(null);
+    const { models, isLoading, error } = useLLMModels();
 	const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 	const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 	const [searchQuery, setSearchQuery] = useState("");
 	const [expandedModels, setExpandedModels] = useState<Set<string>>(new Set());
+	const [filters, setFilters] = useState({
+		streaming: false,
+		vision: false,
+		tools: false,
+		jsonOutput: false,
+		moderatedMode: "any" as "any" | "moderated" | "unmoderated",
+		status: "any" as ModelStatusFilter,
+		providerQuery: "",
+		minContext: "" as string | number,
+		maxPromptPrice: "" as string | number, // in $ per 1K tokens
+	});
 	const isMobile = useBreakpoint(768);
 	const searchInputRef = useRef<HTMLInputElement>(null);
 
-	const hasLoadedFromStorage = useRef(false);
-	const pendingSavedModel = useRef<SelectedModelData | null>(null);
+		const hasLoadedFromStorage = useRef(false);
+		const pendingSavedModel = useRef<SelectedModelData | null>(null);
 
-	useEffect(() => {
-		if (!selectedModelId && !hasLoadedFromStorage.current) {
-			const savedModel = getSelectedModel();
-			if (savedModel?.modelId) {
-				pendingSavedModel.current = savedModel;
-				setSelectedModelId(savedModel.modelId);
-				if (savedModel.providerId && setSelectedProvider) {
-					setSelectedProvider(savedModel.providerId);
-				}
-				hasLoadedFromStorage.current = true;
-			}
-		}
-	}, [selectedModelId, setSelectedModelId, setSelectedProvider]);
-
-	useEffect(() => {
-		if (pendingSavedModel.current && models.length > 0) {
-			const savedModel = pendingSavedModel.current;
-			const modelExists = models.some((model: LLMGatewayModel) => {
-				if (model.id === savedModel.modelId || model.name === savedModel.modelId) {
-					return true;
-				}
-				
-				if (savedModel.modelId.includes('/') && savedModel.providerId) {
-					return model.providers?.some(p => 
-						p.providerId === savedModel.providerId && 
-						(p.modelName === savedModel.modelId.split('/')[1] || p.modelName === savedModel.modelId)
-					);
-				}
-				
-				return false;
-			});
-			
-			if (!modelExists) {
-				removeSelectedModel();
-				if (models.length > 0 && models[0]) {
-					setSelectedModelId(models[0].id);
-					setSelectedModel(models[0].id);
+		useEffect(() => {
+			if (!selectedModelId && !hasLoadedFromStorage.current) {
+				const savedModel = getSelectedModel();
+				if (savedModel?.modelId) {
+					pendingSavedModel.current = savedModel;
+					setSelectedModelId(savedModel.modelId);
+					hasLoadedFromStorage.current = true;
 				}
 			}
-			
-			pendingSavedModel.current = null;
-		}
-	}, [models, setSelectedModelId]);
+		}, [selectedModelId, setSelectedModelId]);
 
-	useEffect(() => {
-		if (selectedModelId && hasLoadedFromStorage.current) {
-			const providerToUse = selectedProvider;
-			setSelectedModel(selectedModelId, providerToUse);
-		}
-	}, [selectedModelId, selectedProvider]);
-
-	const modelsCache = useRef<{
-		data: LLMGatewayModel[] | null;
-		timestamp: number;
-	}>({
-		data: null,
-		timestamp: 0,
-	});
-
-	useEffect(() => {
-		const fetchModels = async () => {
-			const now = Date.now();
-			const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
-			
-			if (modelsCache.current.data && 
-				(now - modelsCache.current.timestamp) < CACHE_DURATION) {
-				setModels(modelsCache.current.data);
-				setIsLoading(false);
-				return;
-			}
-
-			try {
-				setIsLoading(true);
-				setError(null);
-				const response = await fetch("/api/models");
-				
-				if (!response.ok) {
-					throw new Error(`HTTP error! status: ${response.status}`);
-				}
-				
-				const data = await response.json();
-				
-				if (data.models && Array.isArray(data.models)) {
-					modelsCache.current = {
-						data: data.models,
-						timestamp: now,
-					};
-					
-					setModels(data.models);
-					
-					if (!selectedModelId && !hasLoadedFromStorage.current && data.models.length > 0) {
-						const savedModel = getSelectedModel();
-						if (!savedModel?.modelId && data.models[0]) {
-							setSelectedModelId(data.models[0].id);
-						}
+		useEffect(() => {
+			if (pendingSavedModel.current && models.length > 0) {
+				const savedModel = pendingSavedModel.current;
+				const modelExists = models.some((model: LLMGatewayModel) => {
+					if (model.id === savedModel.modelId || model.name === savedModel.modelId) {
+						return true;
 					}
-				} else {
-					throw new Error("Invalid response format from models API");
+					if (savedModel.modelId.includes('/') && savedModel.providerId) {
+						return model.providers?.some(p => 
+							p.providerId === savedModel.providerId && 
+							(p.modelName === savedModel.modelId.split('/')[1] || p.modelName === savedModel.modelId)
+						);
+					}
+					return false;
+				});
+				if (!modelExists) {
+					removeSelectedModel();
+					if (models.length > 0 && models[0]) {
+						setSelectedModelId(models[0].id);
+						setSelectedModel(models[0].id);
+					}
 				}
-			} catch (error) {
-				console.error("Failed to fetch models:", error);
-				setError(error instanceof Error ? error.message : "Failed to load models");
-			} finally {
-				setIsLoading(false);
+				pendingSavedModel.current = null;
 			}
-		};
+		}, [models, setSelectedModelId]);
 
-		fetchModels();
-	}, [selectedModelId, setSelectedModelId, setSelectedProvider]);
+		useEffect(() => {
+			if (selectedModelId && hasLoadedFromStorage.current) {
+				setSelectedModel(selectedModelId);
+			}
+		}, [selectedModelId]);
+
+    useEffect(() => {
+        if (!selectedModelId && !hasLoadedFromStorage.current && models.length > 0) {
+            const savedModel = getSelectedModel();
+            if (!savedModel?.modelId && models[0]) {
+                setSelectedModelId(models[0].id);
+            }
+        }
+    }, [models, selectedModelId, setSelectedModelId]);
 
 	useEffect(() => {
 		const handleKeyDown = (e: KeyboardEvent) => {
@@ -276,38 +188,75 @@ export function ModelSelector({
 		});
 	}, []);
 
-	const handleModelSelect = useCallback((model: LLMGatewayModel, providerId?: string) => {
-		const providerToUse = providerId || model.providers?.[0]?.providerId;
-		const selectedProvider = model.providers?.find(p => p.providerId === providerToUse);
-		
-		const modelName = selectedProvider?.modelName || model.name;
-		const modelString = providerToUse ? `${providerToUse}/${modelName}` : model.id;
-		setSelectedModelId(modelString);
-		
-		if (providerToUse && setSelectedProvider) {
-			setSelectedProvider(providerToUse);
-		}
-		
-		setSelectedModel(modelString, providerToUse);
-		
-		if (isMobile) {
-			setIsDrawerOpen(false);
-		} else {
-			setIsDropdownOpen(false);
-		}
-	}, [isMobile, setSelectedModelId, setSelectedProvider]);
+		const handleModelSelect = useCallback((model: LLMGatewayModel, providerId?: string) => {
+			const providerToUse = providerId || model.providers?.[0]?.providerId;
+			const selectedProvider = model.providers?.find(p => p.providerId === providerToUse);
+			const modelName = selectedProvider?.modelName || model.name;
+			const modelString = providerToUse ? `${providerToUse}/${modelName}` : model.id;
+			setSelectedModelId(modelString);
+			setSelectedModel(modelString);
+			if (isMobile) {
+				setIsDrawerOpen(false);
+			} else {
+				setIsDropdownOpen(false);
+			}
+		}, [isMobile, setSelectedModelId]);
 
 	const filteredModels = useMemo(() => 
 		models.filter((model) => {
 			const query = searchQuery.toLowerCase();
-			return (
+			const textMatch = (
 				model.name.toLowerCase().includes(query) ||
-				model.family?.toLowerCase().includes(query) ||
-				model.description?.toLowerCase().includes(query) ||
+				(model.family?.toLowerCase().includes(query) ?? false) ||
+				(model.description?.toLowerCase().includes(query) ?? false) ||
 				model.id.toLowerCase().includes(query) ||
-				model.providers?.some(p => p.providerId.toLowerCase().includes(query)) ||
-				model.supported_parameters?.some(p => p.toLowerCase().includes(query))
+				(model.providers?.some(p => p.providerId.toLowerCase().includes(query)) ?? false) ||
+				(model.supported_parameters?.some(p => p.toLowerCase().includes(query)) ?? false)
 			);
+
+			// Status filter
+			if (filters.status !== "any") {
+				const isActive = !model.deactivated_at && !model.deprecated_at;
+				if (filters.status === "active" && !isActive) return false;
+				if (filters.status === "deprecated" && !model.deprecated_at) return false;
+				if (filters.status === "deactivated" && !model.deactivated_at) return false;
+			}
+
+			// Feature toggles (check any provider supports it)
+			const providers = model.providers ?? [];
+			if (filters.streaming && !providers.some(p => p.streaming)) return false;
+			if (filters.vision && !providers.some(p => p.vision)) return false;
+			if (filters.tools && !providers.some(p => p.tools)) return false;
+			if (filters.jsonOutput && !model.json_output) return false;
+			if (filters.moderatedMode === "moderated" && !model.top_provider?.is_moderated) return false;
+			if (filters.moderatedMode === "unmoderated" && model.top_provider?.is_moderated) return false;
+
+			// Provider substring filter
+			if (filters.providerQuery) {
+				const pq = String(filters.providerQuery).toLowerCase();
+				if (!providers.some(p => p.providerId.toLowerCase().includes(pq))) return false;
+			}
+
+			// Context length minimum
+			if (filters.minContext !== "" && filters.minContext !== null) {
+				const minCtx = Number(filters.minContext);
+				if (!Number.isNaN(minCtx) && (model.context_length ?? 0) < minCtx) return false;
+			}
+
+			// Max prompt price (per 1K tokens) across any provider
+			if (filters.maxPromptPrice !== "" && filters.maxPromptPrice !== null) {
+				const maxPrice = Number(filters.maxPromptPrice);
+				if (!Number.isNaN(maxPrice)) {
+					const providerPrices = providers
+						.map(p => (p.pricing?.prompt ? Number.parseFloat(p.pricing.prompt) : 0))
+						.filter(v => !Number.isNaN(v));
+					const fallbackModelPrompt = model.pricing?.prompt ? Number.parseFloat(model.pricing.prompt) : 0;
+					const minProviderPrice = providerPrices.length > 0 ? Math.min(...providerPrices) : fallbackModelPrompt;
+					if (!Number.isNaN(minProviderPrice) && minProviderPrice > maxPrice) return false;
+				}
+			}
+
+			return textMatch;
 		}).sort((a, b) => {
 			const aActive = !a.deactivated_at && !a.deprecated_at;
 			const bActive = !b.deactivated_at && !b.deprecated_at;
@@ -319,12 +268,12 @@ export function ModelSelector({
 			if (aProviders !== bProviders) return bProviders - aProviders;
 			
 			return (b.context_length || 0) - (a.context_length || 0);
-		}), [models, searchQuery]);
+		}), [models, searchQuery, filters]);
 
 	const formatPrice = useCallback((price: string | undefined) => {
 		if (!price || price === "undefined" || price === "null") return "Free";
-		const num = parseFloat(price);
-		if (isNaN(num) || num === 0) return "Free";
+		const num = Number.parseFloat(price);
+		if (Number.isNaN(num) || num === 0) return "Free";
 		if (num < 0.001) return `$${(num * 1000000).toFixed(2)}/1M`;
 		if (num < 1) return `$${(num * 1000).toFixed(2)}/1K`;
 		return `$${num.toFixed(2)}`;
@@ -448,12 +397,13 @@ export function ModelSelector({
 							Available Providers ({model.providers.length})
 						</div>
 						<div className="space-y-2">
-							{model.providers.slice(0, 3).map((provider, idx) => (
-								<div 
-									key={idx} 
+						{model.providers.slice(0, 3).map((provider) => (
+								<button
+									key={`${provider.providerId}-${provider.modelName}`}
+									type="button"
 									className={cn(
 										"text-xs bg-muted/50 rounded-md px-3 py-2 cursor-pointer hover:bg-muted transition-colors",
-										isProviderSelected(model, provider.providerId) && "ring-2 ring-primary bg-primary/10"
+										isProviderSelected(model, provider.providerId) && "bg-primary/10 ring-2 ring-primary"
 									)}
 									onClick={(e) => {
 										e.stopPropagation();
@@ -464,7 +414,7 @@ export function ModelSelector({
 									<div className="text-muted-foreground mt-0.5">
 										{formatPrice(provider.pricing?.prompt || "0")}/1K tokens
 									</div>
-								</div>
+								</button>
 							))}
 							{model.providers.length > 3 && (
 								<div className="text-xs text-muted-foreground pl-3">
@@ -482,8 +432,8 @@ export function ModelSelector({
 					<div className="p-4 py-3">
 						<div className="font-medium text-xs mb-3 text-foreground">Supported Parameters</div>
 						<div className="flex flex-wrap gap-1.5">
-							{model.supported_parameters.slice(0, 8).map((param, idx) => (
-								<Badge key={idx} variant="outline" className="text-xs h-5 px-2">
+						{model.supported_parameters.slice(0, 8).map((param) => (
+								<Badge key={param} variant="outline" className="text-xs h-5 px-2">
 									{param}
 								</Badge>
 							))}
@@ -525,16 +475,17 @@ export function ModelSelector({
 		<TooltipProvider key={model.id}>
 			<Tooltip delayDuration={300}>
 				<TooltipTrigger asChild>
-					<div className="w-full">
-						<div className="flex w-full items-center justify-between gap-2">
-							<div
-								className={cn(
-									"flex w-full items-center justify-between px-3 py-2 cursor-pointer hover:bg-accent transition-colors flex-1 rounded-md",
-									isModelSelected(model) && "bg-accent border border-primary/30",
-									model.deactivated_at && "opacity-60"
-								)}
-								onClick={() => handleModelSelect(model)}
-							>
+						<div className="w-full">
+							<div className="flex w-full items-center justify-between gap-2">
+								<button
+									type="button"
+									className={cn(
+										"flex w-full items-center justify-between px-3 py-2 cursor-pointer hover:bg-accent transition-colors flex-1 rounded-md",
+										isModelSelected(model) && "bg-accent border border-primary/30",
+										model.deactivated_at && "opacity-60"
+									)}
+									onClick={() => handleModelSelect(model)}
+								>
 								<div className="flex items-center gap-2 min-w-0 flex-1">
 									<div className="text-sm font-medium truncate">{model.name}</div>
 									{isModelSelected(model) && (
@@ -544,7 +495,7 @@ export function ModelSelector({
 								<div className="text-xs text-muted-foreground">
 									{formatPrice(model.pricing?.prompt || "0")}/1K
 								</div>
-							</div>
+								</button>
 							
 							{model.providers && model.providers.length > 1 && (
 								<Button
@@ -569,24 +520,25 @@ export function ModelSelector({
 						{expandedModels.has(model.id) && 
 						 model.providers && model.providers.length > 1 && (
 							<div className="ml-4 border-l border-border pl-3 space-y-1">
-								{model.providers.map((provider, idx) => (
-									<div
-										key={idx}
-										className={cn(
-											"flex items-center justify-between px-2 py-1 text-xs cursor-pointer hover:bg-accent/50 rounded transition-colors",
-											isProviderSelected(model, provider.providerId) && "bg-accent/70 ring-1 ring-primary/50"
-										)}
-										onClick={(e) => {
-											e.stopPropagation();
-											handleModelSelect(model, provider.providerId);
-										}}
-									>
-										<span className="font-medium">{provider.providerId}</span>
-										<span className="text-muted-foreground">
-											{formatPrice(provider.pricing?.prompt || "0")}/1K
-										</span>
-									</div>
-								))}
+						{model.providers.map((provider) => (
+								<button
+									key={`${provider.providerId}-${provider.modelName}`}
+									type="button"
+									className={cn(
+										"flex items-center justify-between px-2 py-1 text-xs cursor-pointer hover:bg-accent/50 rounded transition-colors",
+										isProviderSelected(model, provider.providerId) && "bg-accent/70 ring-1 ring-primary/50"
+									)}
+									onClick={(e) => {
+										e.stopPropagation();
+										handleModelSelect(model, provider.providerId);
+									}}
+								>
+									<span className="font-medium">{provider.providerId}</span>
+									<span className="text-muted-foreground">
+										{formatPrice(provider.pricing?.prompt || "0")}/1K
+									</span>
+								</button>
+							))}
 							</div>
 						)}
 					</div>
@@ -647,26 +599,98 @@ export function ModelSelector({
 								<Input
 									ref={searchInputRef}
 									placeholder={`Search ${filteredModels.length} models...`}
-									className="pl-8"
+									className="pl-8 pr-10"
 									value={searchQuery}
 									onChange={handleSearchChange}
 									onClick={(e) => e.stopPropagation()}
 								/>
+								<Popover>
+									<PopoverTrigger asChild>
+										<Button
+											variant="ghost"
+											size="sm"
+											type="button"
+											aria-label="Open filters"
+											className="absolute right-1.5 top-1.5 h-7 w-7 p-0 hover:bg-accent/50"
+										>
+											<SlidersHorizontal className="h-4 w-4" />
+										</Button>
+									</PopoverTrigger>
+									<PopoverContent align="end" className="w-80 p-3 space-y-3">
+										<div className="grid grid-cols-2 gap-3">
+											<div className="flex items-center justify-between gap-2">
+												<Label htmlFor="f-streaming" className="text-xs">Streaming</Label>
+												<Switch id="f-streaming" checked={filters.streaming} onCheckedChange={(v) => setFilters((p) => ({ ...p, streaming: v }))} />
+											</div>
+											<div className="flex items-center justify-between gap-2">
+												<Label htmlFor="f-vision" className="text-xs">Vision</Label>
+												<Switch id="f-vision" checked={filters.vision} onCheckedChange={(v) => setFilters((p) => ({ ...p, vision: v }))} />
+											</div>
+											<div className="flex items-center justify-between gap-2">
+												<Label htmlFor="f-tools" className="text-xs">Tools</Label>
+												<Switch id="f-tools" checked={filters.tools} onCheckedChange={(v) => setFilters((p) => ({ ...p, tools: v }))} />
+											</div>
+						{/* Reasoning filter removed */}
+						{/* Cancellation filter removed */}
+											<div className="flex items-center justify-between gap-2">
+												<Label htmlFor="f-json" className="text-xs">JSON Output</Label>
+												<Switch id="f-json" checked={filters.jsonOutput} onCheckedChange={(v) => setFilters((p) => ({ ...p, jsonOutput: v }))} />
+											</div>
+										{/* <div className="flex items-center justify-between gap-2">
+											<Label htmlFor="f-moderated" className="text-xs">Moderation</Label>
+											<select id="f-moderated" className="h-8 w-36 rounded-md border bg-background px-2 text-xs" value={filters.moderatedMode} onChange={(e) => setFilters((p) => ({ ...p, moderatedMode: e.target.value as any }))}>
+												<option value="any">Any</option>
+												<option value="moderated">Moderated</option>
+												<option value="unmoderated">Unmoderated</option>
+											</select>
+										</div> */}
+										</div>
+										<div className="grid grid-cols-2 gap-3">
+											<div>
+												<Label htmlFor="f-provider" className="text-xs">Provider</Label>
+												<Input id="f-provider" placeholder="e.g. openai" value={String(filters.providerQuery)} onChange={(e) => setFilters((p) => ({ ...p, providerQuery: e.target.value }))} className="h-8" />
+											</div>
+											<div>
+												<Label htmlFor="f-minctx" className="text-xs">Min context</Label>
+												<Input id="f-minctx" type="number" min={0} value={String(filters.minContext)} onChange={(e) => setFilters((p) => ({ ...p, minContext: e.target.value }))} className="h-8" />
+											</div>
+											<div>
+												<Label htmlFor="f-maxprice" className="text-xs">Max prompt $/1K</Label>
+												<Input id="f-maxprice" type="number" min={0} step="0.0001" value={String(filters.maxPromptPrice)} onChange={(e) => setFilters((p) => ({ ...p, maxPromptPrice: e.target.value }))} className="h-8" />
+											</div>
+											<div>
+												<Label htmlFor="f-status" className="text-xs">Status</Label>
+											<select id="f-status" className="h-8 w-full rounded-md border bg-background px-2 text-sm" value={filters.status} onChange={(e) => setFilters((p) => ({ ...p, status: e.target.value as ModelStatusFilter }))}>
+													<option value="any">Any</option>
+													<option value="active">Active</option>
+													<option value="deprecated">Deprecated</option>
+													<option value="deactivated">Deactivated</option>
+												</select>
+											</div>
+										</div>
+										<div className="flex items-center justify-between">
+							<Button type="button" variant="ghost" size="sm" onClick={() => setFilters({ streaming: false, vision: false, tools: false, jsonOutput: false, moderatedMode: "any", status: "any", providerQuery: "", minContext: "", maxPromptPrice: "" })}>
+												Reset
+											</Button>
+										</div>
+									</PopoverContent>
+								</Popover>
 							</div>
 						</div>
 						<div className="flex h-full flex-col space-y-0.5 overflow-y-auto px-4 pb-6">
 							{filteredModels.length > 0 ? (
 								filteredModels.map((model) => (
 									<div key={model.id} className="w-full">
-										<div className="flex w-full items-center justify-between gap-2">
-											<div
-												className={cn(
-													"flex w-full items-center justify-between px-3 py-2 cursor-pointer hover:bg-accent transition-colors rounded-md flex-1",
-													isModelSelected(model) && "bg-accent border border-primary/30",
-													model.deactivated_at && "opacity-60"
-												)}
-												onClick={() => handleModelSelect(model)}
-											>
+								<div className="flex w-full items-center justify-between gap-2">
+									<button
+										type="button"
+										className={cn(
+											"flex w-full items-center justify-between px-3 py-2 cursor-pointer hover:bg-accent transition-colors rounded-md flex-1",
+											isModelSelected(model) && "bg-accent border border-primary/30",
+											model.deactivated_at && "opacity-60"
+										)}
+										onClick={() => handleModelSelect(model)}
+									>
 												<div className="flex items-center gap-2 min-w-0 flex-1">
 													<div className="text-sm font-medium truncate">{model.name}</div>
 													{isModelSelected(model) && (
@@ -676,7 +700,7 @@ export function ModelSelector({
 												<div className="text-xs text-muted-foreground">
 													{formatPrice(model.pricing?.prompt || "0")}/1K
 												</div>
-											</div>
+									</button>
 											
 											{model.providers && model.providers.length > 1 && (
 												<Button
@@ -701,24 +725,25 @@ export function ModelSelector({
 										{expandedModels.has(model.id) && 
 										 model.providers && model.providers.length > 1 && (
 											<div className="ml-4 mt-1 border-l border-border pl-3 space-y-1">
-												{model.providers.map((provider, idx) => (
-													<div
-														key={idx}
-														className={cn(
-															"flex items-center justify-between px-2 py-1 text-xs cursor-pointer hover:bg-accent/50 rounded transition-colors",
-															isProviderSelected(model, provider.providerId) && "bg-accent/70 ring-1 ring-primary/50"
-														)}
-														onClick={(e) => {
-															e.stopPropagation();
-															handleModelSelect(model, provider.providerId);
-														}}
-													>
-														<span className="font-medium">{provider.providerId}</span>
-														<span className="text-muted-foreground">
-															{formatPrice(provider.pricing?.prompt || "0")}/1K
-														</span>
-													</div>
-												))}
+						{model.providers.map((provider) => (
+								<button
+									key={`${provider.providerId}-${provider.modelName}`}
+									type="button"
+									className={cn(
+										"flex items-center justify-between px-2 py-1 text-xs cursor-pointer hover:bg-accent/50 rounded transition-colors",
+										isProviderSelected(model, provider.providerId) && "bg-accent/70 ring-1 ring-primary/50"
+									)}
+									onClick={(e) => {
+										e.stopPropagation();
+										handleModelSelect(model, provider.providerId);
+									}}
+								>
+									<span className="font-medium">{provider.providerId}</span>
+									<span className="text-muted-foreground">
+										{formatPrice(provider.pricing?.prompt || "0")}/1K
+									</span>
+								</button>
+							))}
 											</div>
 										)}
 									</div>
@@ -762,22 +787,157 @@ export function ModelSelector({
 							<MagnifyingGlass className="absolute top-2.5 left-2.5 h-4 w-4 text-muted-foreground" />
 							<Input
 								ref={searchInputRef}
-								placeholder={`Search ${models.length} models...`}
-								className="rounded-b-none border border-none pl-8 shadow-none focus-visible:ring-0 dark:bg-popover"
+									placeholder={`Search ${filteredModels.length} models...`}
+								className="rounded-b-none border border-none pl-8 pr-10 shadow-none focus-visible:ring-0 dark:bg-popover"
 								value={searchQuery}
 								onChange={handleSearchChange}
 								onClick={(e) => e.stopPropagation()}
 								onFocus={(e) => e.stopPropagation()}
 								onKeyDown={(e) => e.stopPropagation()}
 							/>
+							<Popover>
+								<PopoverTrigger asChild>
+									<Button
+										variant="ghost"
+										size="sm"
+										type="button"
+										aria-label="Open filters"
+										className="absolute right-1.5 top-1.5 h-7 w-7 p-0 hover:bg-accent/50"
+									>
+										<SlidersHorizontal className="h-4 w-4" />
+									</Button>
+								</PopoverTrigger>
+								<PopoverContent align="center" className="w-80 p-3 space-y-3">
+									<div className="grid grid-cols-2 gap-3">
+										<div className="flex items-center justify-between gap-2">
+											<Label htmlFor="hf-streaming" className="text-xs">Streaming</Label>
+											<Switch id="hf-streaming" checked={filters.streaming} onCheckedChange={(v) => setFilters((p) => ({ ...p, streaming: v }))} />
+										</div>
+										<div className="flex items-center justify-between gap-2">
+											<Label htmlFor="hf-vision" className="text-xs">Vision</Label>
+											<Switch id="hf-vision" checked={filters.vision} onCheckedChange={(v) => setFilters((p) => ({ ...p, vision: v }))} />
+										</div>
+										<div className="flex items-center justify-between gap-2">
+											<Label htmlFor="hf-tools" className="text-xs">Tools</Label>
+											<Switch id="hf-tools" checked={filters.tools} onCheckedChange={(v) => setFilters((p) => ({ ...p, tools: v }))} />
+										</div>
+						{/* Reasoning filter removed */}
+						{/* Cancellation filter removed */}
+										<div className="flex items-center justify-between gap-2">
+											<Label htmlFor="hf-json" className="text-xs">JSON Output</Label>
+											<Switch id="hf-json" checked={filters.jsonOutput} onCheckedChange={(v) => setFilters((p) => ({ ...p, jsonOutput: v }))} />
+										</div>
+										{/* <div className="flex items-center justify-between gap-2">
+											<Label htmlFor="hf-moderated" className="text-xs">Moderation</Label>
+											<select id="hf-moderated" className="h-8 w-36 rounded-md border bg-background px-2 text-xs" value={filters.moderatedMode} onChange={(e) => setFilters((p) => ({ ...p, moderatedMode: e.target.value as any }))}>
+												<option value="any">Any</option>
+												<option value="moderated">Moderated</option>
+												<option value="unmoderated">Unmoderated</option>
+											</select>
+										</div> */}
+									</div>
+									<div className="grid grid-cols-2 gap-3">
+										<div>
+											<Label htmlFor="hf-provider" className="text-xs">Provider</Label>
+											<Input id="hf-provider" placeholder="e.g. openai" value={String(filters.providerQuery)} onChange={(e) => setFilters((p) => ({ ...p, providerQuery: e.target.value }))} className="h-8" />
+										</div>
+										<div>
+											<Label htmlFor="hf-minctx" className="text-xs">Min context</Label>
+											<Input id="hf-minctx" type="number" min={0} value={String(filters.minContext)} onChange={(e) => setFilters((p) => ({ ...p, minContext: e.target.value }))} className="h-8" />
+										</div>
+										<div>
+											<Label htmlFor="hf-maxprice" className="text-xs">Max prompt $/1K</Label>
+											<Input id="hf-maxprice" type="number" min={0} step="0.0001" value={String(filters.maxPromptPrice)} onChange={(e) => setFilters((p) => ({ ...p, maxPromptPrice: e.target.value }))} className="h-8" />
+										</div>
+										<div>
+											<Label htmlFor="hf-status" className="text-xs">Status</Label>
+											<select id="hf-status" className="h-8 w-full rounded-md border bg-background px-2 text-sm" value={filters.status} onChange={(e) => setFilters((p) => ({ ...p, status: e.target.value as ModelStatusFilter }))}>
+												<option value="any">Any</option>
+												<option value="active">Active</option>
+												<option value="deprecated">Deprecated</option>
+												<option value="deactivated">Deactivated</option>
+											</select>
+										</div>
+									</div>
+									<div className="flex items-center justify-between">
+						<Button type="button" variant="ghost" size="sm" onClick={() => setFilters({ streaming: false, vision: false, tools: false, jsonOutput: false, moderatedMode: "any", status: "any", providerQuery: "", minContext: "", maxPromptPrice: "" })}>
+											Reset
+										</Button>
+									</div>
+								</PopoverContent>
+							</Popover>
 						</div>
 					</div>
 					<div className="flex h-full flex-col space-y-0.5 overflow-y-auto px-1 pt-1 pb-0">
 						{filteredModels.length > 0 ? (
 							<>
 								{searchQuery && (
-									<div className="px-3 py-2 text-xs text-muted-foreground border-b">
+									<div className="flex items-center justify-between px-3 py-2 text-xs">
 										Showing {filteredModels.length} of {models.length} models
+										<Popover>
+											<PopoverTrigger asChild>
+												<Button variant="ghost" size="sm" type="button" className="h-7 px-2">
+													<SlidersHorizontal className="h-4 w-4" />
+												</Button>
+											</PopoverTrigger>
+											<PopoverContent align="end" className="w-80 p-3 space-y-3">
+												<div className="grid grid-cols-2 gap-3">
+													<div className="flex items-center justify-between gap-2">
+														<Label htmlFor="df-streaming" className="text-xs">Streaming</Label>
+														<Switch id="df-streaming" checked={filters.streaming} onCheckedChange={(v) => setFilters((p) => ({ ...p, streaming: v }))} />
+													</div>
+													<div className="flex items-center justify-between gap-2">
+														<Label htmlFor="df-vision" className="text-xs">Vision</Label>
+														<Switch id="df-vision" checked={filters.vision} onCheckedChange={(v) => setFilters((p) => ({ ...p, vision: v }))} />
+													</div>
+													<div className="flex items-center justify-between gap-2">
+														<Label htmlFor="df-tools" className="text-xs">Tools</Label>
+														<Switch id="df-tools" checked={filters.tools} onCheckedChange={(v) => setFilters((p) => ({ ...p, tools: v }))} />
+													</div>
+						{/* Cancellation filter removed */}
+													<div className="flex items-center justify-between gap-2">
+														<Label htmlFor="df-json" className="text-xs">JSON Output</Label>
+														<Switch id="df-json" checked={filters.jsonOutput} onCheckedChange={(v) => setFilters((p) => ({ ...p, jsonOutput: v }))} />
+													</div>
+										{/* <div className="flex items-center justify-between gap-2">
+											<Label htmlFor="df-moderated" className="text-xs">Moderation</Label>
+											<select id="df-moderated" className="h-8 w-36 rounded-md border bg-background px-2 text-xs" value={filters.moderatedMode} onChange={(e) => setFilters((p) => ({ ...p, moderatedMode: e.target.value as any }))}>
+												<option value="any">Any</option>
+												<option value="moderated">Moderated</option>
+												<option value="unmoderated">Unmoderated</option>
+											</select>
+										</div> */}
+												</div>
+												<div className="grid grid-cols-2 gap-3">
+													<div>
+														<Label htmlFor="df-provider" className="text-xs">Provider</Label>
+														<Input id="df-provider" placeholder="e.g. openai" value={String(filters.providerQuery)} onChange={(e) => setFilters((p) => ({ ...p, providerQuery: e.target.value }))} className="h-8" />
+													</div>
+													<div>
+														<Label htmlFor="df-minctx" className="text-xs">Min context</Label>
+														<Input id="df-minctx" type="number" min={0} value={String(filters.minContext)} onChange={(e) => setFilters((p) => ({ ...p, minContext: e.target.value }))} className="h-8" />
+													</div>
+													<div>
+														<Label htmlFor="df-maxprice" className="text-xs">Max prompt $/1K</Label>
+														<Input id="df-maxprice" type="number" min={0} step="0.0001" value={String(filters.maxPromptPrice)} onChange={(e) => setFilters((p) => ({ ...p, maxPromptPrice: e.target.value }))} className="h-8" />
+													</div>
+													<div>
+														<Label htmlFor="df-status" className="text-xs">Status</Label>
+											<select id="df-status" className="h-8 w-full rounded-md border bg-background px-2 text-sm" value={filters.status} onChange={(e) => setFilters((p) => ({ ...p, status: e.target.value as ModelStatusFilter }))}>
+															<option value="any">Any</option>
+															<option value="active">Active</option>
+															<option value="deprecated">Deprecated</option>
+															<option value="deactivated">Deactivated</option>
+														</select>
+													</div>
+												</div>
+												<div className="flex items-center justify-between">
+							<Button type="button" variant="ghost" size="sm" onClick={() => setFilters({ streaming: false, vision: false, tools: false, jsonOutput: false, moderatedMode: "any", status: "any", providerQuery: "", minContext: "", maxPromptPrice: "" })}>
+														Reset
+													</Button>
+												</div>
+											</PopoverContent>
+										</Popover>
 									</div>
 								)}
 								{filteredModels.map(renderModelItem)}
