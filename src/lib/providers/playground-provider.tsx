@@ -34,6 +34,26 @@ type ModelConfig = {
 	topK: number;
 	frequencyPenalty: number;
 	presencePenalty: number;
+  openai?: {
+    reasoningEffort?: "minimal" | "low" | "medium" | "high";
+    reasoningSummary?: "auto" | "detailed";
+    textVerbosity?: "low" | "medium" | "high";
+    serviceTier?: "auto" | "flex" | "priority";
+    parallelToolCalls?: boolean;
+    store?: boolean;
+    strictJsonSchema?: boolean;
+    maxCompletionTokens?: number;
+    user?: string;
+    metadata?: Record<string, string>;
+  };
+  // Google-only provider options (applied when provider is `google`)
+  google?: {
+    cachedContent?: string;
+    structuredOutputs?: boolean;
+    safetySettings?: Array<{ category: string; threshold: string }>;
+    responseModalities?: string[];
+    thinkingConfig?: { thinkingBudget?: number; includeThoughts?: boolean };
+  };
 };
 
 export type ChatColumn = {
@@ -44,6 +64,7 @@ export type ChatColumn = {
 	synced: boolean;
 	config: ModelConfig;
 	isStreaming: boolean;
+  status?: "submitted" | "streaming" | "ready" | "error";
 };
 
 type PlaygroundState = {
@@ -59,6 +80,8 @@ interface PlaygroundContextType {
 	columns: ChatColumn[];
 	sharedInput: string;
 	playgroundId: string;
+  maxColumns: number;
+  setMaxColumns: (max: number) => void;
 	addColumn: () => void;
 	removeColumn: (columnId: string) => void;
 	updateColumn: (columnId: string, updates: Partial<ChatColumn>) => void;
@@ -97,6 +120,25 @@ const createDefaultConfig = (): ModelConfig => ({
 	topK: 0,
 	frequencyPenalty: 0,
 	presencePenalty: 0,
+  openai: {
+    reasoningEffort: undefined,
+    reasoningSummary: undefined,
+    textVerbosity: undefined,
+    serviceTier: undefined,
+    parallelToolCalls: undefined,
+    store: undefined,
+    strictJsonSchema: undefined,
+    maxCompletionTokens: undefined,
+    user: undefined,
+    metadata: undefined,
+  },
+  google: {
+    cachedContent: undefined,
+    structuredOutputs: undefined,
+    safetySettings: undefined,
+    responseModalities: undefined,
+    thinkingConfig: undefined,
+  },
 });
 
 let columnCounter = 0;
@@ -110,7 +152,8 @@ const createDefaultColumn = (modelId?: string): ChatColumn => {
 		input: "",
 		synced: false,
 		config: createDefaultConfig(),
-		isStreaming: false,
+    isStreaming: false,
+    status: "ready",
 	};
 };
 
@@ -123,6 +166,21 @@ const createTextParts = (content: string): UIMessage["parts"] => [
 
 const PLAYGROUND_LIST_KEY = "chaichat_playground_list";
 const PLAYGROUND_PREFIX = "chaichat_playground_";
+import {
+  PLAYGROUND_MAX_COLUMNS_CHANGED_EVENT,
+  PLAYGROUND_MAX_COLUMNS_DEFAULT,
+  PLAYGROUND_MAX_COLUMNS_MAX,
+  PLAYGROUND_MAX_COLUMNS_MIN,
+  PLAYGROUND_MAX_COLUMNS_STORAGE_KEY,
+} from "~/lib/config";
+
+function clampMaxColumns(value: number): number {
+  if (Number.isNaN(value)) return PLAYGROUND_MAX_COLUMNS_DEFAULT;
+  return Math.min(
+    Math.max(value, PLAYGROUND_MAX_COLUMNS_MIN),
+    PLAYGROUND_MAX_COLUMNS_MAX,
+  );
+}
 
 function savePlaygroundToStorage(playgroundId: string, state: PlaygroundState) {
 	if (typeof window === "undefined") return;
@@ -227,6 +285,51 @@ export function PlaygroundProvider({
 		};
 	});
 
+  // Settings: max columns
+  const [maxColumns, setMaxColumnsState] = useState<number>(() => {
+    if (typeof window === "undefined") return PLAYGROUND_MAX_COLUMNS_DEFAULT;
+    try {
+      const raw = window.localStorage.getItem(PLAYGROUND_MAX_COLUMNS_STORAGE_KEY);
+      if (!raw) return PLAYGROUND_MAX_COLUMNS_DEFAULT;
+      const parsed = Number.parseInt(raw);
+      return clampMaxColumns(parsed);
+    } catch {
+      return PLAYGROUND_MAX_COLUMNS_DEFAULT;
+    }
+  });
+
+  const setMaxColumns = useCallback((value: number) => {
+    const clamped = clampMaxColumns(value);
+    setMaxColumnsState(clamped);
+    try {
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(
+          PLAYGROUND_MAX_COLUMNS_STORAGE_KEY,
+          String(clamped),
+        );
+      }
+    } catch {}
+  }, []);
+
+  const pickConfigForModel = useCallback(function pickConfigForModel(modelId: string, config: ModelConfig): ModelConfig {
+    const providerRoot = (modelId.split("/")[0] || "").toLowerCase();
+    const base: ModelConfig = {
+      temperature: config.temperature,
+      maxOutputTokens: config.maxOutputTokens,
+      topP: config.topP,
+      topK: config.topK,
+      frequencyPenalty: config.frequencyPenalty,
+      presencePenalty: config.presencePenalty,
+    } as ModelConfig;
+    if (providerRoot.includes("openai")) {
+      return { ...base, openai: config.openai };
+    }
+    if (providerRoot.includes("google") || providerRoot.includes("gemini")) {
+      return { ...base, google: config.google };
+    }
+    return base;
+  }, []);
+
 	useEffect(() => {
 		if (!playgroundId) return;
 		if (playgroundId.includes(",")) {
@@ -247,17 +350,18 @@ export function PlaygroundProvider({
 				parentChatId: undefined,
 				columnChatIds: {},
 			});
+			setHasLoadedFromStorage(true);
 			return;
 		}
-		setTimeout(() => {
-			if (typeof window !== "undefined") {
+		if (typeof window !== "undefined") {
+			try {
 				const loaded = loadPlaygroundFromStorage(playgroundId);
 				if (loaded) {
 					setState(loaded);
 				}
-			}
-			setHasLoadedFromStorage(true);
-		}, 0);
+			} catch {}
+		}
+		setHasLoadedFromStorage(true);
 	}, [playgroundId]);
 
 	useEffect(() => {
@@ -297,6 +401,34 @@ export function PlaygroundProvider({
 		};
 	}, []);
 
+  // Sync maxColumns with external changes (settings dialog or other tabs)
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === PLAYGROUND_MAX_COLUMNS_STORAGE_KEY && e.newValue) {
+        const parsed = Number.parseInt(e.newValue);
+        setMaxColumnsState(clampMaxColumns(parsed));
+      }
+    };
+    const onCustom = (e: Event) => {
+      try {
+        const detail = (e as CustomEvent<number>).detail;
+        if (typeof detail === "number") {
+          setMaxColumns(detail);
+        }
+      } catch {}
+    };
+    if (typeof window !== "undefined") {
+      window.addEventListener("storage", onStorage);
+      window.addEventListener(PLAYGROUND_MAX_COLUMNS_CHANGED_EVENT, onCustom as EventListener);
+    }
+    return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener("storage", onStorage);
+        window.removeEventListener(PLAYGROUND_MAX_COLUMNS_CHANGED_EVENT, onCustom as EventListener);
+      }
+    };
+  }, [setMaxColumns]);
+
 	const ensurePlaygroundId = useCallback((): {
 		id: string;
 		created: boolean;
@@ -331,23 +463,27 @@ export function PlaygroundProvider({
 
 	// Column management
 	const addColumn = useCallback(() => {
-		setState((prev) => {
-			const newId = `column-${Date.now()}-${prev.columns.length}`;
-			const newColumn: ChatColumn = {
-				id: newId,
-				modelId: "openai/gpt-4o-mini",
-				messages: [],
-				input: "",
-				synced: false,
-				config: createDefaultConfig(),
-				isStreaming: false,
-			};
-			return {
-				...prev,
-				columns: [...prev.columns, newColumn],
-			};
-		});
-	}, []);
+    setState((prev) => {
+      if (prev.columns.length >= maxColumns) {
+        return prev;
+      }
+      const newId = `column-${Date.now()}-${prev.columns.length}`;
+      const newColumn: ChatColumn = {
+        id: newId,
+        modelId: "openai/gpt-4o-mini",
+        messages: [],
+        input: "",
+        synced: false,
+        config: createDefaultConfig(),
+        isStreaming: false,
+        status: "ready",
+      };
+      return {
+        ...prev,
+        columns: [...prev.columns, newColumn],
+      };
+    });
+  }, [maxColumns]);
 
 	const removeColumn = useCallback((columnId: string) => {
 		setState((prev) => ({
@@ -383,7 +519,7 @@ export function PlaygroundProvider({
 			...prev,
 			columns: prev.columns.map((col) =>
 				col.id === columnId
-					? { ...col, messages: [], isStreaming: false }
+          ? { ...col, messages: [], isStreaming: false, status: "ready" }
 					: col,
 			),
 		}));
@@ -455,8 +591,20 @@ export function PlaygroundProvider({
 		[],
 	);
 
+  const setColumnStatus = useCallback(
+    (columnId: string, status: "submitted" | "streaming" | "ready" | "error") => {
+      setState((prev) => ({
+        ...prev,
+        columns: prev.columns.map((col) =>
+          col.id === columnId ? { ...col, status } : col,
+        ),
+      }));
+    },
+    [],
+  );
+
 	// Message sending
-	const sendToColumn = useCallback(
+  const sendToColumn = useCallback(
 		async (columnId: string, messageText: string) => {
 			const column = state.columns.find((col) => col.id === columnId);
 			if (!column) return;
@@ -464,6 +612,8 @@ export function PlaygroundProvider({
 			try {
 				// Set streaming status to true
 				setColumnStreaming(columnId, true);
+        // Reflect useChat-like lifecycle
+        setColumnStatus(columnId, "submitted");
 
 				const userApiKeys = await getUserApiKeys();
 				const messageTimestamp = Date.now();
@@ -526,23 +676,32 @@ export function PlaygroundProvider({
 								id: c.id,
 								modelId: c.modelId,
 							}));
-							// @ts-expect-error: using string ref until codegen includes playground endpoints
-							const convexPlaygroundId = await convex.mutation(
-								"playground:createPlayground",
-								{
-									userId: user.id,
-									name: `Playground ${new Date().toLocaleTimeString()}`,
-									columns: pgColumns,
-								},
-							);
+						// Using unknown here to bypass type until codegen includes playground endpoints
+						const convexPlaygroundId = await (convex as unknown as {
+							mutation: (
+								name: string,
+								args: Record<string, unknown>,
+							) => Promise<string>;
+						}).mutation(
+							"playground:createPlayground",
+							{
+								userId: user.id,
+								name: `Playground ${new Date().toLocaleTimeString()}`,
+								columns: pgColumns,
+							},
+						);
 							setState((prev) => ({
 								...prev,
 								parentChatId: convexPlaygroundId,
 							}));
 						}
 						if (state.parentChatId) {
-							// @ts-expect-error: using string ref until codegen includes playground endpoints
-							await convex.mutation("playground:addPlaygroundMessage", {
+						await (convex as unknown as {
+							mutation: (
+								name: string,
+								args: Record<string, unknown>,
+							) => Promise<string>;
+						}).mutation("playground:addPlaygroundMessage", {
 								playgroundId: state.parentChatId as unknown as string,
 								columnId: columnId,
 								userId: user.id,
@@ -564,7 +723,7 @@ export function PlaygroundProvider({
 					new Set<AbortController>();
 				setForColumn.add(controller);
 				inFlightControllersRef.current.set(columnId, setForColumn);
-				const response = await fetch("/api/chat", {
+        const response = await fetch("/api/chat", {
 					method: "POST",
 					headers: {
 						"Content-Type": "application/json",
@@ -572,7 +731,8 @@ export function PlaygroundProvider({
 					body: JSON.stringify({
 						messages: messagesForAPI,
 						model: column.modelId,
-						temperature: column.config.temperature,
+                        temperature: column.config.temperature,
+                        config: pickConfigForModel(column.modelId, column.config),
 						userApiKeys,
 					}),
 					signal: controller.signal,
@@ -585,6 +745,7 @@ export function PlaygroundProvider({
 				// Handle streaming response
 				const reader = response.body?.getReader();
 				if (!reader) throw new Error("No reader available");
+        setColumnStatus(columnId, "streaming");
 
 				const decoder = new TextDecoder();
 				let assistantContent = "";
@@ -612,12 +773,12 @@ export function PlaygroundProvider({
 							col.id === columnId
 								? {
 										...col,
-										messages: [
-											...col.messages.filter(
-												(m) => m.id !== assistantMessage.id,
-											),
-											assistantMessage,
-										],
+                                        messages: [
+                                            ...col.messages.filter(
+                                                (m) => m.id !== assistantMessage.id,
+                                            ),
+                                            assistantMessage,
+                                        ],
 									}
 								: col,
 						),
@@ -709,6 +870,7 @@ export function PlaygroundProvider({
 
 				// Set streaming status to false when done
 				setColumnStreaming(columnId, false);
+        setColumnStatus(columnId, "ready");
 				// Remove controller from tracking
 				try {
 					const setForCol = inFlightControllersRef.current.get(columnId);
@@ -763,6 +925,7 @@ export function PlaygroundProvider({
 
 				// Set streaming status to false on error
 				setColumnStreaming(columnId, false);
+        setColumnStatus(columnId, "error");
 
 				// Add error message
 				const errorMessage: PlaygroundMessage = {
@@ -795,11 +958,12 @@ export function PlaygroundProvider({
 				});
 			}
 		},
-		[
+    [
 			state.columns,
 			getUserApiKeys,
 			updateColumn,
 			setColumnStreaming,
+      setColumnStatus,
 			user?.id,
 			currentUserId,
 			ensurePlaygroundId,
@@ -807,10 +971,11 @@ export function PlaygroundProvider({
 			convex,
 			state.parentChatId,
 			state.createdAt,
-		],
+      pickConfigForModel,
+    ],
 	);
 
-	const sendToSyncedColumns = useCallback(
+  const sendToSyncedColumns = useCallback(
 		async (message: string) => {
 			const syncedColumns = state.columns.filter((col) => col.synced);
 
@@ -826,6 +991,7 @@ export function PlaygroundProvider({
 			// Set all synced columns to streaming
 			for (const column of syncedColumns) {
 				setColumnStreaming(column.id, true);
+        setColumnStatus(column.id, "submitted");
 			}
 
 			try {
@@ -903,7 +1069,7 @@ export function PlaygroundProvider({
 								new Set<AbortController>();
 							setForCol.add(controller);
 							inFlightControllersRef.current.set(column.id, setForCol);
-							const response = await fetch("/api/chat", {
+            const response = await fetch("/api/chat", {
 								method: "POST",
 								headers: {
 									"Content-Type": "application/json",
@@ -911,7 +1077,8 @@ export function PlaygroundProvider({
 								body: JSON.stringify({
 									messages: messagesForAPI,
 									model: column.modelId,
-									temperature: column.config.temperature,
+                                    temperature: column.config.temperature,
+                                    config: pickConfigForModel(column.modelId, column.config),
 									userApiKeys,
 								}),
 								signal: controller.signal,
@@ -924,6 +1091,7 @@ export function PlaygroundProvider({
 							// Handle streaming response
 							const reader = response.body?.getReader();
 							if (!reader) throw new Error("No reader available");
+            setColumnStatus(column.id, "streaming");
 
 							const decoder = new TextDecoder();
 							let assistantContent = "";
@@ -1016,7 +1184,8 @@ export function PlaygroundProvider({
 								}
 							} catch {}
 
-							return { columnId: column.id, success: true };
+            setColumnStatus(column.id, "ready");
+            return { columnId: column.id, success: true };
 						} catch (error) {
 							console.error(
 								`Failed to send message to column ${column.id}:`,
@@ -1052,6 +1221,8 @@ export function PlaygroundProvider({
 										: col,
 								),
 							}));
+            setColumnStreaming(column.id, false);
+            setColumnStatus(column.id, "error");
 
 							return { columnId: column.id, success: false, error };
 						}
@@ -1066,10 +1237,22 @@ export function PlaygroundProvider({
 					results,
 				);
 
-				// Set all synced columns streaming status to false
-				for (const column of syncedColumns) {
-					setColumnStreaming(column.id, false);
-				}
+      // Set all synced columns streaming status to false and mark ready where appropriate
+      for (const column of syncedColumns) {
+        setColumnStreaming(column.id, false);
+      }
+      // Preserve any 'error' statuses; only transition submitted/streaming -> ready
+      setState((prev) => ({
+        ...prev,
+        columns: prev.columns.map((col) => {
+          if (!syncedColumns.find((c) => c.id === col.id)) return col;
+          if (col.status === "error") return col;
+          if (col.status === "submitted" || col.status === "streaming") {
+            return { ...col, status: "ready" as const };
+          }
+          return col;
+        }),
+      }));
 
 				// Persist latest state so assistant messages are available after navigation
 				try {
@@ -1099,14 +1282,16 @@ export function PlaygroundProvider({
 				} catch {}
 			}
 		},
-		[
+    [
 			state.columns,
 			getUserApiKeys,
 			updateSharedInput,
 			setColumnStreaming,
 			ensurePlaygroundId,
 			router.replace,
-		],
+      pickConfigForModel,
+      setColumnStatus,
+        ],
 	);
 
 	// Playground management
@@ -1142,6 +1327,8 @@ export function PlaygroundProvider({
 				columns: state.columns,
 				sharedInput: state.sharedInput,
 				playgroundId: state.currentPlaygroundId,
+        maxColumns,
+        setMaxColumns,
 
 				// Column management
 				addColumn,

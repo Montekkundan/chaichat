@@ -72,12 +72,21 @@ function SidebarProvider({
 	const isMobile = useIsMobile();
 	const [openMobile, setOpenMobile] = React.useState(false);
 
-	// This is the internal state of the sidebar.
-	// We use openProp and setOpenProp for control from outside the component.
-	// Important: keep initial render stable between server and client
-	// to avoid hydration mismatches. We do NOT read from window/cookies
-	// until after mount; we start with the provided SSR-friendly default.
-	const [_open, _setOpen] = React.useState<boolean>(defaultOpen);
+  // This is the internal state of the sidebar.
+  // We use openProp and setOpenProp for control from outside the component.
+  // Read from cookie synchronously on the client to avoid an initial
+  // open-then-collapse flash (flicker) when a persisted closed state exists.
+  const [_open, _setOpen] = React.useState<boolean>(() => {
+    if (typeof document === "undefined") return defaultOpen;
+    try {
+      const match = document.cookie.match(
+        new RegExp(`${SIDEBAR_COOKIE_NAME}=([^;]+)`),
+      );
+      return match ? match[1] === "true" : defaultOpen;
+    } catch {
+      return defaultOpen;
+    }
+  });
 	const open = openProp ?? _open;
 	const setOpen = React.useCallback(
 		(value: boolean | ((value: boolean) => boolean)) => {
@@ -121,32 +130,25 @@ function SidebarProvider({
 	// This makes it easier to style the sidebar with Tailwind classes.
 	const state = open ? "expanded" : "collapsed";
 
-	// After mount, reconcile with persisted state (cookie/sessionStorage)
-	React.useEffect(() => {
-		try {
-			if (typeof window !== "undefined") {
-				// Force-open one-shot flag for playground
-				if (window.location.pathname.startsWith("/playground")) {
-					const force = sessionStorage.getItem(
-						"cc_force_open_playground_sidebar",
-					);
-					if (force) {
-						setOpen(true);
-						if (isMobile) setOpenMobile(true);
-						sessionStorage.removeItem("cc_force_open_playground_sidebar");
-						return;
-					}
-				}
-
-				const match = document.cookie.match(
-					new RegExp(`${SIDEBAR_COOKIE_NAME}=([^;]+)`),
-				);
-				if (match) {
-					_setOpen(match[1] === "true");
-				}
-			}
-		} catch {}
-	}, [isMobile, setOpen]);
+  // After mount, only honor the one-shot force-open flag for playground.
+  // Cookie was already read synchronously above to avoid flicker.
+  React.useEffect(() => {
+    try {
+      if (typeof window !== "undefined") {
+        if (window.location.pathname.startsWith("/playground")) {
+          const force = sessionStorage.getItem(
+            "cc_force_open_playground_sidebar",
+          );
+          if (force) {
+            setOpen(true);
+            if (isMobile) setOpenMobile(true);
+            sessionStorage.removeItem("cc_force_open_playground_sidebar");
+            return;
+          }
+        }
+      }
+    } catch {}
+  }, [isMobile, setOpen]);
 
 	React.useEffect(() => {}, []);
 
@@ -244,6 +246,7 @@ function Sidebar({
 
 	return (
 		<div
+			suppressHydrationWarning
 			className="group peer hidden text-sidebar-foreground md:block"
 			data-state={state}
 			data-collapsible={state === "collapsed" ? collapsible : ""}
@@ -331,6 +334,7 @@ function SidebarRail({ className, ...props }: React.ComponentProps<"button">) {
 				"-translate-x-1/2 group-data-[side=left]:-right-4 absolute inset-y-0 z-20 hidden w-4 transition-all ease-linear after:absolute after:inset-y-0 after:left-1/2 after:w-[2px] hover:after:bg-sidebar-border group-data-[side=right]:left-0 sm:flex",
 				"in-data-[side=left]:cursor-w-resize in-data-[side=right]:cursor-e-resize",
 				"[[data-side=left][data-state=collapsed]_&]:cursor-e-resize [[data-side=right][data-state=collapsed]_&]:cursor-w-resize",
+				"group-data-[state=expanded]:mt-6",
 				"group-data-[collapsible=offcanvas]:translate-x-0 hover:group-data-[collapsible=offcanvas]:bg-sidebar group-data-[collapsible=offcanvas]:after:left-full",
 				"[[data-side=left][data-collapsible=offcanvas]_&]:-right-2",
 				"[[data-side=right][data-collapsible=offcanvas]_&]:-left-2",

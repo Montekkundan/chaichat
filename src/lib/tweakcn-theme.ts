@@ -9,8 +9,7 @@ function loadGoogleFont(fontFamily: string, weights: string[] = ["400"]) {
 	const existing = document.querySelector(`link[href="${href}"]`);
 	if (existing) {
 		document.fonts.ready.then(() => {
-			document.fonts.load(`400 16px "${fontFamily}"`).catch(() => {
-			});
+			document.fonts.load(`400 16px "${fontFamily}"`).catch(() => {});
 		});
 		return;
 	}
@@ -26,8 +25,7 @@ function loadGoogleFont(fontFamily: string, weights: string[] = ["400"]) {
 				.then(() => {
 					document.body.style.fontFamily = document.body.style.fontFamily || "";
 				})
-				.catch(() => {
-				});
+				.catch(() => {});
 		});
 	};
 

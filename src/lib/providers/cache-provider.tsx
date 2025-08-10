@@ -38,6 +38,7 @@ interface CacheContextType {
 		userId: string;
 		role: "user" | "assistant" | "system";
 		content: string;
+    partsJson?: string;
 		model: string;
 		attachments?: {
 			name: string;
@@ -651,6 +652,7 @@ export function CacheProvider({
 			userId: string;
 			role: "user" | "assistant" | "system";
 			content: string;
+      partsJson?: string;
 			model: string;
 			attachments?: {
 				name: string;
@@ -745,21 +747,34 @@ export function CacheProvider({
 			try {
 				// If chatId is still optimistic, delay server sync until realId exists
 				let newMessageId: string | undefined;
-				if (!targetChatId.startsWith(OPTIMISTIC_PREFIX)) {
-					const convexData = {
-						chatId: targetChatId as Id<"chats">,
-						userId: messageData.userId,
-						role: messageData.role,
-						content: messageData.content,
-						model: messageData.model,
-						attachments: messageData.attachments,
-						...(messageData.parentMessageId && {
-							parentMessageId: messageData.parentMessageId as Id<"messages">,
-						}),
-						...(messageData.version && { version: messageData.version }),
-					};
-					newMessageId = await addMessageMutation(convexData);
-				}
+                if (!targetChatId.startsWith(OPTIMISTIC_PREFIX)) {
+                  const convexData: Record<string, unknown> = {
+                    chatId: targetChatId as Id<"chats">,
+                    userId: messageData.userId,
+                    role: messageData.role,
+                    content: messageData.content,
+                    model: messageData.model,
+                    attachments: messageData.attachments,
+                    ...(messageData.parentMessageId && {
+                      parentMessageId: messageData.parentMessageId as Id<"messages">,
+                    }),
+                    ...(messageData.version && { version: messageData.version }),
+                  };
+                  if (messageData.partsJson) {
+                    convexData.partsJson = messageData.partsJson;
+                  }
+                  newMessageId = await addMessageMutation(convexData as unknown as {
+                    chatId: Id<"chats">;
+                    userId: string;
+                    role: "user" | "assistant" | "system";
+                    content: string;
+                    model: string;
+                    attachments?: { name: string; url: string; contentType: string; size: number }[];
+                    parentMessageId?: Id<"messages">;
+                    version?: number;
+                    partsJson?: string;
+                  });
+                }
 
 				if (newMessageId) {
 					const realMessage = { ...optimisticMessage, _id: newMessageId };

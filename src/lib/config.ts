@@ -1,22 +1,9 @@
 export const SYSTEM_PROMPT_DEFAULT =
-	"You are ChaiChat, a helpful assistant. You are able to answer questions and help with tasks. " +
-	"If you include internal reasoning, start your response with <think> and stream ALL reasoning inside it. " +
-	"Close reasoning with </think> before the final answer. After </think>, write only the final answer.";
+	"You are ChaiChat, a helpful assistant. You are able to answer questions and help with tasks.";
 
 export const MODEL_DEFAULT = "gpt-4o";
 
 export const MESSAGE_MAX_LENGTH = 4000;
-
-// Only these providers will be available in the UI and API
-// Add providers here after they have been fully tested and verified
-export const TESTED_PROVIDERS: string[] = [
-	"OpenAI",
-	// "Anthropic",
-	// "Google",
-	// "Groq",
-	// "Mistral",
-	// "xAI",
-];
 
 // --- App SEO / metadata ---
 export const APP_NAME = "ChaiChat";
@@ -40,3 +27,11 @@ export const generateOGImageURL = (params: {
 
 	return `${APP_URL}/api/og?${searchParams.toString()}`;
 };
+
+// --- Playground configuration ---
+export const PLAYGROUND_MAX_COLUMNS_MIN = 1;
+export const PLAYGROUND_MAX_COLUMNS_MAX = 10;
+export const PLAYGROUND_MAX_COLUMNS_DEFAULT = 3;
+export const PLAYGROUND_MAX_COLUMNS_STORAGE_KEY = "chaichat_playground_max_columns";
+export const PLAYGROUND_MAX_COLUMNS_CHANGED_EVENT =
+  "cc-playground-max-columns-changed";

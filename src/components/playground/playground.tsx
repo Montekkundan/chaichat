@@ -12,7 +12,7 @@ export function Playground() {
 	const collapsed = state === "collapsed";
 
 	return (
-		<SidebarProvider toggleSidebarShortcut={false} defaultOpen={false}>
+		<SidebarProvider toggleSidebarShortcut={false}>
 			<div className="flex size-full h-screen min-h-0 flex-col">
 				<AppSidebar collapsed={collapsed} />
 				<div

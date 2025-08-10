@@ -18,6 +18,8 @@ export interface Message {
 	userId: string;
 	role: "user" | "assistant" | "system";
 	content: string;
+  // full message parts including reasoning/tool calls, not just text content.
+  partsJson?: string;
 	model: string;
 	createdAt: number;
 	_creationTime: number;
@@ -68,12 +70,12 @@ export class ChaiChatDB extends Dexie {
 
 	constructor() {
 		super("ChaiChatDB");
-		this.version(6)
+    this.version(7)
 			.stores({
 				chats:
 					"_id, userId, name, createdAt, currentModel, parentChatId, isPublic",
-				messages:
-					"_id, chatId, userId, createdAt, parentMessageId, version, isActive, model, attachments",
+        messages:
+          "_id, chatId, userId, createdAt, parentMessageId, version, isActive, model, attachments, partsJson",
 				users: "id, fullName",
 				playgrounds: "_id, userId, createdAt",
 				playgroundMessages:
@@ -87,6 +89,7 @@ export class ChaiChatDB extends Dexie {
 						if (message.isActive === undefined) message.isActive = true;
 						if (!message.model) message.model = "gpt-4o";
 						if (message.attachments === undefined) message.attachments = [];
+            if (message.partsJson === undefined) message.partsJson = undefined;
 					});
 
 				// Ensure new parentChatId field exists on chats

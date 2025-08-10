@@ -27,6 +27,7 @@ import {
 	SidebarMenu,
 	SidebarMenuButton,
 	SidebarMenuItem,
+	SidebarRail,
 } from "~/components/ui/sidebar";
 import { toast } from "~/components/ui/toast";
 import { useCache } from "~/lib/providers/cache-provider";
@@ -316,6 +317,7 @@ export function AppSidebar({
 					onToggle={(newVal) => setChatPublicState(shareChatId, newVal)}
 				/>
 			)}
+			<SidebarRail />
 		</Sidebar>
 	);
 }

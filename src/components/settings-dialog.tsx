@@ -34,15 +34,24 @@ import {
 	isTweakcnThemeActive,
 	resetToDefaultTheme,
 } from "~/lib/tweakcn-theme";
+import { cn } from "~/lib/utils";
+import {
+  PLAYGROUND_MAX_COLUMNS_CHANGED_EVENT,
+  PLAYGROUND_MAX_COLUMNS_DEFAULT,
+  PLAYGROUND_MAX_COLUMNS_MAX,
+  PLAYGROUND_MAX_COLUMNS_MIN,
+  PLAYGROUND_MAX_COLUMNS_STORAGE_KEY,
+} from "~/lib/config";
 
 const data = {
 	nav: [
 		{ name: "API Keys", icon: Key, id: "api-keys" },
 		{ name: "Appearance", icon: GearIcon, id: "appearance" },
+		{ name: "Playground", icon: GearIcon, id: "playground" },
 	],
 };
 
-type SettingsSection = "api-keys" | "appearance";
+type SettingsSection = "api-keys" | "appearance" | "playground";
 
 export function SettingsDialog({
 	open,
@@ -60,7 +69,9 @@ export function SettingsDialog({
 	const [themeUrl, setThemeUrl] = React.useState("");
 	const [isLoading, setIsLoading] = React.useState(false);
 	const [isRestoringUrl, setIsRestoringUrl] = React.useState(true);
-	const [isUserAction, setIsUserAction] = React.useState(false);
+    const [isUserAction, setIsUserAction] = React.useState(false);
+    const [maxColumns, setMaxColumns] = React.useState<number>(3);
+    const [maxColumnsInput, setMaxColumnsInput] = React.useState<string>("3");
 
 	const apiKeyManagerComponent = React.useMemo(() => <ApiKeyManager />, []);
 
@@ -121,60 +132,52 @@ export function SettingsDialog({
 		}
 	}, [resolvedTheme, tweakcnTheme]);
 
-	const handleFetchTheme = async () => {
-		if (!themeUrl.trim()) {
-			toast({ title: "Please enter a theme URL", status: "error" });
-			return;
-		}
-
-		if (!themeUrl.startsWith("https://tweakcn.com/r/themes/")) {
-			toast({
-				title:
-					"Please use a valid Tweakcn theme URL (https://tweakcn.com/r/themes/...)",
-				status: "error",
-			});
-			return;
-		}
-
-		setIsLoading(true);
-		setIsUserAction(true); // Mark as user action
+    React.useEffect(() => {
 		try {
-			const theme = await fetchTweakcnTheme(themeUrl);
-			if (theme) {
-				const syncedTheme = {
-					...theme,
-					currentMode: (resolvedTheme === "dark" ? "dark" : "light") as
-						| "dark"
-						| "light",
-				};
-				setTweakcnTheme(syncedTheme);
-				applyTweakcnTheme(syncedTheme);
-				setIsTweakcnActive(true);
+      const raw = localStorage.getItem(PLAYGROUND_MAX_COLUMNS_STORAGE_KEY);
+      const parsed = raw ? Number.parseInt(raw) : PLAYGROUND_MAX_COLUMNS_DEFAULT;
+      const clamped = Math.min(
+        Math.max(
+          Number.isNaN(parsed) ? PLAYGROUND_MAX_COLUMNS_DEFAULT : parsed,
+          PLAYGROUND_MAX_COLUMNS_MIN,
+        ),
+        PLAYGROUND_MAX_COLUMNS_MAX,
+      );
+			setMaxColumns(clamped);
+        setMaxColumnsInput(String(clamped));
+		} catch { }
+	}, []);
 
-				// Persist the theme URL
-				try {
-					localStorage.setItem("chai-tweakcn-theme-url", themeUrl);
-				} catch (error) {
-					console.error("Failed to store theme URL:", error);
-				}
-
-				toast({ title: "Theme fetched and applied!", status: "success" });
-			} else {
-				toast({
-					title: "Failed to fetch theme - invalid JSON response",
-					status: "error",
-				});
-			}
-		} catch (error) {
-			toast({
-				title: "Error fetching theme - please check the URL",
-				status: "error",
-			});
-		} finally {
-			setIsLoading(false);
-			setIsUserAction(false); // Reset the flag
+    const commitMaxColumns = (value: number) => {
+    const clamped = Math.min(
+      Math.max(
+        Number.isNaN(value) ? PLAYGROUND_MAX_COLUMNS_DEFAULT : value,
+        PLAYGROUND_MAX_COLUMNS_MIN,
+      ),
+      PLAYGROUND_MAX_COLUMNS_MAX,
+    );
+		setMaxColumns(clamped);
+      setMaxColumnsInput(String(clamped));
+		try {
+      localStorage.setItem(PLAYGROUND_MAX_COLUMNS_STORAGE_KEY, String(clamped));
+			window.dispatchEvent(
+        new CustomEvent<number>(PLAYGROUND_MAX_COLUMNS_CHANGED_EVENT, {
+					detail: clamped,
+				}),
+			);
+			toast({ title: "Max columns updated", status: "success" });
+		} catch (err) {
+			console.error(err);
+			toast({ title: "Failed to save setting", status: "error" });
 		}
 	};
+    const handleMaxColumnsInputChange = (value: string) => {
+      setMaxColumnsInput(value);
+      const parsed = Number.parseInt(value);
+      if (!Number.isNaN(parsed)) {
+        commitMaxColumns(parsed);
+      }
+    };
 
 	React.useEffect(() => {
 		// Don't process empty URLs during restoration phase
@@ -233,7 +236,7 @@ export function SettingsDialog({
 						});
 					}
 				}
-			} catch (error) {
+			} catch {
 				if (isUserAction) {
 					toast({
 						title: "Error fetching theme - please check the URL",
@@ -247,23 +250,8 @@ export function SettingsDialog({
 		}, 1000);
 
 		return () => clearTimeout(timeoutId);
-	}, [themeUrl, resolvedTheme, isRestoringUrl]); // Added isRestoringUrl, removed tweakcnTheme to prevent infinite loop
-
-	const handleApplyTweakcnTheme = () => {
-		if (tweakcnTheme) {
-			const syncedTheme = {
-				...tweakcnTheme,
-				currentMode: (resolvedTheme === "dark" ? "dark" : "light") as
-					| "dark"
-					| "light",
-			};
-			applyTweakcnTheme(syncedTheme);
-			setIsTweakcnActive(true);
-			toast({ title: "Tweakcn theme applied!", status: "success" });
-		} else {
-			toast({ title: "No theme to apply", status: "error" });
-		}
-	};
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [themeUrl, resolvedTheme, isRestoringUrl, isUserAction, tweakcnTheme]);
 
 	const handleResetTheme = () => {
 		resetToDefaultTheme();
@@ -412,6 +400,38 @@ export function SettingsDialog({
 									)}
 								</div>
 							</div>
+						</div>
+					</div>
+				);
+			case "playground":
+				return (
+					<div className="space-y-6">
+						<div>
+							<h3 className="font-semibold text-lg">Playground</h3>
+							<p className="text-sm" style={{ color: "var(--foreground)", opacity: 0.8 }}>
+								Configure playground limits
+							</p>
+						</div>
+						{/* biome-ignore lint/nursery/useSortedClasses: keep logical grouping */}
+						<div className={cn("bg-card border p-4 rounded-lg space-y-3")}>
+							<h4 className="font-medium">Max Columns</h4>
+                            <p className="text-muted-foreground text-xs">Minimum {PLAYGROUND_MAX_COLUMNS_MIN}, maximum {PLAYGROUND_MAX_COLUMNS_MAX}. Default is {PLAYGROUND_MAX_COLUMNS_DEFAULT}.</p>
+                            <div className="flex items-center gap-2">
+                              <Input
+                                id="max-columns"
+                                type="number"
+                                min={PLAYGROUND_MAX_COLUMNS_MIN}
+                                max={PLAYGROUND_MAX_COLUMNS_MAX}
+                                value={maxColumnsInput}
+                                onChange={(e) => handleMaxColumnsInputChange(e.target.value)}
+                                onBlur={() => {
+                                  if (maxColumnsInput.trim() === "" || Number.isNaN(Number.parseInt(maxColumnsInput))) {
+                                    setMaxColumnsInput(String(maxColumns));
+                                  }
+                                }}
+                                className="h-8 w-24"
+                              />
+                            </div>
 						</div>
 					</div>
 				);

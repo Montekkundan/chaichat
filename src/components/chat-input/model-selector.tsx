@@ -66,8 +66,8 @@ export function ModelSelector({
 	isUserAuthenticated: _isUserAuthenticated,
 }: ModelSelectorProps) {
 	const { models, isLoading, error } = useLLMModels();
-	const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-	const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 	const [searchQuery, setSearchQuery] = useState("");
 	const [expandedModels, setExpandedModels] = useState<Set<string>>(new Set());
 	const [filters, setFilters] = useState({
@@ -88,6 +88,28 @@ export function ModelSelector({
 	const pendingSavedModel = useRef<SelectedModelData | null>(null);
 
 	useEffect(() => {
+    // Focus search input when the dropdown opens on desktop
+    if (!isMobile && isDropdownOpen) {
+      const id = window.setTimeout(() => {
+        searchInputRef.current?.focus();
+        searchInputRef.current?.select?.();
+      }, 0);
+      return () => window.clearTimeout(id);
+    }
+  }, [isDropdownOpen, isMobile]);
+
+  useEffect(() => {
+    // Focus search input when the drawer opens on mobile
+    if (isMobile && isDrawerOpen) {
+      const id = window.setTimeout(() => {
+        searchInputRef.current?.focus();
+        searchInputRef.current?.select?.();
+      }, 0);
+      return () => window.clearTimeout(id);
+    }
+  }, [isDrawerOpen, isMobile]);
+
+  useEffect(() => {
 		if (!selectedModelId && !hasLoadedFromStorage.current) {
 			const savedModel = getSelectedModel();
 			if (savedModel?.modelId) {
@@ -164,49 +186,49 @@ export function ModelSelector({
 		return () => document.removeEventListener("keydown", handleKeyDown);
 	}, [isMobile]);
 
+	const canonicalSelectedKey = useMemo(() => {
+		if (!selectedModelId) return null as string | null;
+		const makeKey = (m: LLMGatewayModel) => `${m.id}::${m.name}`;
+		if (selectedModelId.includes("/")) {
+			const firstSlashIndex = selectedModelId.indexOf("/");
+			const provider = selectedModelId.substring(0, firstSlashIndex);
+			const modelName = selectedModelId.substring(firstSlashIndex + 1);
+			const match = models.find((m) =>
+				m.providers?.some(
+					(p) => p.providerId === provider && p.modelName === modelName,
+				),
+			);
+			if (match) return makeKey(match);
+			const fallback = models.find(
+				(m) => m.id === modelName || m.name === modelName,
+			);
+			return fallback ? makeKey(fallback) : null;
+		}
+		const byName = models.find((m) => m.name === selectedModelId);
+		if (byName) return makeKey(byName);
+		const byId = models.find((m) => m.id === selectedModelId);
+		return byId ? makeKey(byId) : null;
+	}, [selectedModelId, models]);
+
 	const isModelSelected = useCallback(
 		(model: LLMGatewayModel) => {
-			if (selectedModelId === model.id || selectedModelId === model.name)
-				return true;
-
-			if (selectedModelId.includes("/")) {
-				const firstSlashIndex = selectedModelId.indexOf("/");
-				const provider = selectedModelId.substring(0, firstSlashIndex);
-				const modelName = selectedModelId.substring(firstSlashIndex + 1);
-
-				if (!provider || !modelName) return false;
-
-				return !!model.providers?.some(
-					(p) =>
-						p.providerId === provider &&
-						(p.modelName === modelName ||
-							p.modelName.endsWith(`/${modelName}`) ||
-							modelName === p.modelName),
-				);
-			}
-
-			return false;
+			return canonicalSelectedKey === `${model.id}::${model.name}`;
 		},
-		[selectedModelId],
+		[canonicalSelectedKey],
 	);
 	const isProviderSelected = useCallback(
 		(model: LLMGatewayModel, providerId: string) => {
 			if (!selectedModelId.includes("/")) return false;
-
 			const firstSlashIndex = selectedModelId.indexOf("/");
 			const selectedProvider = selectedModelId.substring(0, firstSlashIndex);
 			const selectedModelName = selectedModelId.substring(firstSlashIndex + 1);
-
-			const provider = model.providers?.find(
-				(p) => p.providerId === providerId,
-			);
-			return (
-				selectedProvider === providerId &&
-				provider &&
-				provider.modelName === selectedModelName
-			);
+			if (selectedProvider !== providerId) return false;
+			// Only show the provider selected state for the canonical selected model
+			if (canonicalSelectedKey !== `${model.id}::${model.name}`) return false;
+			const provider = model.providers?.find((p) => p.providerId === providerId);
+			return provider?.modelName === selectedModelName;
 		},
-		[selectedModelId],
+		[selectedModelId, canonicalSelectedKey],
 	);
 
 	const toggleModelExpanded = useCallback((modelId: string) => {
@@ -587,9 +609,24 @@ export function ModelSelector({
 		[getStatusText, isProviderSelected, handleModelSelect, formatPrice],
 	);
 
+	const duplicateModelIdsRef = useRef<Set<string>>(new Set());
+
+	// Track duplicate ids so UI does not mark all with the same id as selected
+	useEffect(() => {
+		const counts = new Map<string, number>();
+		for (const m of models) {
+			counts.set(m.id, (counts.get(m.id) || 0) + 1);
+		}
+		duplicateModelIdsRef.current = new Set(
+			Array.from(counts.entries())
+				.filter(([, c]) => c > 1)
+				.map(([id]) => id),
+		);
+	}, [models]);
+
 	const renderModelItem = useCallback(
 		(model: LLMGatewayModel) => (
-			<TooltipProvider key={model.id}>
+			<TooltipProvider key={`${model.id}::${model.name}`}>
 				<Tooltip delayDuration={300}>
 					<TooltipTrigger asChild>
 						<div className="w-full">
@@ -737,7 +774,7 @@ export function ModelSelector({
 						}
 					}}
 				>
-					<DrawerTrigger asChild>{trigger}</DrawerTrigger>
+          <DrawerTrigger asChild>{trigger}</DrawerTrigger>
 					<DrawerContent>
 						<DrawerHeader>
 							<DrawerTitle>Select Model</DrawerTitle>
@@ -749,6 +786,7 @@ export function ModelSelector({
 									ref={searchInputRef}
 									placeholder={`Search ${filteredModels.length} models...`}
 									className="pr-10 pl-8"
+                  autoFocus
 									value={searchQuery}
 									onChange={handleSearchChange}
 									onClick={(e) => e.stopPropagation()}
@@ -1051,6 +1089,7 @@ export function ModelSelector({
 								ref={searchInputRef}
 								placeholder={`Search ${filteredModels.length} models...`}
 								className="rounded-b-none border border-none pr-10 pl-8 shadow-none focus-visible:ring-0 dark:bg-popover"
+                autoFocus
 								value={searchQuery}
 								onChange={handleSearchChange}
 								onClick={(e) => e.stopPropagation()}

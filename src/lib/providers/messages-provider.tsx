@@ -152,6 +152,7 @@ export function MessagesProvider({ children, chatId }: MessagesProviderProps) {
 		}
 	}, [user?.id]);
 
+	// TODO: add regenerate message option
 	const {
 		messages,
 		status,
@@ -159,7 +160,7 @@ export function MessagesProvider({ children, chatId }: MessagesProviderProps) {
 		setMessages,
 		sendMessage: chatSendMessage,
 	} = useChat({
-		transport: new DefaultChatTransport({
+    transport: new DefaultChatTransport({
 			api: "/api/chat",
 			body: async () => {
 				// Ensure we have a model before proceeding
@@ -175,12 +176,21 @@ export function MessagesProvider({ children, chatId }: MessagesProviderProps) {
 					userApiKeys,
 				};
 			},
-		}),
+    // biome-ignore lint/suspicious/noExplicitAny: Bridging type mismatch between `ai` and `@ai-sdk/react` transport types at compile time; runtime behavior is correct
+    }) as any,
 		onFinish: async ({ message }) => {
 			const currentModel = selectedModelRef.current || "openai/gpt-4o-mini";
 
 			if (message.role === "assistant") {
 				const textContent = getTextContent(message.parts);
+        // Serialize parts for persistence (includes reasoning when present)
+        const partsJson = (() => {
+          try {
+            return JSON.stringify(message.parts ?? []);
+          } catch {
+            return undefined;
+          }
+        })();
 
 				// Add model information to the message immediately
 				const extendedMessage = message as ExtendedMessage;
@@ -210,6 +220,7 @@ export function MessagesProvider({ children, chatId }: MessagesProviderProps) {
 							userId: currentUserId || "local_user",
 							role: "assistant",
 							content: textContent,
+              ...(partsJson ? { partsJson } : {}),
 							model: currentModel,
 							attachments: [],
 							parentMessageId: undefined,
@@ -223,46 +234,62 @@ export function MessagesProvider({ children, chatId }: MessagesProviderProps) {
 				}
 			}
 		},
-		onError: (error) => {
-			const createSystemMessage = (content: string) =>
-				({
-					id: `system-${Date.now()}`,
-					role: "system" as const,
-					parts: createTextParts(content),
-				}) as ExtendedMessage;
+    onError: (error) => {
+      const currentModel = selectedModelRef.current || "openai/gpt-4o-mini";
+      const createAssistantErrorMessage = (content: string) =>
+        ({
+          id: `assistant-error-${Date.now()}`,
+          role: "assistant" as const,
+          parts: createTextParts(content),
+          model: currentModel,
+        }) as ExtendedMessage;
 
-			const addSystemMessage = (sysMsg: ExtendedMessage) => {
-				setMessages((prev) => [...prev, sysMsg]);
-			};
+      const addAssistantErrorMessage = (msg: ExtendedMessage) => {
+        setMessages((prev) => [...prev, msg]);
+      };
 
-			try {
-				const errorData = JSON.parse(error.message);
+      try {
+        const errorData = JSON.parse(error.message);
 
-				if (errorData.code === "RATE_LIMITED") {
-					setRateLimited(true);
-					addSystemMessage(
-						createSystemMessage(
-							"⚠️ Rate limit exceeded. Please wait a moment before sending another message.",
-						),
-					);
-					setTimeout(() => setRateLimited(false), 60000);
-				} else if (errorData.code === "QUOTA_EXCEEDED") {
-					setQuotaExceeded(true);
-					addSystemMessage(
-						createSystemMessage(
-							"⚠️ API quota exceeded. Please check your API key limits or try a different model.",
-						),
-					);
-				} else {
-					addSystemMessage(
-						createSystemMessage(
-							`⚠️ Error: ${errorData.error || "An unexpected error occurred"}`,
-						),
-					);
-				}
-			} catch {
-				addSystemMessage(createSystemMessage(`⚠️ Error: ${error.message}`));
-			}
+        if (errorData.code === "RATE_LIMITED") {
+          setRateLimited(true);
+          addAssistantErrorMessage(
+            createAssistantErrorMessage(
+              "⚠️ Rate limit exceeded. Please wait a moment before sending another message.",
+            ),
+          );
+          setTimeout(() => setRateLimited(false), 60000);
+        } else if (errorData.code === "QUOTA_EXCEEDED") {
+          setQuotaExceeded(true);
+          addAssistantErrorMessage(
+            createAssistantErrorMessage(
+              "⚠️ API quota exceeded. Please check your API key limits or try a different model.",
+            ),
+          );
+        } else if (errorData.code === "MODEL_NOT_SUPPORTED") {
+          addAssistantErrorMessage(
+            createAssistantErrorMessage(
+              "⚠️ Model not supported by the gateway. Please pick a different model.",
+            ),
+          );
+        } else if (errorData.code === "NO_API_KEY") {
+          addAssistantErrorMessage(
+            createAssistantErrorMessage(
+              "⚠️ No LLM Gateway API key configured. Please add your API key in settings.",
+            ),
+          );
+        } else {
+          addAssistantErrorMessage(
+            createAssistantErrorMessage(
+              `⚠️ Error: ${errorData.error || "An unexpected error occurred"}`,
+            ),
+          );
+        }
+      } catch {
+        addAssistantErrorMessage(
+          createAssistantErrorMessage(`⚠️ Error: ${error.message}`),
+        );
+      }
 
 			if ((error as Error).message?.includes("429")) {
 				setRateLimited(true);
@@ -304,16 +331,28 @@ export function MessagesProvider({ children, chatId }: MessagesProviderProps) {
 					// Load messages from cache
 					const cachedMessages = await cache.getMessages(chatId);
 
-					// Convert cached messages to v5 UIMessage format
-					const v5Messages: ExtendedMessage[] = cachedMessages.map((msg) => ({
-						id: msg._id,
-						role: msg.role as "user" | "assistant" | "system",
-						parts: createTextParts(msg.content),
-						convexId: msg._id,
-						parentMessageId: msg.parentMessageId,
-						model: msg.model,
-						_creationTime: msg._creationTime,
-					}));
+          // Convert cached messages to v5 UIMessage format, preferring partsJson when present
+          const v5Messages: ExtendedMessage[] = cachedMessages.map((msg) => {
+            let parts: UIMessage["parts"];
+            if (msg.partsJson) {
+              try {
+                parts = JSON.parse(msg.partsJson);
+              } catch {
+                parts = createTextParts(msg.content);
+              }
+            } else {
+              parts = createTextParts(msg.content);
+            }
+            return {
+              id: msg._id,
+              role: msg.role as "user" | "assistant" | "system",
+              parts,
+              convexId: msg._id,
+              parentMessageId: msg.parentMessageId,
+              model: msg.model,
+              _creationTime: msg._creationTime,
+            } as ExtendedMessage;
+          });
 
 					// Set messages in useChat hook
 					setMessages(v5Messages);
@@ -389,6 +428,8 @@ export function MessagesProvider({ children, chatId }: MessagesProviderProps) {
 						userId: currentUserId,
 						role: "user",
 						content: message,
+            // Persist the user's input as text parts for consistency with v5 structure
+            partsJson: JSON.stringify([{ type: "text", text: message }]),
 						model: selectedModel,
 						attachments: attachments || [],
 						parentMessageId: undefined,

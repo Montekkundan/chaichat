@@ -1,4 +1,5 @@
 import { currentUser } from "@clerk/nextjs/server";
+import { cookies } from "next/headers";
 import type { ReactNode } from "react";
 import ChatLayoutClient from "./layout-client";
 
@@ -15,7 +16,17 @@ export default async function ChatLayout({
 			}
 		: undefined;
 
+  // Keep SSR and client hydration in sync for sidebar open state
+  const cookieStore = await cookies();
+  const sidebarCookie = cookieStore.get("sidebar_state")?.value;
+  const defaultSidebarOpen = sidebarCookie ? sidebarCookie === "true" : true;
+
 	return (
-		<ChatLayoutClient initialUser={minimalUser}>{children}</ChatLayoutClient>
+		<ChatLayoutClient
+			initialUser={minimalUser}
+			defaultSidebarOpen={defaultSidebarOpen}
+		>
+			{children}
+		</ChatLayoutClient>
 	);
 }

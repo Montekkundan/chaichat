@@ -26,6 +26,7 @@ export default defineSchema({
     userId: v.string(),
     role: v.union(v.literal("user"), v.literal("assistant"), v.literal("system")),
     content: v.string(),
+    partsJson: v.optional(v.string()),
     model: v.string(),
     createdAt: v.number(),
     parentMessageId: v.optional(v.id("messages")), // Links to the original message

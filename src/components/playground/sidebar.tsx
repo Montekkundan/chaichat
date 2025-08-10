@@ -1,4 +1,4 @@
-import { GalleryVerticalEnd, X } from "lucide-react";
+import { PlusIcon, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type * as React from "react";
@@ -21,11 +21,9 @@ import {
 	SidebarMenu,
 	SidebarMenuButton,
 	SidebarMenuItem,
-	useSidebar,
 } from "~/components/ui/sidebar";
 import { db } from "~/db";
-import { useCache } from "~/lib/providers/cache-provider";
-// Helper to get playground list from localStorage (with metadata)
+
 function getPlaygroundListWithMeta(): Array<{
 	id: string;
 	name: string;
@@ -88,8 +86,6 @@ export function AppSidebar({
 		null,
 	);
 	const router = useRouter();
-	const { setOpen, isMobile, setOpenMobile } = useSidebar();
-	const _cache = useCache();
 
 	const refreshList = useCallback(() => {
 		const list = getPlaygroundListWithMeta();
@@ -103,9 +99,6 @@ export function AppSidebar({
 		setSummaries(summaryObj);
 	}, []);
 
-	// No-op effect retained intentionally for hook ordering; remove if not needed
-	useEffect(() => {}, []);
-
 	useEffect(() => {
 		// React to cross-tab changes to localStorage for playground list
 		const onStorage = (e: StorageEvent) => {
@@ -117,7 +110,7 @@ export function AppSidebar({
 			}
 		};
 		window.addEventListener("storage", onStorage);
-		// 1) Load from cookie snapshot if available (fast SSR hydration)
+		// Load from cookie snapshot if available (fast SSR hydration)
 		try {
 			const group = document.cookie.match(/cc_playgrounds=([^;]+)/)?.[1];
 			if (group) {
@@ -132,45 +125,33 @@ export function AppSidebar({
 			}
 		} catch {}
 
-		// 2) Load from localStorage (authoritative client index)
+		// Load from localStorage (authoritative client index)
 		refreshList();
 
-		// 3) Optional reconcile with cache-provider for authenticated users in future
+		// Optional reconcile with cache-provider for authenticated users in future
 		return () => window.removeEventListener("storage", onStorage);
 	}, [refreshList]);
 
-	// Helper to format date
 	function formatDate(ts: number) {
 		if (!ts) return "(no time)";
 		const d = new Date(ts);
 		return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 	}
 
-	// Handler for new playground
 	function handleNewPlayground() {
-		try {
-			if (typeof window !== "undefined") {
-				sessionStorage.setItem("cc_force_open_playground_sidebar", "1");
-			}
-			setOpen(true);
-			if (isMobile) setOpenMobile(true);
-		} catch {}
 		router.push("/playground");
 	}
 
-	// Handler for delete button click (open dialog)
 	function handleDeleteClick(id: string) {
 		setPlaygroundToDelete(id);
 		setDeleteDialogOpen(true);
 	}
 
-	// Handler for canceling delete
 	function handleCancelDelete() {
 		setDeleteDialogOpen(false);
 		setPlaygroundToDelete(null);
 	}
 
-	// Handler for confirming delete
 	async function handleConfirmDelete() {
 		if (!playgroundToDelete) return;
 		// Remove from localStorage
@@ -195,7 +176,6 @@ export function AppSidebar({
 			]);
 		} catch {}
 
-		// If currently viewing the deleted playground, navigate to base Playground page
 		try {
 			if (
 				typeof window !== "undefined" &&
@@ -236,23 +216,11 @@ export function AppSidebar({
 		>
 			<SidebarHeader>
 				<SidebarMenu>
-					<SidebarMenuItem>
-						<SidebarMenuButton size="lg" asChild>
-							<a href="/playground">
-								<div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-									<GalleryVerticalEnd className="size-4" />
-								</div>
-								<div className="flex flex-col gap-0.5 leading-none">
-									<span className="font-medium">Documentation</span>
-									<span className="">v1.0.0</span>
-								</div>
-							</a>
-						</SidebarMenuButton>
-					</SidebarMenuItem>
 					{/* New Playground Button */}
 					<SidebarMenuItem>
 						<SidebarMenuButton size="sm" onClick={handleNewPlayground}>
-							+ New Playground
+							<PlusIcon className="h-4 w-4" />
+							New Playground
 						</SidebarMenuButton>
 					</SidebarMenuItem>
 				</SidebarMenu>
@@ -260,7 +228,7 @@ export function AppSidebar({
 			<SidebarContent>
 				{/* Playground History Section */}
 				<SidebarGroup>
-					<div className="px-3 pt-2 pb-1 font-semibold text-muted-foreground text-xs">
+					<div className="px-1 pt-2 pb-1 font-semibold text-muted-foreground text-xs">
 						Playground History
 					</div>
 					<SidebarMenu className="gap-1">
@@ -277,18 +245,6 @@ export function AppSidebar({
 									<Link
 										href={`/playground/${id}`}
 										className="flex w-full flex-col items-start pr-8"
-										onClick={() => {
-											try {
-												if (typeof window !== "undefined") {
-													sessionStorage.setItem(
-														"cc_force_open_playground_sidebar",
-														"1",
-													);
-												}
-												setOpen(true);
-												if (isMobile) setOpenMobile(true);
-											} catch {}
-										}}
 									>
 										<span className="font-medium text-xs">
 											{name.startsWith("playground-")
