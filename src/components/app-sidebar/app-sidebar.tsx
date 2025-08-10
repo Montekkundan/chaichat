@@ -197,7 +197,7 @@ export function AppSidebar({
 					{
 						title: "Tutorials",
 						url: "#",
-					}
+					},
 				],
 			},
 			{
@@ -259,7 +259,6 @@ export function AppSidebar({
 			</SidebarContent>
 
 			<SidebarFooter>
-
 				<SidebarMenu>
 					<SidebarMenuItem>
 						<SidebarMenuButton asChild>
@@ -299,7 +298,6 @@ export function AppSidebar({
 							)} */}
 				</SidebarMenu>
 			</SidebarFooter>
-
 
 			<DeleteChatModal
 				open={deleteModalOpen}

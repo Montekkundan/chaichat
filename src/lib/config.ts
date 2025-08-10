@@ -11,7 +11,7 @@ export const MESSAGE_MAX_LENGTH = 4000;
 // Add providers here after they have been fully tested and verified
 export const TESTED_PROVIDERS: string[] = [
 	"OpenAI",
-	// "Anthropic", 
+	// "Anthropic",
 	// "Google",
 	// "Groq",
 	// "Mistral",
@@ -29,14 +29,14 @@ export const APP_OG_IMAGE = "/images/og.png";
 // Helper function to generate dynamic OG image URLs
 export const generateOGImageURL = (params: {
 	title?: string;
-	type?: 'default' | 'chat' | 'playground' | 'registry';
+	type?: "default" | "chat" | "playground" | "registry";
 	description?: string;
 }) => {
 	const searchParams = new URLSearchParams();
-	
-	if (params.title) searchParams.set('title', params.title);
-	if (params.type) searchParams.set('type', params.type);
-	if (params.description) searchParams.set('description', params.description);
-	
+
+	if (params.title) searchParams.set("title", params.title);
+	if (params.type) searchParams.set("type", params.type);
+	if (params.description) searchParams.set("description", params.description);
+
 	return `${APP_URL}/api/og?${searchParams.toString()}`;
 };

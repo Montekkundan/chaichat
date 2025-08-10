@@ -64,7 +64,7 @@ export function HistoryDialog({
 			if (!isLoggedIn) {
 				const localChats = await localChatStorage.getChats();
 				setChats(localChats);
-				
+
 				// Sync all chat titles to cookies
 				for (const chat of localChats) {
 					ChatTitlesCookieManager.setChatTitle(chat.id, chat.name);
@@ -94,11 +94,11 @@ export function HistoryDialog({
 					(a, b) => b.createdAt - a.createdAt,
 				);
 				setChats(mergedChats);
-				
-                // Sync all chat titles to cookies
-                for (const chat of mergedChats) {
-                    ChatTitlesCookieManager.setChatTitle(chat.id, chat.name);
-                }
+
+				// Sync all chat titles to cookies
+				for (const chat of mergedChats) {
+					ChatTitlesCookieManager.setChatTitle(chat.id, chat.name);
+				}
 			}
 		};
 
@@ -172,7 +172,7 @@ export function HistoryDialog({
 
 	const handleChatSelect = async (chat: LocalChat) => {
 		setSelectedChat(chat);
-		
+
 		// Sync chat title to cookies when selected
 		ChatTitlesCookieManager.setChatTitle(chat.id, chat.name);
 
@@ -257,7 +257,7 @@ export function HistoryDialog({
 		setChatToDelete(null);
 	};
 
-    const convertToMessageFormat = (localMessage: LocalMessage) => ({
+	const convertToMessageFormat = (localMessage: LocalMessage) => ({
 		id: localMessage._id,
 		role: localMessage.role as "user" | "assistant" | "system",
 		parts: [
@@ -266,8 +266,8 @@ export function HistoryDialog({
 				text: localMessage.content,
 			},
 		],
-        // Provide both so downstream sorters can use either
-        createdAt: localMessage.createdAt,
+		// Provide both so downstream sorters can use either
+		createdAt: localMessage.createdAt,
 		_creationTime: localMessage._creationTime,
 		model: localMessage.model,
 		convexId: localMessage._id,
@@ -315,7 +315,10 @@ export function HistoryDialog({
 						className="text-primary text-sm hover:underline"
 						onClick={() => {
 							// Sync chat title to cookies when navigating to full conversation
-							ChatTitlesCookieManager.setChatTitle(selectedChat.id, selectedChat.name);
+							ChatTitlesCookieManager.setChatTitle(
+								selectedChat.id,
+								selectedChat.name,
+							);
 							onOpenChange(false);
 						}}
 					>

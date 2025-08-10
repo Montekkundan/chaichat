@@ -105,7 +105,8 @@ export function getAllKeys(): UserKeys {
 	const sessionKeys = getAllSessionKeys();
 
 	return {
-		llmGatewayApiKey: sessionKeys.llmGatewayApiKey || localKeys.llmGatewayApiKey,
+		llmGatewayApiKey:
+			sessionKeys.llmGatewayApiKey || localKeys.llmGatewayApiKey,
 	};
 }
 

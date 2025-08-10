@@ -62,8 +62,8 @@ export function useChatHandlers({
 		(id: string, newText: string) => {
 			setMessages(
 				messages.map((message) =>
-					message.id === id 
-						? { ...message, parts: [{ type: "text", text: newText }] } 
+					message.id === id
+						? { ...message, parts: [{ type: "text", text: newText }] }
 						: message,
 				),
 			);

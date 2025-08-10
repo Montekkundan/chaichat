@@ -56,10 +56,10 @@ export class LocalChatStorage {
 		};
 
 		await db.chats.add(chat as unknown as Chat);
-		
+
 		// Also save the title to cookies for server-side access
 		ChatTitlesCookieManager.setChatTitle(chatId, name);
-		
+
 		return chatId;
 	}
 
@@ -157,7 +157,7 @@ export class LocalChatStorage {
 
 		// Delete the chat
 		await db.chats.delete(chatId);
-		
+
 		// Also remove from cookies
 		ChatTitlesCookieManager.removeChatTitle(chatId);
 	}
@@ -166,7 +166,7 @@ export class LocalChatStorage {
 		await this.initialize();
 
 		await db.chats.update(chatId, { name });
-		
+
 		// Also update the title in cookies
 		ChatTitlesCookieManager.setChatTitle(chatId, name);
 	}

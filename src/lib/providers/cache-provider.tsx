@@ -236,7 +236,7 @@ export function CacheProvider({
 			}));
 			const value = encodeURIComponent(JSON.stringify(minimal));
 			document.cookie = `cc_chats=${value}; path=/; max-age=604800; SameSite=Lax`;
-			
+
 			// Also save chat titles to our dedicated chat titles cookie
 			for (const chat of chats) {
 				ChatTitlesCookieManager.setChatTitle(chat._id, chat.name);
@@ -935,9 +935,12 @@ export function CacheProvider({
 		return savedModel?.modelId || null;
 	}, []);
 
-	const setDefaultModel = useCallback((modelId: string, providerId?: string): void => {
-		setSelectedModel(modelId, providerId);
-	}, []);
+	const setDefaultModel = useCallback(
+		(modelId: string, providerId?: string): void => {
+			setSelectedModel(modelId, providerId);
+		},
+		[],
+	);
 
 	return (
 		<CacheContext.Provider

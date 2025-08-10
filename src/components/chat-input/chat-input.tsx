@@ -1,11 +1,9 @@
 "use client";
-import { ArrowUp, Globe, Stop } from "@phosphor-icons/react";
-import { generateReactHelpers } from "@uploadthing/react";
-import { motion } from "framer-motion";
-import { Paperclip } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { useAction } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { ArrowUp, Stop } from "@phosphor-icons/react";
+import { generateReactHelpers } from "@uploadthing/react";
+import { useAction } from "convex/react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { UploadRouter } from "~/app/api/uploadthing/core";
 import { CookiePreferencesModal } from "~/components/modals/cookie-preferences-modal";
 import { Button } from "~/components/ui/button";
@@ -75,11 +73,11 @@ export function ChatInput({
 	disabled = false,
 }: ChatInputProps) {
 	const hasToolSupport = true; // Assume all models support tools via LLM Gateway
-	
+
 	// User keys state for search capabilities
 	const getKeys = useAction(api.userKeys.getKeys);
 	const [userKeys, setUserKeys] = useState<UserKeys | undefined>(undefined);
-	
+
 	// Load user keys on mount
 	useEffect(() => {
 		const loadKeys = async () => {
@@ -96,10 +94,10 @@ export function ChatInput({
 				}
 			}
 		};
-		
+
 		loadKeys();
 	}, [isUserAuthenticated, getKeys]);
-	
+
 	// For now, enable search for all models - LLM Gateway will handle capabilities
 	const allowWebSearch = true;
 
@@ -215,7 +213,8 @@ export function ChatInput({
 		return () => {
 			window.removeEventListener("apiKeysChanged", handleApiKeysChanged);
 		};
-	}, [isUserAuthenticated, getKeys]);	const handleSend = useCallback(async () => {
+	}, [isUserAuthenticated, getKeys]);
+	const handleSend = useCallback(async () => {
 		if (isSubmitting || disabled) {
 			return;
 		}
@@ -395,9 +394,7 @@ export function ChatInput({
 							</div>
 						</TooltipTrigger>
 						<TooltipContent side="top">
-							<div className="text-xs">
-								Please add your LLM Gateway API key
-							</div>
+							<div className="text-xs">Please add your LLM Gateway API key</div>
 						</TooltipContent>
 					</Tooltip>
 				) : (

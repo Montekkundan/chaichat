@@ -1,7 +1,7 @@
 "use client";
 
-import { ExternalLink, Key, RotateCcw, Bug } from "lucide-react";
 import { GearIcon } from "@phosphor-icons/react";
+import { ExternalLink, Key, RotateCcw } from "lucide-react";
 import * as React from "react";
 
 import { useTheme } from "next-themes";
@@ -70,10 +70,10 @@ export function SettingsDialog({
 		const syncWithStoredTheme = () => {
 			const storedTheme = getStoredTweakcnTheme();
 			const isActive = isTweakcnThemeActive();
-			
+
 			setTweakcnTheme(storedTheme);
 			setIsTweakcnActive(isActive);
-			
+
 			// Restore the theme URL from localStorage if available
 			try {
 				const storedUrl = localStorage.getItem("chai-tweakcn-theme-url");
@@ -83,7 +83,7 @@ export function SettingsDialog({
 			} catch (error) {
 				console.error("Failed to restore theme URL:", error);
 			}
-			
+
 			// Mark restoration as complete
 			setIsRestoringUrl(false);
 		};
@@ -129,7 +129,8 @@ export function SettingsDialog({
 
 		if (!themeUrl.startsWith("https://tweakcn.com/r/themes/")) {
 			toast({
-				title: "Please use a valid Tweakcn theme URL (https://tweakcn.com/r/themes/...)",
+				title:
+					"Please use a valid Tweakcn theme URL (https://tweakcn.com/r/themes/...)",
 				status: "error",
 			});
 			return;
@@ -142,19 +143,21 @@ export function SettingsDialog({
 			if (theme) {
 				const syncedTheme = {
 					...theme,
-					currentMode: (resolvedTheme === "dark" ? "dark" : "light") as "dark" | "light",
+					currentMode: (resolvedTheme === "dark" ? "dark" : "light") as
+						| "dark"
+						| "light",
 				};
 				setTweakcnTheme(syncedTheme);
 				applyTweakcnTheme(syncedTheme);
 				setIsTweakcnActive(true);
-				
+
 				// Persist the theme URL
 				try {
 					localStorage.setItem("chai-tweakcn-theme-url", themeUrl);
 				} catch (error) {
 					console.error("Failed to store theme URL:", error);
 				}
-				
+
 				toast({ title: "Theme fetched and applied!", status: "success" });
 			} else {
 				toast({
@@ -203,19 +206,21 @@ export function SettingsDialog({
 				if (theme) {
 					const syncedTheme = {
 						...theme,
-						currentMode: (resolvedTheme === "dark" ? "dark" : "light") as "dark" | "light",
+						currentMode: (resolvedTheme === "dark" ? "dark" : "light") as
+							| "dark"
+							| "light",
 					};
 					setTweakcnTheme(syncedTheme);
 					applyTweakcnTheme(syncedTheme);
 					setIsTweakcnActive(true);
-					
+
 					// Persist the theme URL
 					try {
 						localStorage.setItem("chai-tweakcn-theme-url", themeUrl);
 					} catch (error) {
 						console.error("Failed to store theme URL:", error);
 					}
-					
+
 					// Only show toast for user-initiated actions, not during restoration
 					if (isUserAction) {
 						toast({ title: "Theme automatically applied!", status: "success" });
@@ -266,14 +271,14 @@ export function SettingsDialog({
 		setIsTweakcnActive(false);
 		setThemeUrl("");
 		setIsRestoringUrl(false); // Ensure we're not in restoration mode
-		
+
 		// Clear the stored URL
 		try {
 			localStorage.removeItem("chai-tweakcn-theme-url");
 		} catch (error) {
 			console.error("Failed to clear theme URL:", error);
 		}
-		
+
 		toast({ title: "Theme reset to default", status: "success" });
 	};
 
@@ -462,7 +467,7 @@ export function SettingsDialog({
 								</div>
 							</div>
 						</header>
-						<div className="relative z-30 flex flex-1 flex-col gap-4 p-4 pt-0 overflow-y-auto">
+						<div className="relative z-30 flex flex-1 flex-col gap-4 overflow-y-auto p-4 pt-0">
 							{renderContent()}
 						</div>
 					</main>

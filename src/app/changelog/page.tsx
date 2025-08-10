@@ -1,11 +1,11 @@
+import { House } from "@phosphor-icons/react/dist/ssr";
 import { basehub } from "basehub";
 import { RichText } from "basehub/react-rich-text";
-import  ThemeToggle from "~/components/ui/theme-toggle";
-import { formatDate, cn } from "~/lib/utils";
-import { Tweet } from "react-tweet";
 import Image from "next/image";
 import Link from "next/link";
-import { House } from "@phosphor-icons/react/dist/ssr";
+import { Tweet } from "react-tweet";
+import ThemeToggle from "~/components/ui/theme-toggle";
+import { cn, formatDate } from "~/lib/utils";
 
 export default async function ChangelogPage() {
 	const data = await basehub().query({
@@ -78,12 +78,14 @@ export default async function ChangelogPage() {
 						<div className="flex items-center gap-4">
 							<Link
 								href="/"
-								className="inline-flex items-center justify-center rounded-md font-medium text-sm ring-offset-background transition-colors hover:bg-muted hover:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 h-10 px-3"
+								className="inline-flex h-10 items-center justify-center rounded-md px-3 font-medium text-sm ring-offset-background transition-colors hover:bg-muted hover:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
 								aria-label="Go to home"
 							>
 								<House size={24} />
 							</Link>
-							<h1 className="font-semibold text-3xl tracking-tight">Changelog</h1>
+							<h1 className="font-semibold text-3xl tracking-tight">
+								Changelog
+							</h1>
 						</div>
 						<ThemeToggle />
 					</div>
@@ -130,7 +132,7 @@ export default async function ChangelogPage() {
 												</h2>
 
 												{changelog.description && (
-													<p className="text-muted-foreground text-lg">
+													<p className="text-lg text-muted-foreground">
 														{changelog.description}
 													</p>
 												)}
@@ -149,12 +151,12 @@ export default async function ChangelogPage() {
 													</div>
 												)}
 											</div>
-											
+
 											{/* Rich Text Content */}
 											{changelog.content && (
 												<div className="prose dark:prose-invert max-w-none prose-headings:scroll-mt-8 prose-headings:text-balance prose-p:text-balance prose-headings:font-semibold prose-headings:tracking-tight prose-p:tracking-tight prose-a:no-underline">
 													{changelog.content.json ? (
-														<RichText 
+														<RichText
 															content={changelog.content.json.content}
 															blocks={changelog.content.json.blocks}
 															components={{
@@ -163,7 +165,7 @@ export default async function ChangelogPage() {
 																	const tweetId = props.tweetId;
 																	if (!tweetId) return null;
 																	return (
-																		<div className="dark mx-auto grid w-full max-w-[500px] place-items-center my-6">
+																		<div className="dark mx-auto my-6 grid w-full max-w-[500px] place-items-center">
 																			<Tweet
 																				id={tweetId}
 																				components={{
@@ -185,14 +187,16 @@ export default async function ChangelogPage() {
 																		</div>
 																	);
 																},
-																
+
 																YoutubeComponent: (props: any) => {
 																	const youtubeId = props.youtubeId;
 																	if (!youtubeId) return null;
 																	return (
-																		<div className={cn(
-																			"relative aspect-video w-full overflow-hidden rounded-md border my-6"
-																		)}>
+																		<div
+																			className={cn(
+																				"relative my-6 aspect-video w-full overflow-hidden rounded-md border",
+																			)}
+																		>
 																			<iframe
 																				src={`https://www.youtube.com/embed/${youtubeId}`}
 																				title="YouTube video player"
@@ -203,14 +207,14 @@ export default async function ChangelogPage() {
 																		</div>
 																	);
 																},
-																
+
 																VideoComponent: (props: any) => {
 																	const url = props.url;
 																	if (!url) return null;
 																	return (
 																		<div className="my-6">
 																			<video
-																				className="rounded-md border w-full"
+																				className="w-full rounded-md border"
 																				controls
 																				loop
 																				src={url}
@@ -218,7 +222,7 @@ export default async function ChangelogPage() {
 																		</div>
 																	);
 																},
-																
+
 																ImageComponent: (props: any) => {
 																	const url = props.url;
 																	const title = props._title;
@@ -227,7 +231,7 @@ export default async function ChangelogPage() {
 																		<div className="my-6">
 																			{/* eslint-disable-next-line @next/next/no-img-element */}
 																			<img
-																				className="rounded-md border w-full"
+																				className="w-full rounded-md border"
 																				src={url}
 																				alt={title || "Image"}
 																			/>
@@ -238,7 +242,11 @@ export default async function ChangelogPage() {
 														/>
 													) : changelog.content.markdown ? (
 														// Fallback markdown content
-														<div dangerouslySetInnerHTML={{ __html: changelog.content.markdown }} />
+														<div
+															dangerouslySetInnerHTML={{
+																__html: changelog.content.markdown,
+															}}
+														/>
 													) : null}
 												</div>
 											)}

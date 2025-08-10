@@ -61,7 +61,7 @@ function SidebarProvider({
 	className,
 	style,
 	children,
-	toggleSidebarShortcut=true,
+	toggleSidebarShortcut = true,
 	...props
 }: React.ComponentProps<"div"> & {
 	defaultOpen?: boolean;
@@ -74,10 +74,10 @@ function SidebarProvider({
 
 	// This is the internal state of the sidebar.
 	// We use openProp and setOpenProp for control from outside the component.
-    // Important: keep initial render stable between server and client
-    // to avoid hydration mismatches. We do NOT read from window/cookies
-    // until after mount; we start with the provided SSR-friendly default.
-    const [_open, _setOpen] = React.useState<boolean>(defaultOpen);
+	// Important: keep initial render stable between server and client
+	// to avoid hydration mismatches. We do NOT read from window/cookies
+	// until after mount; we start with the provided SSR-friendly default.
+	const [_open, _setOpen] = React.useState<boolean>(defaultOpen);
 	const open = openProp ?? _open;
 	const setOpen = React.useCallback(
 		(value: boolean | ((value: boolean) => boolean)) => {
@@ -94,10 +94,9 @@ function SidebarProvider({
 		[setOpenProp, open],
 	);
 
-
 	// Helper to toggle the sidebar.
 	const toggleSidebar = React.useCallback(() => {
-    return isMobile ? setOpenMobile((open) => !open) : setOpen((open) => !open);
+		return isMobile ? setOpenMobile((open) => !open) : setOpen((open) => !open);
 	}, [isMobile, setOpen]);
 
 	if (toggleSidebarShortcut) {
@@ -117,36 +116,39 @@ function SidebarProvider({
 			return () => window.removeEventListener("keydown", handleKeyDown);
 		}, [toggleSidebar]);
 	}
-	
 
 	// We add a state so that we can do data-state="expanded" or "collapsed".
 	// This makes it easier to style the sidebar with Tailwind classes.
-  const state = open ? "expanded" : "collapsed";
+	const state = open ? "expanded" : "collapsed";
 
-  // After mount, reconcile with persisted state (cookie/sessionStorage)
-  React.useEffect(() => {
-    try {
-      if (typeof window !== "undefined") {
-        // Force-open one-shot flag for playground
-        if (window.location.pathname.startsWith("/playground")) {
-          const force = sessionStorage.getItem("cc_force_open_playground_sidebar");
-          if (force) {
-            setOpen(true);
-            if (isMobile) setOpenMobile(true);
-            sessionStorage.removeItem("cc_force_open_playground_sidebar");
-            return;
-          }
-        }
+	// After mount, reconcile with persisted state (cookie/sessionStorage)
+	React.useEffect(() => {
+		try {
+			if (typeof window !== "undefined") {
+				// Force-open one-shot flag for playground
+				if (window.location.pathname.startsWith("/playground")) {
+					const force = sessionStorage.getItem(
+						"cc_force_open_playground_sidebar",
+					);
+					if (force) {
+						setOpen(true);
+						if (isMobile) setOpenMobile(true);
+						sessionStorage.removeItem("cc_force_open_playground_sidebar");
+						return;
+					}
+				}
 
-        const match = document.cookie.match(new RegExp(`${SIDEBAR_COOKIE_NAME}=([^;]+)`));
-        if (match) {
-          _setOpen(match[1] === "true");
-        }
-      }
-    } catch {}
-  }, [isMobile, setOpen]);
+				const match = document.cookie.match(
+					new RegExp(`${SIDEBAR_COOKIE_NAME}=([^;]+)`),
+				);
+				if (match) {
+					_setOpen(match[1] === "true");
+				}
+			}
+		} catch {}
+	}, [isMobile, setOpen]);
 
-  React.useEffect(() => {}, []);
+	React.useEffect(() => {}, []);
 
 	const contextValue = React.useMemo<SidebarContextProps>(
 		() => ({

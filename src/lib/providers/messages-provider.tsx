@@ -1,23 +1,26 @@
 "use client";
 
-import { useChat, type UIMessage } from "@ai-sdk/react";
-import { DefaultChatTransport } from "ai";
+import { type UIMessage, useChat } from "@ai-sdk/react";
 import { useUser } from "@clerk/nextjs";
+import { DefaultChatTransport } from "ai";
+import { useRouter } from "next/navigation";
 import {
+	type ReactNode,
 	createContext,
 	useCallback,
 	useContext,
 	useEffect,
 	useRef,
 	useState,
-	type ReactNode,
 } from "react";
-import { userSessionManager } from "~/lib/user-session-manager";
-import { useRouter } from "next/navigation";
-import { useCache } from "~/lib/providers/cache-provider";
-import { getAllKeys } from "~/lib/local-keys";
-import { getSelectedModel, setSelectedModel as saveSelectedModel } from "~/lib/local-model-storage";
 import { SYSTEM_PROMPT_DEFAULT } from "~/lib/config";
+import { getAllKeys } from "~/lib/local-keys";
+import {
+	getSelectedModel,
+	setSelectedModel as saveSelectedModel,
+} from "~/lib/local-model-storage";
+import { useCache } from "~/lib/providers/cache-provider";
+import { userSessionManager } from "~/lib/user-session-manager";
 
 type UploadedFile = {
 	name: string;
@@ -73,7 +76,9 @@ interface MessagesProviderProps {
 const getTextContent = (parts: UIMessage["parts"]) => {
 	if (!parts) return "";
 	const textParts = parts.filter((part) => part.type === "text");
-	return textParts.map((part) => part.type === "text" ? part.text : "").join("");
+	return textParts
+		.map((part) => (part.type === "text" ? part.text : ""))
+		.join("");
 };
 
 // v5 helper - create text parts from content
@@ -81,11 +86,11 @@ const createTextParts = (content: string): UIMessage["parts"] => [
 	{
 		type: "text" as const,
 		text: content,
-	}
+	},
 ];
 
 // v5 helper - create file parts from attachments
-const _createFileParts = (attachments: UploadedFile[]) => 
+const _createFileParts = (attachments: UploadedFile[]) =>
 	attachments.map((att) => ({
 		type: "file" as const,
 		url: att.url,
@@ -97,10 +102,7 @@ const _createFileParts = (attachments: UploadedFile[]) =>
  * MessagesProvider - Manages chat messages, model selection, and AI communication
  * Uses AI SDK v5 with proper BYOK (Bring Your Own Key) support
  */
-export function MessagesProvider({
-	children,
-	chatId,
-}: MessagesProviderProps) {
+export function MessagesProvider({ children, chatId }: MessagesProviderProps) {
 	const { user } = useUser();
 	const cache = useCache();
 	const router = useRouter();
@@ -128,27 +130,27 @@ export function MessagesProvider({
 	useEffect(() => {
 		if (selectedModel && typeof window !== "undefined") {
 			// Extract provider from the model string if it contains a slash
-			const providerToUse = selectedModel.includes('/') 
-				? selectedModel.split('/')[0] 
+			const providerToUse = selectedModel.includes("/")
+				? selectedModel.split("/")[0]
 				: undefined;
 			saveSelectedModel(selectedModel, providerToUse);
 		}
 	}, [selectedModel]);
 
 	// Get user API keys for BYOK
-    const getUserApiKeys = useCallback(async () => {
-        if (user?.id) {
-            // For authenticated users, keys should come from server
-            return {};
-        }
-        // For anonymous users, get from local secure storage
-        try {
-            return await getAllKeys();
-        } catch (error) {
-            console.error("Failed to get API keys:", error);
-            return {};
-        }
-    }, [user?.id]);
+	const getUserApiKeys = useCallback(async () => {
+		if (user?.id) {
+			// For authenticated users, keys should come from server
+			return {};
+		}
+		// For anonymous users, get from local secure storage
+		try {
+			return await getAllKeys();
+		} catch (error) {
+			console.error("Failed to get API keys:", error);
+			return {};
+		}
+	}, [user?.id]);
 
 	const {
 		messages,
@@ -165,7 +167,7 @@ export function MessagesProvider({
 				if (!currentModel) {
 					throw new Error("No model selected");
 				}
-				
+
 				const userApiKeys = await getUserApiKeys();
 				return {
 					model: currentModel,
@@ -176,25 +178,30 @@ export function MessagesProvider({
 		}),
 		onFinish: async ({ message }) => {
 			const currentModel = selectedModelRef.current || "openai/gpt-4o-mini";
-			
+
 			if (message.role === "assistant") {
 				const textContent = getTextContent(message.parts);
-				
+
 				// Add model information to the message immediately
 				const extendedMessage = message as ExtendedMessage;
-				extendedMessage.model = currentModel;				
+				extendedMessage.model = currentModel;
 				// Force UI update by updating the messages state
 				setMessages((prevMessages) => {
 					const updatedMessages = [...prevMessages];
 					const lastMessageIndex = updatedMessages.length - 1;
-					
-					if (lastMessageIndex >= 0 && updatedMessages[lastMessageIndex] && updatedMessages[lastMessageIndex].role === "assistant") {
-						(updatedMessages[lastMessageIndex] as ExtendedMessage).model = currentModel;
+
+					if (
+						lastMessageIndex >= 0 &&
+						updatedMessages[lastMessageIndex] &&
+						updatedMessages[lastMessageIndex].role === "assistant"
+					) {
+						(updatedMessages[lastMessageIndex] as ExtendedMessage).model =
+							currentModel;
 					}
-					
+
 					return updatedMessages;
 				});
-				
+
 				try {
 					// Persist assistant message to cache
 					if (chatId && chatId !== "new") {
@@ -217,11 +224,12 @@ export function MessagesProvider({
 			}
 		},
 		onError: (error) => {
-			const createSystemMessage = (content: string) => ({
-				id: `system-${Date.now()}`,
-				role: "system" as const,
-				parts: createTextParts(content),
-			} as ExtendedMessage);
+			const createSystemMessage = (content: string) =>
+				({
+					id: `system-${Date.now()}`,
+					role: "system" as const,
+					parts: createTextParts(content),
+				}) as ExtendedMessage;
 
 			const addSystemMessage = (sysMsg: ExtendedMessage) => {
 				setMessages((prev) => [...prev, sysMsg]);
@@ -229,16 +237,28 @@ export function MessagesProvider({
 
 			try {
 				const errorData = JSON.parse(error.message);
-				
+
 				if (errorData.code === "RATE_LIMITED") {
 					setRateLimited(true);
-					addSystemMessage(createSystemMessage("⚠️ Rate limit exceeded. Please wait a moment before sending another message."));
+					addSystemMessage(
+						createSystemMessage(
+							"⚠️ Rate limit exceeded. Please wait a moment before sending another message.",
+						),
+					);
 					setTimeout(() => setRateLimited(false), 60000);
 				} else if (errorData.code === "QUOTA_EXCEEDED") {
 					setQuotaExceeded(true);
-					addSystemMessage(createSystemMessage("⚠️ API quota exceeded. Please check your API key limits or try a different model."));
+					addSystemMessage(
+						createSystemMessage(
+							"⚠️ API quota exceeded. Please check your API key limits or try a different model.",
+						),
+					);
 				} else {
-					addSystemMessage(createSystemMessage(`⚠️ Error: ${errorData.error || "An unexpected error occurred"}`));
+					addSystemMessage(
+						createSystemMessage(
+							`⚠️ Error: ${errorData.error || "An unexpected error occurred"}`,
+						),
+					);
 				}
 			} catch {
 				addSystemMessage(createSystemMessage(`⚠️ Error: ${error.message}`));
@@ -266,7 +286,7 @@ export function MessagesProvider({
 				}
 				return extMsg;
 			});
-			
+
 			return hasChanges ? updatedMessages : prevMessages;
 		});
 	}, [selectedModel, setMessages]);
@@ -283,7 +303,7 @@ export function MessagesProvider({
 				try {
 					// Load messages from cache
 					const cachedMessages = await cache.getMessages(chatId);
-					
+
 					// Convert cached messages to v5 UIMessage format
 					const v5Messages: ExtendedMessage[] = cachedMessages.map((msg) => ({
 						id: msg._id,
@@ -317,9 +337,9 @@ export function MessagesProvider({
 			const newChatId = await cache.createChat(
 				`Chat ${new Date().toLocaleTimeString()}`, // Temporary name
 				model,
-				currentUserId
+				currentUserId,
 			);
-			
+
 			return newChatId;
 		},
 		[currentUserId, cache],
@@ -329,7 +349,7 @@ export function MessagesProvider({
 		async (
 			message: string,
 			attachments: UploadedFile[] = [],
-            _search = false,
+			_search = false,
 		) => {
 			if (!currentUserId) {
 				return;
@@ -348,7 +368,7 @@ export function MessagesProvider({
 				try {
 					// Create new chat
 					targetChatId = await createNewChat(message, selectedModel);
-					
+
 					// Navigate to the new chat with the message as a query parameter
 					const url = `/chat/${targetChatId}?message=${encodeURIComponent(message)}`;
 					router.push(url);
@@ -379,7 +399,7 @@ export function MessagesProvider({
 				}
 
 				// Send message using AI SDK v5
-                const _messageResult = await chatSendMessage({ 
+				const _messageResult = await chatSendMessage({
 					text: message,
 				});
 
@@ -388,7 +408,7 @@ export function MessagesProvider({
 				setTimeout(() => {
 					setMessages((prevMessages) => {
 						const updatedMessages = [...prevMessages];
-						
+
 						// Find the most recent user message and add model info if it doesn't have it
 						for (let i = updatedMessages.length - 1; i >= 0; i--) {
 							const msg = updatedMessages[i] as ExtendedMessage;
@@ -397,18 +417,27 @@ export function MessagesProvider({
 								break;
 							}
 						}
-						
+
 						return updatedMessages;
 					});
 				}, 100); // Small delay to ensure the message is in the state
-
 			} catch (error) {
 				console.error("Failed to send message:", error);
 			} finally {
 				setIsSubmitting(false);
 			}
 		},
-        [currentUserId, chatId, isSubmitting, selectedModel, chatSendMessage, cache, createNewChat, router, setMessages],
+		[
+			currentUserId,
+			chatId,
+			isSubmitting,
+			selectedModel,
+			chatSendMessage,
+			cache,
+			createNewChat,
+			router,
+			setMessages,
+		],
 	);
 
 	// Handle automatic message sending from query parameter
@@ -416,11 +445,17 @@ export function MessagesProvider({
 		const handleQueryMessage = async () => {
 			const urlParams = new URLSearchParams(window.location.search);
 			const messageFromQuery = urlParams.get("message") || urlParams.get("q");
-			
-			if (messageFromQuery && chatId && messages.length === 0 && !isSubmitting && selectedModel) {
+
+			if (
+				messageFromQuery &&
+				chatId &&
+				messages.length === 0 &&
+				!isSubmitting &&
+				selectedModel
+			) {
 				const decodedMessage = decodeURIComponent(messageFromQuery);
 				await sendMessage(decodedMessage);
-				
+
 				// Clean up URL
 				const newUrl = new URL(window.location.href);
 				newUrl.searchParams.delete("message");
@@ -433,12 +468,9 @@ export function MessagesProvider({
 		return () => clearTimeout(timeoutId);
 	}, [chatId, messages.length, isSubmitting, selectedModel, sendMessage]);
 
-	const regenerate = useCallback(
-        async (_messageId: string, _model: string) => {
-			// Regeneration will be implemented in a future update
-		},
-		[],
-	);
+	const regenerate = useCallback(async (_messageId: string, _model: string) => {
+		// Regeneration will be implemented in a future update
+	}, []);
 
 	return (
 		<MessagesContext.Provider

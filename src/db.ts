@@ -40,43 +40,44 @@ export interface UserProfile {
 }
 
 export interface Playground {
-  _id: string; // playground id (e.g., playground-...)
-  userId: string;
-  name: string;
-  createdAt: number;
-  columns: { id: string; modelId: string }[];
+	_id: string; // playground id (e.g., playground-...)
+	userId: string;
+	name: string;
+	createdAt: number;
+	columns: { id: string; modelId: string }[];
 }
 
 export interface PlaygroundMessage {
-  _id: string;
-  playgroundId: string;
-  columnId: string;
-  userId: string;
-  role: "user" | "assistant" | "system";
-  content: string;
-  model: string;
-  createdAt: number;
-  _creationTime: number;
+	_id: string;
+	playgroundId: string;
+	columnId: string;
+	userId: string;
+	role: "user" | "assistant" | "system";
+	content: string;
+	model: string;
+	createdAt: number;
+	_creationTime: number;
 }
 
 export class ChaiChatDB extends Dexie {
 	chats!: Table<Chat, string>;
 	messages!: Table<Message, string>;
 	users!: Table<UserProfile, string>;
-  playgrounds!: Table<Playground, string>;
-  playgroundMessages!: Table<PlaygroundMessage, string>;
+	playgrounds!: Table<Playground, string>;
+	playgroundMessages!: Table<PlaygroundMessage, string>;
 
 	constructor() {
 		super("ChaiChatDB");
-    this.version(6)
+		this.version(6)
 			.stores({
 				chats:
 					"_id, userId, name, createdAt, currentModel, parentChatId, isPublic",
 				messages:
 					"_id, chatId, userId, createdAt, parentMessageId, version, isActive, model, attachments",
-        users: "id, fullName",
-        playgrounds: "_id, userId, createdAt",
-        playgroundMessages: "_id, playgroundId, columnId, userId, createdAt, model",
+				users: "id, fullName",
+				playgrounds: "_id, userId, createdAt",
+				playgroundMessages:
+					"_id, playgroundId, columnId, userId, createdAt, model",
 			})
 			.upgrade((tx) => {
 				// Ensure message fields exist

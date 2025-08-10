@@ -32,7 +32,7 @@ export function ChatTitleSyncer({ chatId }: ChatTitleSyncerProps) {
 
 				if (user) {
 					// For logged-in users: check cache first, then Convex
-					const cachedChat = cache.chats.find(c => c._id === chatId);
+					const cachedChat = cache.chats.find((c) => c._id === chatId);
 					if (cachedChat?.name) {
 						chatTitle = cachedChat.name;
 					}
@@ -49,7 +49,7 @@ export function ChatTitleSyncer({ chatId }: ChatTitleSyncerProps) {
 					ChatTitlesCookieManager.setChatTitle(chatId, chatTitle);
 				}
 			} catch (error) {
-				console.warn('Failed to sync chat title:', error);
+				console.warn("Failed to sync chat title:", error);
 			}
 		};
 

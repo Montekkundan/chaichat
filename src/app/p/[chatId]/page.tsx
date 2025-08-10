@@ -8,9 +8,9 @@ import { APP_NAME, generateOGImageURL } from "~/lib/config";
 
 type SimpleTextPart = { type: "text"; text: string };
 
-function truncateTitle(title: string, maxLength: number = 50): string {
+function truncateTitle(title: string, maxLength = 50): string {
 	if (title.length <= maxLength) return title;
-	return title.slice(0, maxLength).trim() + "...";
+	return `${title.slice(0, maxLength).trim()}...`;
 }
 
 export async function generateMetadata({
@@ -19,27 +19,29 @@ export async function generateMetadata({
 	params: Promise<{ chatId: string }>;
 }): Promise<Metadata> {
 	const { chatId } = await params;
-	
+
 	try {
 		const data = await fetchQuery(api.chat.getPublicChat, {
 			chatId: chatId as Id<"chats">,
 		});
-		
+
 		const rawTitle = data?.chat.name || "Public Chat";
 		const displayTitle = truncateTitle(rawTitle);
 		const ogTitle = truncateTitle(rawTitle, 40);
-		
+
 		return {
 			title: `${displayTitle} - ${APP_NAME}`,
-			description: "View this public AI conversation. See how others interact with AI models.",
+			description:
+				"View this public AI conversation. See how others interact with AI models.",
 			openGraph: {
 				title: `${displayTitle} - ${APP_NAME}`,
-				description: "View this public AI conversation. See how others interact with AI models.",
+				description:
+					"View this public AI conversation. See how others interact with AI models.",
 				images: [
 					{
 						url: generateOGImageURL({
 							title: ogTitle,
-							type: 'chat',
+							type: "chat",
 						}),
 						width: 1200,
 						height: 630,
@@ -50,11 +52,14 @@ export async function generateMetadata({
 			twitter: {
 				card: "summary_large_image",
 				title: `${displayTitle} - ${APP_NAME}`,
-				description: "View this public AI conversation. See how others interact with AI models.",
-				images: [generateOGImageURL({
-					title: ogTitle,
-					type: 'chat',
-				})],
+				description:
+					"View this public AI conversation. See how others interact with AI models.",
+				images: [
+					generateOGImageURL({
+						title: ogTitle,
+						type: "chat",
+					}),
+				],
 			},
 		};
 	} catch {
@@ -62,15 +67,17 @@ export async function generateMetadata({
 		const fallbackTitle = "Public Chat";
 		return {
 			title: `${fallbackTitle} - ${APP_NAME}`,
-			description: "View this public AI conversation. See how others interact with AI models.",
+			description:
+				"View this public AI conversation. See how others interact with AI models.",
 			openGraph: {
 				title: `${fallbackTitle} - ${APP_NAME}`,
-				description: "View this public AI conversation. See how others interact with AI models.",
+				description:
+					"View this public AI conversation. See how others interact with AI models.",
 				images: [
 					{
 						url: generateOGImageURL({
 							title: fallbackTitle,
-							type: 'chat',
+							type: "chat",
 						}),
 						width: 1200,
 						height: 630,
@@ -81,11 +88,14 @@ export async function generateMetadata({
 			twitter: {
 				card: "summary_large_image",
 				title: `${fallbackTitle} - ${APP_NAME}`,
-				description: "View this public AI conversation. See how others interact with AI models.",
-				images: [generateOGImageURL({
-					title: fallbackTitle,
-					type: 'chat',
-				})],
+				description:
+					"View this public AI conversation. See how others interact with AI models.",
+				images: [
+					generateOGImageURL({
+						title: fallbackTitle,
+						type: "chat",
+					}),
+				],
 			},
 		};
 	}

@@ -70,7 +70,11 @@ export function cleanMessagesForTools(
 			}
 
 			// For user messages, clean any tool-related content from parts array
-			if (message.role === "user" && message.parts && Array.isArray(message.parts)) {
+			if (
+				message.role === "user" &&
+				message.parts &&
+				Array.isArray(message.parts)
+			) {
 				const filteredParts = message.parts.filter((part: any) => {
 					if (part && typeof part === "object" && part.type) {
 						const isToolPart =
@@ -87,8 +91,8 @@ export function cleanMessagesForTools(
 					return {
 						...message,
 						parts:
-							filteredParts.length > 0 
-								? filteredParts 
+							filteredParts.length > 0
+								? filteredParts
 								: [{ type: "text", text: "User message" }],
 					};
 				}
@@ -107,15 +111,17 @@ export function cleanMessagesForTools(
 export function messageHasToolContent(message: MessageAISDK): boolean {
 	return !!(
 		(message as { role: string }).role === "tool" ||
-		(message.parts && Array.isArray(message.parts) &&
-			message.parts.some((part: any) =>
-				part &&
-				typeof part === "object" &&
-				part.type &&
-				(part.type === "tool-call" ||
-					part.type === "tool-result" ||
-					part.type === "dynamic-tool" ||
-					part.type.startsWith("tool-")),
+		(message.parts &&
+			Array.isArray(message.parts) &&
+			message.parts.some(
+				(part: any) =>
+					part &&
+					typeof part === "object" &&
+					part.type &&
+					(part.type === "tool-call" ||
+						part.type === "tool-result" ||
+						part.type === "dynamic-tool" ||
+						part.type.startsWith("tool-")),
 			))
 	);
 }

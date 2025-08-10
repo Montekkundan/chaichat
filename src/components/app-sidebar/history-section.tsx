@@ -3,11 +3,11 @@
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { useUser } from "@clerk/nextjs";
+import { useMutation } from "convex/react";
 import { ChevronRight, History, Share2, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { useMutation } from "convex/react";
 import { ShareChatModal } from "~/components/modals/share-chat-modal";
 import { Button } from "~/components/ui/button";
 import {
@@ -28,11 +28,11 @@ import {
 	SidebarMenuSubButton,
 	SidebarMenuSubItem,
 } from "~/components/ui/sidebar";
+import { toast } from "~/components/ui/toast";
 import { ChatTitlesCookieManager } from "~/lib/chat-titles-cookie";
 import { type LocalChat, localChatStorage } from "~/lib/local-chat-storage";
 import { useCache } from "~/lib/providers/cache-provider";
 import { userSessionManager } from "~/lib/user-session-manager";
-import { toast } from "~/components/ui/toast";
 import {
 	Collapsible,
 	CollapsibleContent,
@@ -49,8 +49,8 @@ export function HistorySection() {
 	const [isDialogOpen, setIsDialogOpen] = useState(false);
 	const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 	const [chatToDelete, setChatToDelete] = useState<string | null>(null);
-    const [shareChatId, setShareChatId] = useState<string | null>(null);
-    const toggleVisibility = useMutation(api.chat.toggleChatVisibility);
+	const [shareChatId, setShareChatId] = useState<string | null>(null);
+	const toggleVisibility = useMutation(api.chat.toggleChatVisibility);
 
 	useEffect(() => {
 		const loadRecentChats = async () => {
@@ -60,11 +60,11 @@ export function HistorySection() {
 				const count = await localChatStorage.getChatCount(storageUserId);
 				setRecentChats(chats);
 				setChatCount(count);
-				
-                // Sync chat titles to cookies for server-side access
-                for (const chat of chats) {
-                    ChatTitlesCookieManager.setChatTitle(chat.id, chat.name);
-                }
+
+				// Sync chat titles to cookies for server-side access
+				for (const chat of chats) {
+					ChatTitlesCookieManager.setChatTitle(chat.id, chat.name);
+				}
 			} else {
 				const [cacheChats, localChats] = await Promise.all([
 					Promise.resolve(cache.chats.slice(0, 3)),
@@ -89,11 +89,11 @@ export function HistorySection() {
 				);
 				setRecentChats(mergedChats.slice(0, 3));
 				setChatCount(cache.chats.length);
-				
-                // Sync chat titles to cookies for server-side access
-                for (const chat of mergedChats) {
-                    ChatTitlesCookieManager.setChatTitle(chat.id || chat._id, chat.name);
-                }
+
+				// Sync chat titles to cookies for server-side access
+				for (const chat of mergedChats) {
+					ChatTitlesCookieManager.setChatTitle(chat.id || chat._id, chat.name);
+				}
 			}
 		};
 
@@ -145,28 +145,28 @@ export function HistorySection() {
 		ChatTitlesCookieManager.setChatTitle(chatId, chatName);
 	};
 
-    const setChatPublicState = async (
-        chatId: string,
-        newValue: boolean | undefined,
-    ) => {
-        if (newValue === undefined) return;
-        try {
-            await toggleVisibility({
-                chatId: chatId as Id<"chats">,
-                isPublic: newValue,
-                userId: user?.id ?? "",
-            });
-            cache.refreshCache();
-            if (newValue) {
-                const url = `${window.location.origin}/p/${chatId}`;
-                await navigator.clipboard.writeText(url);
-                toast({ title: "Public link copied to clipboard", status: "success" });
-            }
-        } catch (e) {
-            console.error(e);
-            toast({ title: "Failed to update visibility", status: "error" });
-        }
-    };
+	const setChatPublicState = async (
+		chatId: string,
+		newValue: boolean | undefined,
+	) => {
+		if (newValue === undefined) return;
+		try {
+			await toggleVisibility({
+				chatId: chatId as Id<"chats">,
+				isPublic: newValue,
+				userId: user?.id ?? "",
+			});
+			cache.refreshCache();
+			if (newValue) {
+				const url = `${window.location.origin}/p/${chatId}`;
+				await navigator.clipboard.writeText(url);
+				toast({ title: "Public link copied to clipboard", status: "success" });
+			}
+		} catch (e) {
+			console.error(e);
+			toast({ title: "Failed to update visibility", status: "error" });
+		}
+	};
 
 	return (
 		<>
@@ -192,28 +192,30 @@ export function HistorySection() {
 									{recentChats.map((subItem) => (
 										<SidebarMenuSubItem key={subItem.id} className="group/chat">
 											<SidebarMenuSubButton asChild>
-												<Link 
+												<Link
 													href={`/chat/${subItem.id}`}
-													onClick={() => handleChatClick(subItem.id, subItem.name)}
+													onClick={() =>
+														handleChatClick(subItem.id, subItem.name)
+													}
 												>
 													<span>{subItem.name}</span>
 												</Link>
 											</SidebarMenuSubButton>
 											<div className="-translate-y-1/2 absolute top-1/2 right-2 hidden items-center gap-1 group-hover/chat:flex">
-                                            {user && (
-                                                <button
-                                                    type="button"
-                                                    className="flex h-6 w-6 items-center justify-center rounded-sm text-muted-foreground hover:bg-muted hover:text-foreground"
-                                                    onClick={(e) => {
-                                                        e.preventDefault();
-                                                        if (!user) return;
-                                                        setShareChatId(subItem.id);
-                                                    }}
-                                                    aria-label="Share chat"
-                                                >
-                                                    <Share2 className="h-3 w-3" />
-                                                </button>
-                                            )}
+												{user && (
+													<button
+														type="button"
+														className="flex h-6 w-6 items-center justify-center rounded-sm text-muted-foreground hover:bg-muted hover:text-foreground"
+														onClick={(e) => {
+															e.preventDefault();
+															if (!user) return;
+															setShareChatId(subItem.id);
+														}}
+														aria-label="Share chat"
+													>
+														<Share2 className="h-3 w-3" />
+													</button>
+												)}
 												<button
 													type="button"
 													className="flex h-6 w-6 items-center justify-center rounded-sm text-muted-foreground hover:bg-destructive hover:text-destructive-foreground"
@@ -252,20 +254,20 @@ export function HistorySection() {
 				isLoggedIn={!!user}
 			/>
 
-            {user && shareChatId && (
-                <ShareChatModal
-                    open={shareChatId !== null}
-                    onOpenChange={(open) => {
-                        if (!open) setShareChatId(null);
-                    }}
-                    chatId={shareChatId}
-                    isPublic={
-                        recentChats.find((c) => c.id === shareChatId)?.isPublic ??
-                        cache.chats.find((c) => c._id === shareChatId)?.isPublic
-                    }
-                    onToggle={(newVal) => setChatPublicState(shareChatId, newVal)}
-                />
-            )}
+			{user && shareChatId && (
+				<ShareChatModal
+					open={shareChatId !== null}
+					onOpenChange={(open) => {
+						if (!open) setShareChatId(null);
+					}}
+					chatId={shareChatId}
+					isPublic={
+						recentChats.find((c) => c.id === shareChatId)?.isPublic ??
+						cache.chats.find((c) => c._id === shareChatId)?.isPublic
+					}
+					onToggle={(newVal) => setChatPublicState(shareChatId, newVal)}
+				/>
+			)}
 
 			<Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
 				<DialogContent>

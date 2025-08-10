@@ -22,9 +22,9 @@ export function getSelectedModel(): SelectedModelData | null {
 		if (!stored) return null;
 
 		const data = JSON.parse(stored) as SelectedModelData;
-		
+
 		// Check if the data is too old (older than 30 days)
-		const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
+		const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
 		if (data.timestamp < thirtyDaysAgo) {
 			removeSelectedModel();
 			return null;
