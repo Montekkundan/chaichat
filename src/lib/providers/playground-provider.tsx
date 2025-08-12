@@ -1276,18 +1276,21 @@ export function PlaygroundProvider({
 				const userApiKeys = await getUserApiKeys();
 				const messageTimestamp = Date.now();
 
-				// 1. Add user messages to all synced columns immediately
-				const userMessages = syncedColumns.map((column) => ({
-					column,
-					userMessage: {
-						id: `user-${messageTimestamp}-${column.id}`,
-						role: "user" as const,
-						content: message,
-						parts: createTextParts(message),
-						createdAt: new Date(),
-						model: column.modelId,
-					},
-				}));
+				// Add user messages to all synced columns immediately
+                const userMessages = syncedColumns.map((column) => ({
+                    column,
+                    userMessage: {
+                        id: `user-${messageTimestamp}-${column.id}`,
+                        role: "user" as const,
+                        content: message,
+                        parts: createTextParts(message),
+                        createdAt: new Date(),
+                        model: column.modelId,
+                        gateway: (column.gatewaySource === "aigateway"
+                            ? "vercel-ai-gateway"
+                            : "llm-gateway") as "llm-gateway" | "vercel-ai-gateway",
+                    },
+                }));
 
 				// Add all user messages at once
 				setState((prev) => ({
@@ -1312,13 +1315,16 @@ export function PlaygroundProvider({
 						const messagesForAPI = [...column.messages, userMessage];
 
 						// Create assistant message placeholder
-						const assistantMessage = {
+                        const assistantMessage: PlaygroundMessage = {
 							id: `assistant-${messageTimestamp}-${column.id}`,
 							role: "assistant" as const,
 							content: "",
 							parts: createTextParts(""),
 							createdAt: new Date(),
 							model: column.modelId,
+                            gateway: (column.gatewaySource === "aigateway"
+                                ? "vercel-ai-gateway"
+                                : "llm-gateway") as "llm-gateway" | "vercel-ai-gateway",
 						};
 
 						try {

@@ -3,7 +3,9 @@ import { basehub } from "basehub";
 import { RichText } from "basehub/react-rich-text";
 import Image from "next/image";
 import Link from "next/link";
+import ReactMarkdown from "react-markdown";
 import { Tweet } from "react-tweet";
+import remarkGfm from "remark-gfm";
 import ThemeToggle from "~/components/ui/theme-toggle";
 import { cn, formatDate } from "~/lib/utils";
 
@@ -219,13 +221,14 @@ export default async function ChangelogPage() {
 																	if (!url) return null;
 																	return (
 																		<div className="my-6">
-																			{/* biome-ignore lint/a11y/useMediaCaption: No captions available for embedded video content */}
 																			<video
 																				className="w-full rounded-md border"
 																				controls
 																				loop
 																				src={url}
-																			/>
+																			>
+																				<track kind="captions" />
+																			</video>
 																		</div>
 																	);
 																},
@@ -252,12 +255,9 @@ export default async function ChangelogPage() {
 														/>
 													) : changelog.content.markdown ? (
 														// Fallback markdown content
-														/* biome-ignore lint/security/noDangerouslySetInnerHtml: Content comes from Basehub and is trusted */
-														<div
-															dangerouslySetInnerHTML={{
-																__html: changelog.content.markdown,
-															}}
-														/>
+														<ReactMarkdown remarkPlugins={[remarkGfm]}>
+															{changelog.content.markdown}
+														</ReactMarkdown>
 													) : null}
 												</div>
 											)}

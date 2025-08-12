@@ -111,21 +111,31 @@ export interface TweakcnStyles {
 }
 
 function applyStyleToElement(element: HTMLElement, key: string, value: string) {
-	const currentStyle = element.getAttribute("style") || "";
-	const cleanedStyle = currentStyle
-		.replace(new RegExp(`--${key}:\\s*[^;]+;?`, "g"), "")
-		.trim();
+    // Skip if the value is already applied to avoid needless mutations
+    const inlineValue = element.style.getPropertyValue(`--${key}`);
+    const computedValue =
+        inlineValue || getComputedStyle(element).getPropertyValue(`--${key}`);
+    if ((computedValue || "").trim() === String(value).trim()) {
+        return;
+    }
 
-	element.setAttribute("style", `${cleanedStyle}--${key}: ${value};`);
+    const currentStyle = element.getAttribute("style") || "";
+    const cleanedStyle = currentStyle
+        .replace(new RegExp(`--${key}:\\s*[^;]+;?`, "g"), "")
+        .trim();
+
+    const nextStyle = `${cleanedStyle}${cleanedStyle ? " " : ""}--${key}: ${value};`;
+    element.setAttribute("style", nextStyle);
 }
 
-function updateThemeClass(root: HTMLElement, mode: "light" | "dark") {
-	if (mode === "light") {
-		root.classList.remove("dark");
-	} else {
-		root.classList.add("dark");
-	}
-}
+// NOTE: kept for potential future use
+// function updateThemeClass(root: HTMLElement, mode: "light" | "dark") {
+//     if (mode === "light") {
+//         root.classList.remove("dark");
+//     } else {
+//         root.classList.add("dark");
+//     }
+// }
 
 let isResetting = false;
 let lastAppliedTime = 0;
@@ -142,6 +152,14 @@ export function applyTweakcnTheme(
 
 	const now = Date.now();
 
+    // If theme is identical to the last applied state, do nothing
+    if (
+        lastThemeState &&
+        JSON.stringify(lastThemeState) === JSON.stringify(themeState)
+    ) {
+        return;
+    }
+
 	const isModeChangeOnly =
 		lastThemeState &&
 		lastThemeState.preset === themeState.preset &&
@@ -155,8 +173,8 @@ export function applyTweakcnTheme(
 	)
 		return;
 
-	lastAppliedTime = now;
-	lastThemeState = { ...themeState };
+    lastAppliedTime = now;
+    lastThemeState = { ...themeState };
 
 	const root = document.documentElement;
 	const { currentMode: mode, styles: themeStyles } = themeState;
@@ -181,7 +199,7 @@ export function applyTweakcnTheme(
 
 				const fontPromises: Promise<void>[] = [];
 
-				for (const [type, fontValue] of Object.entries(currentFonts)) {
+                for (const [_type, fontValue] of Object.entries(currentFonts)) {
 					if (fontValue) {
 						const fontFamily = extractFontFamily(fontValue);
 						if (fontFamily) {
@@ -203,7 +221,7 @@ export function applyTweakcnTheme(
 					}
 				}
 
-				Promise.all(fontPromises).then(() => {
+                Promise.all(fontPromises).then(() => {
 					setTimeout(() => {
 						const fontSansValue = currentStyles["font-sans"];
 						const fontSerifValue = currentStyles["font-serif"];
@@ -231,9 +249,9 @@ export function applyTweakcnTheme(
 							);
 						}
 					}, 100);
-				});
-			}
-		} catch (e) {
+                });
+            }
+        } catch {
 			// Silently handle font loading errors
 		}
 	}
@@ -244,7 +262,7 @@ export function applyTweakcnTheme(
 export function getStoredTweakcnTheme(): TweakcnThemeState | null {
 	if (typeof window === "undefined") return null;
 
-	try {
+    try {
 		const stored = localStorage.getItem("chai-tweakcn-theme");
 		if (!stored) return null;
 
@@ -300,7 +318,7 @@ export function resetToDefaultTheme() {
 				}
 			}
 		}
-	} catch (e) {
+    } catch {
 		const prefersDark = window.matchMedia(
 			"(prefers-color-scheme: dark)",
 		).matches;

@@ -34,8 +34,11 @@ export const addPlaygroundMessage = mutation({
     role: v.union(v.literal("user"), v.literal("assistant"), v.literal("system")),
     content: v.string(),
     model: v.string(),
+    gateway: v.optional(
+      v.union(v.literal("llm-gateway"), v.literal("vercel-ai-gateway")),
+    ),
   },
-  handler: async (ctx, { playgroundId, columnId, userId, role, content, model }) => {
+  handler: async (ctx, { playgroundId, columnId, userId, role, content, model, gateway }) => {
     const identity = await ctx.auth.getUserIdentity();
     const actualUserId = identity?.subject || userId;
     const msgId = await ctx.db.insert("playgroundMessages", {
@@ -45,6 +48,7 @@ export const addPlaygroundMessage = mutation({
       role,
       content,
       model,
+      gateway,
       createdAt: Date.now(),
     });
     return msgId;

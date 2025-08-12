@@ -71,7 +71,7 @@ export function ModelSelector({
 	source,
 	onSourceChange,
 }: ModelSelectorProps) {
-	const isControlled = typeof source === "string";
+  const isControlled = typeof source === "string";
 	const { models, isLoading, error } = useLLMModels(
 		isControlled ? { source, controlled: true } : undefined,
 	);
@@ -109,16 +109,28 @@ export function ModelSelector({
 		}
 	}, [isDropdownOpen, isMobile]);
 
-	useEffect(() => {
-		if (isControlled) {
-			setUseAiGateway(source === "aigateway");
-			return;
-		}
-		try {
-			const raw = window.localStorage.getItem("chaichat_models_source");
-			setUseAiGateway(raw === "aigateway");
-		} catch {}
-	}, [isControlled, source]);
+  useEffect(() => {
+    if (isControlled) {
+      setUseAiGateway(source === "aigateway");
+      return;
+    }
+    try {
+      const raw = window.localStorage.getItem("chaichat_models_source");
+      setUseAiGateway(raw === "aigateway");
+    } catch {}
+    const sync = () => {
+      try {
+        const raw = window.localStorage.getItem("chaichat_models_source");
+        setUseAiGateway(raw === "aigateway");
+      } catch {}
+    };
+    window.addEventListener("modelsSourceChanged", sync as EventListener);
+    window.addEventListener("storage", sync);
+    return () => {
+      window.removeEventListener("modelsSourceChanged", sync as EventListener);
+      window.removeEventListener("storage", sync);
+    };
+  }, [isControlled, source]);
 
 	// Keep local UI toggle state in sync with global source changes
 	useEffect(() => {

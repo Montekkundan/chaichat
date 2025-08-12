@@ -27,6 +27,9 @@ export default defineSchema({
     content: v.string(),
     partsJson: v.optional(v.string()),
     model: v.string(),
+    gateway: v.optional(
+      v.union(v.literal("llm-gateway"), v.literal("vercel-ai-gateway")),
+    ),
     createdAt: v.number(),
     parentMessageId: v.optional(v.id("messages")), // Links to the original message
     version: v.optional(v.number()), // Version number (1, 2, 3, etc.)
@@ -65,6 +68,9 @@ export default defineSchema({
     role: v.union(v.literal("user"), v.literal("assistant"), v.literal("system")),
     content: v.string(),
     model: v.string(),
+    gateway: v.optional(
+      v.union(v.literal("llm-gateway"), v.literal("vercel-ai-gateway")),
+    ),
     createdAt: v.number(),
   }).index("by_playground", ["playgroundId"]).index("by_user", ["userId"]),
 });

@@ -157,10 +157,8 @@ export function Conversation({
 														const key = `${message.id}-text-${i}`;
 														const isCopied = copiedKey === key;
 														const isLastBlock = i === textParts.length - 1;
-														const showActions =
-															isLastBlock &&
-															message.role === "assistant" &&
-															status !== "streaming";
+                                                        const showActions =
+                                                            isLastBlock && message.role === "assistant";
 														return (
 															<div key={key} className="w-full">
 																<Response>{part.text}</Response>
@@ -236,6 +234,32 @@ export function Conversation({
 															</div>
 														);
 													})}
+                                                    {/* Fallback: while streaming and before any text arrives, still show model badge */}
+                                                    {message.role === "assistant" &&
+                                                        status === "streaming" &&
+                                                        textParts.length === 0 &&
+                                                        typeof (
+                                                            message as { model?: string } | undefined
+                                                        )?.model === "string" && (
+                                                            <Actions className="mt-2 opacity-0 transition-opacity group-hover:opacity-100">
+                                                                <div className="mr-2">
+                                                                    <ModelBadge
+                                                                        modelId={
+                                                                            (message as { model?: string }).model
+                                                                        }
+                                                                        gateway={
+                                                                            (
+                                                                                message as {
+                                                                                    gateway?:
+                                                                                        | "llm-gateway"
+                                                                                        | "vercel-ai-gateway";
+                                                                                }
+                                                                            ).gateway || gateway
+                                                                        }
+                                                                    />
+                                                                </div>
+                                                            </Actions>
+                                                        )}
 												</>
 											);
 										})()

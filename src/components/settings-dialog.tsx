@@ -73,6 +73,9 @@ export function SettingsDialog({
 	const [maxColumns, setMaxColumns] = React.useState<number>(3);
 	const [maxColumnsInput, setMaxColumnsInput] = React.useState<string>("3");
 
+	// Track last applied URL to avoid redundant fetches and flicker
+	const lastAppliedUrlRef = React.useRef<string | null>(null);
+
 	const apiKeyManagerComponent = React.useMemo(() => <ApiKeyManager />, []);
 
 	React.useEffect(() => {
@@ -90,6 +93,8 @@ export function SettingsDialog({
 				const storedUrl = localStorage.getItem("chai-tweakcn-theme-url");
 				if (storedUrl && storedTheme) {
 					setThemeUrl(storedUrl);
+					// We already have a stored theme; skip re-fetching the same URL
+					lastAppliedUrlRef.current = storedUrl;
 				}
 			} catch (error) {
 				console.error("Failed to restore theme URL:", error);
@@ -182,14 +187,12 @@ export function SettingsDialog({
 	};
 
 	React.useEffect(() => {
-		// Don't process empty URLs during restoration phase
 		if (!themeUrl.trim()) {
-			// Only reset theme if we're not in the restoration phase and there was a theme active
 			if (!isRestoringUrl && tweakcnTheme) {
 				resetToDefaultTheme();
 				setTweakcnTheme(null);
 				setIsTweakcnActive(false);
-				// Also clear the stored URL
+				lastAppliedUrlRef.current = null;
 				try {
 					localStorage.removeItem("chai-tweakcn-theme-url");
 				} catch (error) {
@@ -200,7 +203,13 @@ export function SettingsDialog({
 			return;
 		}
 
+		// Only handle valid tweakcn URLs
 		if (!themeUrl.startsWith("https://tweakcn.com/r/themes/")) {
+			return;
+		}
+
+		// Skip if we're restoring and already have this URL applied
+		if (lastAppliedUrlRef.current === themeUrl) {
 			return;
 		}
 
@@ -219,24 +228,22 @@ export function SettingsDialog({
 					applyTweakcnTheme(syncedTheme);
 					setIsTweakcnActive(true);
 
-					// Persist the theme URL
+					// Persist the theme URL and mark as applied to avoid refetch loop
 					try {
 						localStorage.setItem("chai-tweakcn-theme-url", themeUrl);
+						lastAppliedUrlRef.current = themeUrl;
 					} catch (error) {
 						console.error("Failed to store theme URL:", error);
 					}
 
-					// Only show toast for user-initiated actions, not during restoration
 					if (isUserAction) {
 						toast({ title: "Theme automatically applied!", status: "success" });
 					}
-				} else {
-					if (isUserAction) {
-						toast({
-							title: "Failed to fetch theme - invalid JSON response",
-							status: "error",
-						});
-					}
+				} else if (isUserAction) {
+					toast({
+						title: "Failed to fetch theme - invalid JSON response",
+						status: "error",
+					});
 				}
 			} catch {
 				if (isUserAction) {
@@ -247,22 +254,22 @@ export function SettingsDialog({
 				}
 			} finally {
 				setIsLoading(false);
-				setIsUserAction(false); // Reset the flag
+				setIsUserAction(false);
 			}
-		}, 1000);
+		}, 600);
 
 		return () => clearTimeout(timeoutId);
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [themeUrl, resolvedTheme, isRestoringUrl, isUserAction, tweakcnTheme]);
+		// Only re-run when the URL text changes or restoration status flips
+	}, [themeUrl, isRestoringUrl, resolvedTheme, isUserAction, tweakcnTheme]);
 
 	const handleResetTheme = () => {
 		resetToDefaultTheme();
 		setTweakcnTheme(null);
 		setIsTweakcnActive(false);
 		setThemeUrl("");
-		setIsRestoringUrl(false); // Ensure we're not in restoration mode
+		setIsRestoringUrl(false);
+		lastAppliedUrlRef.current = null;
 
-		// Clear the stored URL
 		try {
 			localStorage.removeItem("chai-tweakcn-theme-url");
 		} catch (error) {

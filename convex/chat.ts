@@ -38,6 +38,9 @@ export const addMessage = mutation({
     content: v.string(),
     partsJson: v.optional(v.string()),
     model: v.string(),
+    gateway: v.optional(
+      v.union(v.literal("llm-gateway"), v.literal("vercel-ai-gateway")),
+    ),
     attachments: v.optional(
       v.array(
         v.object({
@@ -53,7 +56,7 @@ export const addMessage = mutation({
   },
   handler: async (
     ctx,
-    { chatId, userId, role, content, partsJson, model, attachments, parentMessageId, version }
+    { chatId, userId, role, content, partsJson, model, gateway, attachments, parentMessageId, version }
   ) => {
     const messageId = await ctx.db.insert("messages", {
       chatId,
@@ -62,6 +65,7 @@ export const addMessage = mutation({
       content,
       partsJson,
       model,
+      gateway,
       attachments,
       createdAt: Date.now(),
       parentMessageId,
