@@ -1,6 +1,8 @@
 "use client";
 
 import { useUser } from "@clerk/nextjs";
+import { useAction } from "convex/react";
+import { api } from "@/convex/_generated/api";
 import { LinkIcon, LinkSimpleBreakIcon } from "@phosphor-icons/react";
 import {
 	ChevronLeft,
@@ -43,9 +45,12 @@ export function PlaygroundColumn({
 	columnIndex,
 }: PlaygroundColumnProps) {
 	const { user } = useUser();
+  const getKeys = useAction(api.userKeys.getKeys);
 
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const [isConfigMenuOpen, setIsConfigMenuOpen] = useState(false);
+  const [hasLlmKey, setHasLlmKey] = useState<boolean>(false);
+  const [hasAiKey, setHasAiKey] = useState<boolean>(false);
 
 	// Per-column scroll API so Enter can scroll to bottom if needed
 	const conversationScrollApiRef = useRef<{
@@ -64,6 +69,34 @@ export function PlaygroundColumn({
 			| "llmgateway";
 		setColumnSource(next);
 	}, [column.gatewaySource]);
+
+  // Load both keys on mount and on apiKeysChanged
+  useEffect(() => {
+    const loadKeys = async () => {
+      try {
+        if (user?.id) {
+          const result = (await getKeys({})) as {
+            llmGatewayApiKey?: string;
+            aiGatewayApiKey?: string;
+          };
+          setHasLlmKey(Boolean(result?.llmGatewayApiKey));
+          setHasAiKey(Boolean(result?.aiGatewayApiKey));
+        } else {
+          const { getAllKeys } = await import("~/lib/local-keys");
+          const local = await getAllKeys();
+          setHasLlmKey(Boolean(local?.llmGatewayApiKey));
+          setHasAiKey(Boolean(local?.aiGatewayApiKey));
+        }
+      } catch {
+        setHasLlmKey(false);
+        setHasAiKey(false);
+      }
+    };
+    void loadKeys();
+    const onChanged = () => void loadKeys();
+    window.addEventListener("apiKeysChanged", onChanged);
+    return () => window.removeEventListener("apiKeysChanged", onChanged);
+  }, [user?.id, getKeys]);
 	const {
 		models,
 		isLoading: isModelsLoading,
@@ -220,7 +253,8 @@ export function PlaygroundColumn({
 		}
 	};
 
-	const currentInput = column.synced ? sharedInput : column.input;
+  const currentInput = column.synced ? sharedInput : column.input;
+  const hasRequiredKey = columnSource === "aigateway" ? hasAiKey : hasLlmKey;
 	const canMoveLeft = columnIndex > 0;
 	const canMoveRight = columnIndex < columns.length - 1;
 	const canRemove = columns.length > 1;
@@ -534,41 +568,42 @@ export function PlaygroundColumn({
 									handleSend();
 								}}
 							>
-								<textarea
-									placeholder={
-										column.synced
-											? "Type a synced message..."
-											: "Type your message…"
-									}
-									value={currentInput}
-									onChange={(e) => {
-										handleInputChange(e.target.value);
-										// Auto-resize textarea
-										const target = e.target as HTMLTextAreaElement;
-										target.style.height = "auto";
-										target.style.height = `${Math.min(target.scrollHeight, 120)}px`;
-									}}
-									className="max-h-[120px] min-h-[38px] flex-1 resize-none overflow-y-auto rounded-md border bg-background-100 py-2 pr-9 pl-4 text-sm focus:border-zinc-400 focus:outline-none focus:ring-0 dark:focus:border-zinc-600"
-									spellCheck="false"
-									rows={1}
-									style={{
-										fontFamily: "var(--font-geist-sans)",
-										height: "38px",
-										lineHeight: "1.5",
-									}}
-									onKeyDown={(e) => {
-										if (e.key === "Enter" && !e.shiftKey) {
-											e.preventDefault();
-											handleSend();
-										}
-									}}
-								/>
+                        <textarea
+                          placeholder={
+                            hasRequiredKey
+                              ? (column.synced ? "Type a synced message..." : "Type your message…")
+                              : `Please add your ${columnSource === "aigateway" ? "Vercel AI Gateway" : "LLM Gateway"} API key to start chatting`
+                          }
+                          value={currentInput}
+                          onChange={(e) => {
+                            handleInputChange(e.target.value);
+                            const target = e.target as HTMLTextAreaElement;
+                            target.style.height = "auto";
+                            target.style.height = `${Math.min(target.scrollHeight, 120)}px`;
+                          }}
+                          className="min-h-[38px] max-h-[120px] flex-1 resize-none overflow-y-auto rounded-md border bg-background-100 py-2 pl-4 pr-9 text-sm focus:border-zinc-400 focus:outline-none focus:ring-0 dark:focus:border-zinc-600 disabled:cursor-not-allowed disabled:opacity-60"
+                          spellCheck="false"
+                          rows={1}
+                          style={{
+                            fontFamily: "var(--font-geist-sans)",
+                            height: "38px",
+                            lineHeight: "1.5",
+                          }}
+                          disabled={!hasRequiredKey}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && !e.shiftKey) {
+                              e.preventDefault();
+                              if (!hasRequiredKey) return;
+                              handleSend();
+                            }
+                          }}
+                        />
 								<div className="absolute right-1 bottom-[3px] inline-flex items-center justify-end">
-									<button
+                                    <button
 										type="button"
 										aria-label="Send Message"
-										onClick={handleSend}
-										disabled={isSubmitting || !currentInput.trim()}
+                                      onClick={handleSend}
+                                      disabled={!hasRequiredKey || isSubmitting || !currentInput.trim()}
 										className="button_base__IZQUR reset_reset__sz7UJ button_button__dyHAB reset_reset__sz7UJ geist-new-themed geist-new-tertiary geist-new-tertiary-fill button_tertiary__t8MGO button_shape__4NO5k button_small__BoUqH button_invert__WPMQW"
 										data-geist-button=""
 										data-prefix="false"

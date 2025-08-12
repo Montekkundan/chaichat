@@ -35,7 +35,8 @@ import { ModelSelector } from "./model-selector";
 // TODO cleanup: use all user keys
 
 type UserKeys = {
-	llmGatewayApiKey?: string;
+    llmGatewayApiKey?: string;
+    aiGatewayApiKey?: string;
 };
 
 type ChatInputProps = {
@@ -85,27 +86,61 @@ export function ChatInput({
 
 	// User keys state for search capabilities
 	const getKeys = useAction(api.userKeys.getKeys);
-	const [_userKeys, setUserKeys] = useState<UserKeys | undefined>(undefined);
+  const [_userKeys, setUserKeys] = useState<UserKeys | undefined>(undefined);
+  const [hasLlmKey, setHasLlmKey] = useState<boolean>(false);
+  const [hasAiKey, setHasAiKey] = useState<boolean>(false);
+  const [modelsSource, setModelsSource] = useState<"llmgateway" | "aigateway">(
+    "llmgateway",
+  );
 
 	// Load user keys on mount
-	useEffect(() => {
-		const loadKeys = async () => {
-			if (isUserAuthenticated) {
-				const result = (await getKeys({})) as UserKeys;
-				setUserKeys(result);
-			} else {
-				try {
-					const { getAllKeys } = await import("~/lib/local-keys");
-					const localKeys = await getAllKeys();
-					setUserKeys(localKeys);
-				} catch (_error) {
-					setUserKeys({});
-				}
-			}
-		};
+  useEffect(() => {
+    const loadKeys = async () => {
+      if (isUserAuthenticated) {
+        const result = (await getKeys({})) as UserKeys;
+        setUserKeys(result);
+        setHasLlmKey(Boolean(result?.llmGatewayApiKey));
+        setHasAiKey(Boolean(result?.aiGatewayApiKey));
+      } else {
+        try {
+          const { getAllKeys } = await import("~/lib/local-keys");
+          const localKeys = await getAllKeys();
+          setUserKeys(localKeys);
+          setHasLlmKey(Boolean(localKeys?.llmGatewayApiKey));
+          setHasAiKey(Boolean(localKeys?.aiGatewayApiKey));
+        } catch {
+          setUserKeys({});
+          setHasLlmKey(false);
+          setHasAiKey(false);
+        }
+      }
+    };
 
-		loadKeys();
-	}, [isUserAuthenticated, getKeys]);
+    loadKeys();
+    const onKeysChanged = () => void loadKeys();
+    window.addEventListener("apiKeysChanged", onKeysChanged);
+    return () => window.removeEventListener("apiKeysChanged", onKeysChanged);
+  }, [isUserAuthenticated, getKeys]);
+
+  // Track current models source (global toggle in ModelSelector) to decide which key is required
+  useEffect(() => {
+    const readSource = () => {
+      try {
+        const raw = window.localStorage.getItem("chaichat_models_source");
+        setModelsSource(raw === "aigateway" ? "aigateway" : "llmgateway");
+      } catch {
+        setModelsSource("llmgateway");
+      }
+    };
+    readSource();
+    const onChange = () => readSource();
+    window.addEventListener("modelsSourceChanged", onChange as EventListener);
+    window.addEventListener("storage", onChange);
+    return () => {
+      window.removeEventListener("modelsSourceChanged", onChange as EventListener);
+      window.removeEventListener("storage", onChange);
+    };
+  }, []);
 
 	// For now, enable search for all models - LLM Gateway will handle capabilities
 	// const allowWebSearch = true;
@@ -191,38 +226,8 @@ export function ChatInput({
 	//   setIsSearchEnabled((prev) => !prev);
 	// };
 
-	// Track if user has any API keys available - check for LLM Gateway key
-	const [hasApiKeys, setHasApiKeys] = useState(false); // Default to false
-
-	useEffect(() => {
-		const checkApiKeys = async () => {
-			try {
-				if (isUserAuthenticated) {
-					const result = (await getKeys({})) as UserKeys;
-					setHasApiKeys(!!result?.llmGatewayApiKey);
-				} else {
-					const { getAllKeys } = await import("~/lib/local-keys");
-					const localKeys = await getAllKeys();
-					setHasApiKeys(!!localKeys?.llmGatewayApiKey);
-				}
-			} catch (error) {
-				console.error("Failed to check API keys:", error);
-				setHasApiKeys(false);
-			}
-		};
-
-		checkApiKeys();
-
-		// Listen for API key changes from the API key manager
-		const handleApiKeysChanged = () => {
-			checkApiKeys();
-		};
-
-		window.addEventListener("apiKeysChanged", handleApiKeysChanged);
-		return () => {
-			window.removeEventListener("apiKeysChanged", handleApiKeysChanged);
-		};
-	}, [isUserAuthenticated, getKeys]);
+  // Derived: does the current source have the required key?
+  const hasRequiredKey = modelsSource === "aigateway" ? hasAiKey : hasLlmKey;
 	const handleSend = useCallback(async () => {
 		if (isSubmitting || disabled) {
 			return;
@@ -392,12 +397,12 @@ export function ChatInput({
 				{supportsAttachments && (
 					<FileList files={files} onFileRemove={handleFileRemove} />
 				)}
-				{!hasApiKeys ? (
+                {!hasRequiredKey ? (
 					<Tooltip>
 						<TooltipTrigger asChild>
 							<div>
 								<PromptInputTextarea
-									placeholder="Please add your LLM Gateway API key to start chatting"
+                          placeholder={`Please add your ${modelsSource === "aigateway" ? "Vercel AI Gateway" : "LLM Gateway"} API key to start chatting`}
 									onKeyDown={handleKeyDown}
 									onChange={(e) => onValueChange(e.target.value)}
 									className="min-h-[44px] cursor-not-allowed pt-3 pl-4 text-base leading-[1.3] sm:text-base md:text-base"
@@ -407,7 +412,7 @@ export function ChatInput({
 							</div>
 						</TooltipTrigger>
 						<TooltipContent side="top">
-							<div className="text-xs">Please add your LLM Gateway API key</div>
+                      <div className="text-xs">Please add your {modelsSource === "aigateway" ? "Vercel AI Gateway" : "LLM Gateway"} API key</div>
 						</TooltipContent>
 					</Tooltip>
 				) : (
@@ -534,25 +539,25 @@ export function ChatInput({
 							</PromptInputAction>
 						)} */}
 					</div>
-					<PromptInputAction
-						tooltip={
-							!hasApiKeys
-								? "Please add your LLM Gateway API key"
-								: status === "streaming"
-									? "Stop"
-									: "Send"
-						}
-					>
+                  <PromptInputAction
+                    tooltip={
+                      !hasRequiredKey
+                        ? `Please add your ${modelsSource === "aigateway" ? "Vercel AI Gateway" : "LLM Gateway"} API key`
+                        : status === "streaming"
+                          ? "Stop"
+                          : "Send"
+                    }
+                  >
 						<Button
 							size="sm"
 							className="size-9 rounded-full transition-all duration-300 ease-out"
-							disabled={
-								disabled ||
-								!hasApiKeys ||
-								isUploading ||
-								(isOnlyWhitespace(value) && files.length === 0) ||
-								isSubmitting
-							}
+                          disabled={
+                            disabled ||
+                            !hasRequiredKey ||
+                            isUploading ||
+                            (isOnlyWhitespace(value) && files.length === 0) ||
+                            isSubmitting
+                          }
 							type="button"
 							onClick={handleSend}
 							aria-label={status === "streaming" ? "Stop" : "Send message"}
