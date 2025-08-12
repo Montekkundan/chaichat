@@ -7,7 +7,12 @@
 	},
 	"files": {
 		"ignoreUnknown": false,
-		"ignore": ["convex", "basehub-types.d.ts"]
+		"ignore": [
+			"convex",
+			"basehub-types.d.ts",
+			"apps/www/convex",
+			"apps/www/basehub-types.d.ts"
+		]
 	},
 	"formatter": { "enabled": true },
 	"organizeImports": { "enabled": true },

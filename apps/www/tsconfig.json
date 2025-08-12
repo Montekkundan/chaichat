@@ -1,0 +1,22 @@
+{
+    "extends": "../../packages/tsconfig/base.json",
+    "compilerOptions": {
+        "baseUrl": ".",
+        "paths": {
+            "~/*": ["./src/*"],
+            "@/*": ["./*"],
+            "@/convex/*": ["./convex/*"]
+        },
+        "plugins": [{ "name": "next" }]
+    },
+	"include": [
+		"next-env.d.ts",
+		"**/*.ts",
+		"**/*.tsx",
+		"**/*.cjs",
+		"**/*.js",
+		".next/types/**/*.ts",
+		"basehub-types.d.ts"
+	],
+	"exclude": ["node_modules"]
+}

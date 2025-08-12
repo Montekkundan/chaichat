@@ -1,6 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
+import type { Transition } from "framer-motion";
 import type { UploadedFile } from "./file-items";
 import { FileItem } from "./file-items";
 
@@ -9,7 +10,7 @@ export type FileListProps = {
 	onFileRemove: (file: UploadedFile) => void;
 };
 
-const TRANSITION = {
+const TRANSITION: Transition = {
 	type: "spring",
 	duration: 0.2,
 	bounce: 0,
