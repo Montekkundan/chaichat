@@ -13,7 +13,7 @@ export function ThemeProvider({
 	useEffect(() => {
 		let timeoutId: NodeJS.Timeout;
 
-        const syncTweakcnTheme = () => {
+		const syncTweakcnTheme = () => {
 			const storedTheme = getStoredTweakcnTheme();
 			if (storedTheme) {
 				// Check current DOM state for dark mode
@@ -27,7 +27,7 @@ export function ThemeProvider({
 						currentMode: newMode as "dark" | "light",
 					};
 					// Use bypassThrottle for instant mode changes
-                    applyTweakcnTheme(syncedTheme, true);
+					applyTweakcnTheme(syncedTheme, true);
 				}
 			}
 		};
@@ -49,7 +49,7 @@ export function ThemeProvider({
 			}
 		});
 
-        // Observe class changes on html element, but ignore transient changes coming from theme application
+		// Observe class changes on html element, but ignore transient changes coming from theme application
 		observer.observe(document.documentElement, {
 			attributes: true,
 			attributeFilter: ["class"],

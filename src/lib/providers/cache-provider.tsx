@@ -41,7 +41,7 @@ interface CacheContextType {
 		content: string;
 		partsJson?: string;
 		model: string;
-    gateway?: "llm-gateway" | "vercel-ai-gateway";
+		gateway?: "llm-gateway" | "vercel-ai-gateway";
 		attachments?: {
 			name: string;
 			url: string;
@@ -360,13 +360,13 @@ export function CacheProvider({
 					for (const localMsg of reassignedMsgs) {
 						if (localMsg._id.startsWith(OPTIMISTIC_PREFIX)) {
 							try {
-                const newMessageId = await addMessageMutation({
+								const newMessageId = await addMessageMutation({
 									chatId: realId as Id<"chats">,
 									userId: localMsg.userId,
 									role: localMsg.role,
 									content: localMsg.content,
 									model: localMsg.model,
-                  gateway: (localMsg as Message).gateway,
+									gateway: (localMsg as Message).gateway,
 									attachments: localMsg.attachments,
 									...(localMsg.parentMessageId && {
 										parentMessageId: localMsg.parentMessageId as Id<"messages">,
@@ -696,7 +696,7 @@ export function CacheProvider({
 			content: string;
 			partsJson?: string;
 			model: string;
-      gateway?: "llm-gateway" | "vercel-ai-gateway";
+			gateway?: "llm-gateway" | "vercel-ai-gateway";
 			attachments?: {
 				name: string;
 				url: string;

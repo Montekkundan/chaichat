@@ -238,5 +238,5 @@ export {
 	CarouselItem,
 	CarouselPrevious,
 	CarouselNext,
-  	useCarousel,
+	useCarousel,
 };

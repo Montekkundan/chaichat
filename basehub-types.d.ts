@@ -51,12 +51,6 @@ export interface Scalars {
 }))[],
     BSHBRichTextContentSchema: RichTextNode[],
     BSHBRichTextTOCSchema: RichTextTocNode[],
-    BSHBSelect_1097962293: 'amber' | 'blue' | 'bronze' | 'brown' | 'crimson' | 'cyan' | 'gold' | 'grass' | 'gray' | 'green' | 'indigo' | 'iris' | 'jade' | 'lime' | 'mint' | 'orange' | 'pink' | 'plum' | 'purple' | 'red' | 'ruby' | 'sky' | 'teal' | 'tomato' | 'violet' | 'yellow',
-    BSHBSelect_16540676: 'auto' | 'gray' | 'mauve' | 'olive' | 'sage' | 'sand' | 'slate',
-    BSHBSelect_288583032: 'solid' | 'translucent',
-    BSHBSelect_602945086: 'dark' | 'system' | 'light',
-    BSHBSelect_975605961: '105%' | '100%' | '110%' | '90%' | '95%',
-    BSHBSelect__1180720836: 'full' | 'large' | 'medium' | 'none' | 'small',
     Boolean: boolean,
     CodeSnippetLanguage: B_Language,
     DateTime: any,
@@ -106,7 +100,7 @@ export interface BlockColor {
     __typename: 'BlockColor'
 }
 
-export type BlockDocument = (Changelog | Components | ImageComponent | Metadata | Pages | PagesItem | Pages_1 | Registry | Settings | Tags | TagsItem | Theme | TweetComponent | VideoComponent | YoutubeComponent | _AgentStart | imageComponent_AsList | pagesItem_AsList | tagsItem_AsList | tweetComponent_AsList | videoComponent_AsList | youtubeComponent_AsList) & { __isUnion?: true }
+export type BlockDocument = (Changelog | Components | ImageComponent | Pages | PagesItem | Tags | TagsItem | TweetComponent | VideoComponent | YoutubeComponent | _AgentStart | imageComponent_AsList | pagesItem_AsList | tagsItem_AsList | tweetComponent_AsList | videoComponent_AsList | youtubeComponent_AsList) & { __isUnion?: true }
 
 export interface BlockDocumentSys {
     apiNamePath: Scalars['String']
@@ -165,7 +159,7 @@ export interface BlockImage {
     __typename: 'BlockImage'
 }
 
-export type BlockList = (Pages_1 | Tags | imageComponent_AsList | pagesItem_AsList | tagsItem_AsList | tweetComponent_AsList | videoComponent_AsList | youtubeComponent_AsList) & { __isUnion?: true }
+export type BlockList = (Pages | Tags | imageComponent_AsList | pagesItem_AsList | tagsItem_AsList | tweetComponent_AsList | videoComponent_AsList | youtubeComponent_AsList) & { __isUnion?: true }
 
 export interface BlockOgImage {
     height: Scalars['Int']
@@ -201,7 +195,7 @@ export interface Changelog {
     _slugPath: Scalars['String']
     _sys: BlockDocumentSys
     _title: Scalars['String']
-    pages: Pages_1
+    pages: Pages
     __typename: 'Changelog'
 }
 
@@ -231,7 +225,7 @@ export interface Content {
 }
 
 export interface ContentRichText {
-    blocks: UnionVideoComponentYoutubeComponentTweetComponentImageComponent[]
+    blocks: UnionImageComponentVideoComponentYoutubeComponentTweetComponent[]
     content: Scalars['BSHBRichTextContentSchema']
     toc: Scalars['BSHBRichTextTOCSchema']
     __typename: 'ContentRichText'
@@ -247,7 +241,7 @@ export interface ImageComponent {
     _analyticsKey: Scalars['String']
     _dashboardUrl: Scalars['String']
     /** Array of search highlight information with field names and HTML markup */
-    _highlight: (SearchHighlight_z1l5L3M9ZpPwZtTj1Uia0[] | null)
+    _highlight: (SearchHighlight_2f5601182cb62396388c3[] | null)
     _id: Scalars['String']
     _idPath: Scalars['String']
     _slug: Scalars['String']
@@ -271,21 +265,6 @@ export interface ListMeta {
 export type MediaBlock = (BlockAudio | BlockFile | BlockImage | BlockVideo) & { __isUnion?: true }
 
 export type MediaBlockUnion = (BlockAudio | BlockFile | BlockImage | BlockVideo) & { __isUnion?: true }
-
-export interface Metadata {
-    _analyticsKey: Scalars['String']
-    _dashboardUrl: Scalars['String']
-    _id: Scalars['String']
-    _idPath: Scalars['String']
-    _slug: Scalars['String']
-    _slugPath: Scalars['String']
-    _sys: BlockDocumentSys
-    _title: Scalars['String']
-    favicon: BlockImage
-    pageTitleTemplate: Scalars['String']
-    sitename: Scalars['String']
-    __typename: 'Metadata'
-}
 
 export interface Mutation {
     /**
@@ -325,10 +304,17 @@ export interface Pages {
     _dashboardUrl: Scalars['String']
     _id: Scalars['String']
     _idPath: Scalars['String']
+    _meta: ListMeta
+    /** The key used to search from the frontend. */
+    _searchKey: Scalars['String']
     _slug: Scalars['String']
     _slugPath: Scalars['String']
     _sys: BlockDocumentSys
     _title: Scalars['String']
+    /** Returns the first item in the list, or null if the list is empty. Useful when you expect only one result. */
+    item: (PagesItem | null)
+    /** Returns the list of items after filtering and paginating according to the arguments sent by the client. */
+    items: PagesItem[]
     __typename: 'Pages'
 }
 
@@ -336,7 +322,7 @@ export interface PagesItem {
     _analyticsKey: Scalars['String']
     _dashboardUrl: Scalars['String']
     /** Array of search highlight information with field names and HTML markup */
-    _highlight: (SearchHighlight_da595a5a418a57167c8b4[] | null)
+    _highlight: (SearchHighlight_dac20f43675eef992a54d[] | null)
     _id: Scalars['String']
     _idPath: Scalars['String']
     _slug: Scalars['String']
@@ -353,25 +339,6 @@ export interface PagesItem {
 
 export type PagesItemOrderByEnum = '_sys_createdAt__ASC' | '_sys_createdAt__DESC' | '_sys_hash__ASC' | '_sys_hash__DESC' | '_sys_id__ASC' | '_sys_id__DESC' | '_sys_lastModifiedAt__ASC' | '_sys_lastModifiedAt__DESC' | '_sys_slug__ASC' | '_sys_slug__DESC' | '_sys_title__ASC' | '_sys_title__DESC' | 'content__ASC' | 'content__DESC' | 'date__ASC' | 'date__DESC' | 'description__ASC' | 'description__DESC' | 'tags__ASC' | 'tags__DESC' | 'version__ASC' | 'version__DESC'
 
-export interface Pages_1 {
-    _analyticsKey: Scalars['String']
-    _dashboardUrl: Scalars['String']
-    _id: Scalars['String']
-    _idPath: Scalars['String']
-    _meta: ListMeta
-    /** The key used to search from the frontend. */
-    _searchKey: Scalars['String']
-    _slug: Scalars['String']
-    _slugPath: Scalars['String']
-    _sys: BlockDocumentSys
-    _title: Scalars['String']
-    /** Returns the first item in the list, or null if the list is empty. Useful when you expect only one result. */
-    item: (PagesItem | null)
-    /** Returns the list of items after filtering and paginating according to the arguments sent by the client. */
-    items: PagesItem[]
-    __typename: 'Pages_1'
-}
-
 export interface Query {
     _agent: (_AgentStart | null)
     /** Query across the custom AI agents in the repository. */
@@ -385,22 +352,7 @@ export interface Query {
     _sys: RepoSys
     changelog: Changelog
     components: Components
-    registry: Registry
     __typename: 'Query'
-}
-
-export interface Registry {
-    _analyticsKey: Scalars['String']
-    _dashboardUrl: Scalars['String']
-    _id: Scalars['String']
-    _idPath: Scalars['String']
-    _slug: Scalars['String']
-    _slugPath: Scalars['String']
-    _sys: BlockDocumentSys
-    _title: Scalars['String']
-    pages: Pages
-    settings: Settings
-    __typename: 'Registry'
 }
 
 export interface RepoSys {
@@ -415,69 +367,52 @@ export interface RepoSys {
 
 export type RichTextJson = (BaseRichTextJson | ContentRichText) & { __isUnion?: true }
 
-export interface SearchHighlight_1N8oOrcmyNzxqyz404Pti {
+export interface SearchHighlight_2f5601182cb62396388c3 {
     /** The field/path that was matched (e.g., "title", "body.content") */
     by: Scalars['String']
     /** HTML snippet with <mark> tags around the matched terms */
     snippet: Scalars['String']
-    __typename: 'SearchHighlight_1N8oOrcmyNzxqyz404Pti'
+    __typename: 'SearchHighlight_2f5601182cb62396388c3'
 }
 
-export interface SearchHighlight_7c6c746eb4c3d9ac2d3e1 {
+export interface SearchHighlight_4662cc29ecb4132588cc0 {
     /** The field/path that was matched (e.g., "title", "body.content") */
     by: Scalars['String']
     /** HTML snippet with <mark> tags around the matched terms */
     snippet: Scalars['String']
-    __typename: 'SearchHighlight_7c6c746eb4c3d9ac2d3e1'
+    __typename: 'SearchHighlight_4662cc29ecb4132588cc0'
 }
 
-export interface SearchHighlight_BqluItM67eIFYP6P4HpNX {
+export interface SearchHighlight_769e9caa5c362ef7561a3 {
     /** The field/path that was matched (e.g., "title", "body.content") */
     by: Scalars['String']
     /** HTML snippet with <mark> tags around the matched terms */
     snippet: Scalars['String']
-    __typename: 'SearchHighlight_BqluItM67eIFYP6P4HpNX'
+    __typename: 'SearchHighlight_769e9caa5c362ef7561a3'
 }
 
-export interface SearchHighlight_RXQAKvhosL2dgLKJ8SaLx {
+export interface SearchHighlight_b04630ba11df7a8f5c865 {
     /** The field/path that was matched (e.g., "title", "body.content") */
     by: Scalars['String']
     /** HTML snippet with <mark> tags around the matched terms */
     snippet: Scalars['String']
-    __typename: 'SearchHighlight_RXQAKvhosL2dgLKJ8SaLx'
+    __typename: 'SearchHighlight_b04630ba11df7a8f5c865'
 }
 
-export interface SearchHighlight_da595a5a418a57167c8b4 {
+export interface SearchHighlight_c3a106766df8e1f2910dc {
     /** The field/path that was matched (e.g., "title", "body.content") */
     by: Scalars['String']
     /** HTML snippet with <mark> tags around the matched terms */
     snippet: Scalars['String']
-    __typename: 'SearchHighlight_da595a5a418a57167c8b4'
+    __typename: 'SearchHighlight_c3a106766df8e1f2910dc'
 }
 
-export interface SearchHighlight_z1l5L3M9ZpPwZtTj1Uia0 {
+export interface SearchHighlight_dac20f43675eef992a54d {
     /** The field/path that was matched (e.g., "title", "body.content") */
     by: Scalars['String']
     /** HTML snippet with <mark> tags around the matched terms */
     snippet: Scalars['String']
-    __typename: 'SearchHighlight_z1l5L3M9ZpPwZtTj1Uia0'
-}
-
-export interface Settings {
-    _analyticsKey: Scalars['String']
-    _dashboardUrl: Scalars['String']
-    _id: Scalars['String']
-    _idPath: Scalars['String']
-    _slug: Scalars['String']
-    _slugPath: Scalars['String']
-    _sys: BlockDocumentSys
-    _title: Scalars['String']
-    logo: BlockImage
-    logoDark: BlockImage
-    metadata: Metadata
-    showUseTemplate: Scalars['Boolean']
-    theme: Theme
-    __typename: 'Settings'
+    __typename: 'SearchHighlight_dac20f43675eef992a54d'
 }
 
 export interface Tags {
@@ -503,7 +438,7 @@ export interface TagsItem {
     _analyticsKey: Scalars['String']
     _dashboardUrl: Scalars['String']
     /** Array of search highlight information with field names and HTML markup */
-    _highlight: (SearchHighlight_7c6c746eb4c3d9ac2d3e1[] | null)
+    _highlight: (SearchHighlight_769e9caa5c362ef7561a3[] | null)
     _id: Scalars['String']
     _idPath: Scalars['String']
     _slug: Scalars['String']
@@ -514,24 +449,6 @@ export interface TagsItem {
 }
 
 export type TagsItemOrderByEnum = '_sys_createdAt__ASC' | '_sys_createdAt__DESC' | '_sys_hash__ASC' | '_sys_hash__DESC' | '_sys_id__ASC' | '_sys_id__DESC' | '_sys_lastModifiedAt__ASC' | '_sys_lastModifiedAt__DESC' | '_sys_slug__ASC' | '_sys_slug__DESC' | '_sys_title__ASC' | '_sys_title__DESC'
-
-export interface Theme {
-    _analyticsKey: Scalars['String']
-    _dashboardUrl: Scalars['String']
-    _id: Scalars['String']
-    _idPath: Scalars['String']
-    _slug: Scalars['String']
-    _slugPath: Scalars['String']
-    _sys: BlockDocumentSys
-    _title: Scalars['String']
-    accentColor: Scalars['BSHBSelect_1097962293']
-    appearance: (Scalars['BSHBSelect_602945086'] | null)
-    grayScale: Scalars['BSHBSelect_16540676']
-    panelBackground: Scalars['BSHBSelect_288583032']
-    radius: Scalars['BSHBSelect__1180720836']
-    scaling: Scalars['BSHBSelect_975605961']
-    __typename: 'Theme'
-}
 
 export interface TransactionStatus {
     /** Duration in milliseconds. */
@@ -550,7 +467,7 @@ export interface TweetComponent {
     _analyticsKey: Scalars['String']
     _dashboardUrl: Scalars['String']
     /** Array of search highlight information with field names and HTML markup */
-    _highlight: (SearchHighlight_RXQAKvhosL2dgLKJ8SaLx[] | null)
+    _highlight: (SearchHighlight_c3a106766df8e1f2910dc[] | null)
     _id: Scalars['String']
     _idPath: Scalars['String']
     _slug: Scalars['String']
@@ -563,7 +480,7 @@ export interface TweetComponent {
 
 export type TweetComponentOrderByEnum = '_sys_createdAt__ASC' | '_sys_createdAt__DESC' | '_sys_hash__ASC' | '_sys_hash__DESC' | '_sys_id__ASC' | '_sys_id__DESC' | '_sys_lastModifiedAt__ASC' | '_sys_lastModifiedAt__DESC' | '_sys_slug__ASC' | '_sys_slug__DESC' | '_sys_title__ASC' | '_sys_title__DESC' | 'tweetId__ASC' | 'tweetId__DESC' | 'untitled__ASC' | 'untitled__DESC'
 
-export type UnionVideoComponentYoutubeComponentTweetComponentImageComponent = (ImageComponent | TweetComponent | VideoComponent | YoutubeComponent) & { __isUnion?: true }
+export type UnionImageComponentVideoComponentYoutubeComponentTweetComponent = (ImageComponent | TweetComponent | VideoComponent | YoutubeComponent) & { __isUnion?: true }
 
 export interface Variant {
     apiName: Scalars['String']
@@ -578,7 +495,7 @@ export interface VideoComponent {
     _analyticsKey: Scalars['String']
     _dashboardUrl: Scalars['String']
     /** Array of search highlight information with field names and HTML markup */
-    _highlight: (SearchHighlight_1N8oOrcmyNzxqyz404Pti[] | null)
+    _highlight: (SearchHighlight_4662cc29ecb4132588cc0[] | null)
     _id: Scalars['String']
     _idPath: Scalars['String']
     _slug: Scalars['String']
@@ -595,7 +512,7 @@ export interface YoutubeComponent {
     _analyticsKey: Scalars['String']
     _dashboardUrl: Scalars['String']
     /** Array of search highlight information with field names and HTML markup */
-    _highlight: (SearchHighlight_BqluItM67eIFYP6P4HpNX[] | null)
+    _highlight: (SearchHighlight_b04630ba11df7a8f5c865[] | null)
     _id: Scalars['String']
     _idPath: Scalars['String']
     _slug: Scalars['String']
@@ -887,15 +804,10 @@ export interface BlockDocumentGenqlSelection{
     on_Changelog?: ChangelogGenqlSelection
     on_Components?: ComponentsGenqlSelection
     on_ImageComponent?: ImageComponentGenqlSelection
-    on_Metadata?: MetadataGenqlSelection
     on_Pages?: PagesGenqlSelection
     on_PagesItem?: PagesItemGenqlSelection
-    on_Pages_1?: Pages_1GenqlSelection
-    on_Registry?: RegistryGenqlSelection
-    on_Settings?: SettingsGenqlSelection
     on_Tags?: TagsGenqlSelection
     on_TagsItem?: TagsItemGenqlSelection
-    on_Theme?: ThemeGenqlSelection
     on_TweetComponent?: TweetComponentGenqlSelection
     on_VideoComponent?: VideoComponentGenqlSelection
     on_YoutubeComponent?: YoutubeComponentGenqlSelection
@@ -984,7 +896,7 @@ export interface BlockListGenqlSelection{
     _slugPath?: boolean | number
     _sys?: BlockDocumentSysGenqlSelection
     _title?: boolean | number
-    on_Pages_1?: Pages_1GenqlSelection
+    on_Pages?: PagesGenqlSelection
     on_Tags?: TagsGenqlSelection
     on_imageComponent_AsList?: imageComponent_AsListGenqlSelection
     on_pagesItem_AsList?: pagesItem_AsListGenqlSelection
@@ -1049,7 +961,7 @@ export interface ChangelogGenqlSelection{
     _slugPath?: boolean | number
     _sys?: BlockDocumentSysGenqlSelection
     _title?: boolean | number
-    pages?: (Pages_1GenqlSelection & { __args?: {
+    pages?: (PagesGenqlSelection & { __args?: {
     /** Filter by a field. */
     filter?: (PagesItemFilterInput | null), 
     /** Limit the number of items returned. Defaults to 500. */
@@ -1101,7 +1013,7 @@ export interface ContentGenqlSelection{
 }
 
 export interface ContentRichTextGenqlSelection{
-    blocks?: UnionVideoComponentYoutubeComponentTweetComponentImageComponentGenqlSelection
+    blocks?: UnionImageComponentVideoComponentYoutubeComponentTweetComponentGenqlSelection
     content?: boolean | number
     toc?: boolean | number
     __typename?: boolean | number
@@ -1125,7 +1037,7 @@ export interface ImageComponentGenqlSelection{
     scope?: (AnalyticsKeyScope | null)} } | boolean | number
     _dashboardUrl?: boolean | number
     /** Array of search highlight information with field names and HTML markup */
-    _highlight?: SearchHighlight_z1l5L3M9ZpPwZtTj1Uia0GenqlSelection
+    _highlight?: SearchHighlight_2f5601182cb62396388c3GenqlSelection
     _id?: boolean | number
     _idPath?: boolean | number
     _slug?: boolean | number
@@ -1173,27 +1085,6 @@ export interface MediaBlockUnionGenqlSelection{
     on_BlockImage?:BlockImageGenqlSelection,
     on_BlockVideo?:BlockVideoGenqlSelection,
     on_MediaBlock?: MediaBlockGenqlSelection,
-    __typename?: boolean | number
-}
-
-export interface MetadataGenqlSelection{
-    _analyticsKey?: { __args: {
-    /**
-     * The scope of the analytics key. Use `send` for just ingesting data. Use `query` if you need to show an analytics data in your website.
-     * 
-     * Have in mind, if you expose your `query` analytics key in the frontend, you'll be exposing all of this block's analytics data to the public. This is generally safe, but it might not be in your case.
-     */
-    scope?: (AnalyticsKeyScope | null)} } | boolean | number
-    _dashboardUrl?: boolean | number
-    _id?: boolean | number
-    _idPath?: boolean | number
-    _slug?: boolean | number
-    _slugPath?: boolean | number
-    _sys?: BlockDocumentSysGenqlSelection
-    _title?: boolean | number
-    favicon?: BlockImageGenqlSelection
-    pageTitleTemplate?: boolean | number
-    sitename?: boolean | number
     __typename?: boolean | number
 }
 
@@ -1267,10 +1158,17 @@ export interface PagesGenqlSelection{
     _dashboardUrl?: boolean | number
     _id?: boolean | number
     _idPath?: boolean | number
+    _meta?: ListMetaGenqlSelection
+    /** The key used to search from the frontend. */
+    _searchKey?: boolean | number
     _slug?: boolean | number
     _slugPath?: boolean | number
     _sys?: BlockDocumentSysGenqlSelection
     _title?: boolean | number
+    /** Returns the first item in the list, or null if the list is empty. Useful when you expect only one result. */
+    item?: PagesItemGenqlSelection
+    /** Returns the list of items after filtering and paginating according to the arguments sent by the client. */
+    items?: PagesItemGenqlSelection
     __typename?: boolean | number
 }
 
@@ -1284,7 +1182,7 @@ export interface PagesItemGenqlSelection{
     scope?: (AnalyticsKeyScope | null)} } | boolean | number
     _dashboardUrl?: boolean | number
     /** Array of search highlight information with field names and HTML markup */
-    _highlight?: SearchHighlight_da595a5a418a57167c8b4GenqlSelection
+    _highlight?: SearchHighlight_dac20f43675eef992a54dGenqlSelection
     _id?: boolean | number
     _idPath?: boolean | number
     _slug?: boolean | number
@@ -1317,31 +1215,6 @@ by?: (Scalars['String'][] | null),
 /** Search query */
 q?: (Scalars['String'] | null)}
 
-export interface Pages_1GenqlSelection{
-    _analyticsKey?: { __args: {
-    /**
-     * The scope of the analytics key. Use `send` for just ingesting data. Use `query` if you need to show an analytics data in your website.
-     * 
-     * Have in mind, if you expose your `query` analytics key in the frontend, you'll be exposing all of this block's analytics data to the public. This is generally safe, but it might not be in your case.
-     */
-    scope?: (AnalyticsKeyScope | null)} } | boolean | number
-    _dashboardUrl?: boolean | number
-    _id?: boolean | number
-    _idPath?: boolean | number
-    _meta?: ListMetaGenqlSelection
-    /** The key used to search from the frontend. */
-    _searchKey?: boolean | number
-    _slug?: boolean | number
-    _slugPath?: boolean | number
-    _sys?: BlockDocumentSysGenqlSelection
-    _title?: boolean | number
-    /** Returns the first item in the list, or null if the list is empty. Useful when you expect only one result. */
-    item?: PagesItemGenqlSelection
-    /** Returns the list of items after filtering and paginating according to the arguments sent by the client. */
-    items?: PagesItemGenqlSelection
-    __typename?: boolean | number
-}
-
 export interface QueryGenqlSelection{
     _agent?: (_AgentStartGenqlSelection & { __args: {
     /** The ID of the agent. */
@@ -1371,27 +1244,6 @@ export interface QueryGenqlSelection{
     _sys?: RepoSysGenqlSelection
     changelog?: ChangelogGenqlSelection
     components?: ComponentsGenqlSelection
-    registry?: RegistryGenqlSelection
-    __typename?: boolean | number
-}
-
-export interface RegistryGenqlSelection{
-    _analyticsKey?: { __args: {
-    /**
-     * The scope of the analytics key. Use `send` for just ingesting data. Use `query` if you need to show an analytics data in your website.
-     * 
-     * Have in mind, if you expose your `query` analytics key in the frontend, you'll be exposing all of this block's analytics data to the public. This is generally safe, but it might not be in your case.
-     */
-    scope?: (AnalyticsKeyScope | null)} } | boolean | number
-    _dashboardUrl?: boolean | number
-    _id?: boolean | number
-    _idPath?: boolean | number
-    _slug?: boolean | number
-    _slugPath?: boolean | number
-    _sys?: BlockDocumentSysGenqlSelection
-    _title?: boolean | number
-    pages?: PagesGenqlSelection
-    settings?: SettingsGenqlSelection
     __typename?: boolean | number
 }
 
@@ -1413,7 +1265,7 @@ export interface RichTextJsonGenqlSelection{
     __typename?: boolean | number
 }
 
-export interface SearchHighlight_1N8oOrcmyNzxqyz404PtiGenqlSelection{
+export interface SearchHighlight_2f5601182cb62396388c3GenqlSelection{
     /** The field/path that was matched (e.g., "title", "body.content") */
     by?: boolean | number
     /** HTML snippet with <mark> tags around the matched terms */
@@ -1421,7 +1273,7 @@ export interface SearchHighlight_1N8oOrcmyNzxqyz404PtiGenqlSelection{
     __typename?: boolean | number
 }
 
-export interface SearchHighlight_7c6c746eb4c3d9ac2d3e1GenqlSelection{
+export interface SearchHighlight_4662cc29ecb4132588cc0GenqlSelection{
     /** The field/path that was matched (e.g., "title", "body.content") */
     by?: boolean | number
     /** HTML snippet with <mark> tags around the matched terms */
@@ -1429,7 +1281,7 @@ export interface SearchHighlight_7c6c746eb4c3d9ac2d3e1GenqlSelection{
     __typename?: boolean | number
 }
 
-export interface SearchHighlight_BqluItM67eIFYP6P4HpNXGenqlSelection{
+export interface SearchHighlight_769e9caa5c362ef7561a3GenqlSelection{
     /** The field/path that was matched (e.g., "title", "body.content") */
     by?: boolean | number
     /** HTML snippet with <mark> tags around the matched terms */
@@ -1437,7 +1289,7 @@ export interface SearchHighlight_BqluItM67eIFYP6P4HpNXGenqlSelection{
     __typename?: boolean | number
 }
 
-export interface SearchHighlight_RXQAKvhosL2dgLKJ8SaLxGenqlSelection{
+export interface SearchHighlight_b04630ba11df7a8f5c865GenqlSelection{
     /** The field/path that was matched (e.g., "title", "body.content") */
     by?: boolean | number
     /** HTML snippet with <mark> tags around the matched terms */
@@ -1445,7 +1297,7 @@ export interface SearchHighlight_RXQAKvhosL2dgLKJ8SaLxGenqlSelection{
     __typename?: boolean | number
 }
 
-export interface SearchHighlight_da595a5a418a57167c8b4GenqlSelection{
+export interface SearchHighlight_c3a106766df8e1f2910dcGenqlSelection{
     /** The field/path that was matched (e.g., "title", "body.content") */
     by?: boolean | number
     /** HTML snippet with <mark> tags around the matched terms */
@@ -1453,7 +1305,7 @@ export interface SearchHighlight_da595a5a418a57167c8b4GenqlSelection{
     __typename?: boolean | number
 }
 
-export interface SearchHighlight_z1l5L3M9ZpPwZtTj1Uia0GenqlSelection{
+export interface SearchHighlight_dac20f43675eef992a54dGenqlSelection{
     /** The field/path that was matched (e.g., "title", "body.content") */
     by?: boolean | number
     /** HTML snippet with <mark> tags around the matched terms */
@@ -1462,29 +1314,6 @@ export interface SearchHighlight_z1l5L3M9ZpPwZtTj1Uia0GenqlSelection{
 }
 
 export interface SelectFilter {excludes?: (Scalars['String'] | null),excludesAll?: (Scalars['String'][] | null),includes?: (Scalars['String'] | null),includesAll?: (Scalars['String'][] | null),includesAny?: (Scalars['String'][] | null),isEmpty?: (Scalars['Boolean'] | null)}
-
-export interface SettingsGenqlSelection{
-    _analyticsKey?: { __args: {
-    /**
-     * The scope of the analytics key. Use `send` for just ingesting data. Use `query` if you need to show an analytics data in your website.
-     * 
-     * Have in mind, if you expose your `query` analytics key in the frontend, you'll be exposing all of this block's analytics data to the public. This is generally safe, but it might not be in your case.
-     */
-    scope?: (AnalyticsKeyScope | null)} } | boolean | number
-    _dashboardUrl?: boolean | number
-    _id?: boolean | number
-    _idPath?: boolean | number
-    _slug?: boolean | number
-    _slugPath?: boolean | number
-    _sys?: BlockDocumentSysGenqlSelection
-    _title?: boolean | number
-    logo?: BlockImageGenqlSelection
-    logoDark?: BlockImageGenqlSelection
-    metadata?: MetadataGenqlSelection
-    showUseTemplate?: boolean | number
-    theme?: ThemeGenqlSelection
-    __typename?: boolean | number
-}
 
 export interface StringFilter {contains?: (Scalars['String'] | null),endsWith?: (Scalars['String'] | null),eq?: (Scalars['String'] | null),in?: (Scalars['String'][] | null),isNull?: (Scalars['Boolean'] | null),matches?: (StringMatchesFilter | null),notEq?: (Scalars['String'] | null),notIn?: (Scalars['String'][] | null),startsWith?: (Scalars['String'] | null)}
 
@@ -1525,7 +1354,7 @@ export interface TagsItemGenqlSelection{
     scope?: (AnalyticsKeyScope | null)} } | boolean | number
     _dashboardUrl?: boolean | number
     /** Array of search highlight information with field names and HTML markup */
-    _highlight?: SearchHighlight_7c6c746eb4c3d9ac2d3e1GenqlSelection
+    _highlight?: SearchHighlight_769e9caa5c362ef7561a3GenqlSelection
     _id?: boolean | number
     _idPath?: boolean | number
     _slug?: boolean | number
@@ -1544,30 +1373,6 @@ by?: (Scalars['String'][] | null),
 q?: (Scalars['String'] | null)}
 
 export interface TargetBlock {focus?: (Scalars['Boolean'] | null),id: Scalars['String'],label: Scalars['String']}
-
-export interface ThemeGenqlSelection{
-    _analyticsKey?: { __args: {
-    /**
-     * The scope of the analytics key. Use `send` for just ingesting data. Use `query` if you need to show an analytics data in your website.
-     * 
-     * Have in mind, if you expose your `query` analytics key in the frontend, you'll be exposing all of this block's analytics data to the public. This is generally safe, but it might not be in your case.
-     */
-    scope?: (AnalyticsKeyScope | null)} } | boolean | number
-    _dashboardUrl?: boolean | number
-    _id?: boolean | number
-    _idPath?: boolean | number
-    _slug?: boolean | number
-    _slugPath?: boolean | number
-    _sys?: BlockDocumentSysGenqlSelection
-    _title?: boolean | number
-    accentColor?: boolean | number
-    appearance?: boolean | number
-    grayScale?: boolean | number
-    panelBackground?: boolean | number
-    radius?: boolean | number
-    scaling?: boolean | number
-    __typename?: boolean | number
-}
 
 export interface TransactionStatusGenqlSelection{
     /** Duration in milliseconds. */
@@ -1590,7 +1395,7 @@ export interface TweetComponentGenqlSelection{
     scope?: (AnalyticsKeyScope | null)} } | boolean | number
     _dashboardUrl?: boolean | number
     /** Array of search highlight information with field names and HTML markup */
-    _highlight?: SearchHighlight_RXQAKvhosL2dgLKJ8SaLxGenqlSelection
+    _highlight?: SearchHighlight_c3a106766df8e1f2910dcGenqlSelection
     _id?: boolean | number
     _idPath?: boolean | number
     _slug?: boolean | number
@@ -1609,7 +1414,7 @@ by?: (Scalars['String'][] | null),
 /** Search query */
 q?: (Scalars['String'] | null)}
 
-export interface UnionVideoComponentYoutubeComponentTweetComponentImageComponentGenqlSelection{
+export interface UnionImageComponentVideoComponentYoutubeComponentTweetComponentGenqlSelection{
     on_ImageComponent?:ImageComponentGenqlSelection,
     on_TweetComponent?:TweetComponentGenqlSelection,
     on_VideoComponent?:VideoComponentGenqlSelection,
@@ -1637,7 +1442,7 @@ export interface VideoComponentGenqlSelection{
     scope?: (AnalyticsKeyScope | null)} } | boolean | number
     _dashboardUrl?: boolean | number
     /** Array of search highlight information with field names and HTML markup */
-    _highlight?: SearchHighlight_1N8oOrcmyNzxqyz404PtiGenqlSelection
+    _highlight?: SearchHighlight_4662cc29ecb4132588cc0GenqlSelection
     _id?: boolean | number
     _idPath?: boolean | number
     _slug?: boolean | number
@@ -1666,7 +1471,7 @@ export interface YoutubeComponentGenqlSelection{
     scope?: (AnalyticsKeyScope | null)} } | boolean | number
     _dashboardUrl?: boolean | number
     /** Array of search highlight information with field names and HTML markup */
-    _highlight?: SearchHighlight_BqluItM67eIFYP6P4HpNXGenqlSelection
+    _highlight?: SearchHighlight_b04630ba11df7a8f5c865GenqlSelection
     _id?: boolean | number
     _idPath?: boolean | number
     _slug?: boolean | number
@@ -2086,10 +1891,6 @@ export interface FragmentsMap {
     root: MediaBlock,
     selection: MediaBlockGenqlSelection,
 }
-  Metadata: {
-    root: Metadata,
-    selection: MetadataGenqlSelection,
-}
   Mutation: {
     root: Mutation,
     selection: MutationGenqlSelection,
@@ -2102,17 +1903,9 @@ export interface FragmentsMap {
     root: PagesItem,
     selection: PagesItemGenqlSelection,
 }
-  Pages_1: {
-    root: Pages_1,
-    selection: Pages_1GenqlSelection,
-}
   Query: {
     root: Query,
     selection: QueryGenqlSelection,
-}
-  Registry: {
-    root: Registry,
-    selection: RegistryGenqlSelection,
 }
   RepoSys: {
     root: RepoSys,
@@ -2122,33 +1915,29 @@ export interface FragmentsMap {
     root: RichTextJson,
     selection: RichTextJsonGenqlSelection,
 }
-  SearchHighlight_1N8oOrcmyNzxqyz404Pti: {
-    root: SearchHighlight_1N8oOrcmyNzxqyz404Pti,
-    selection: SearchHighlight_1N8oOrcmyNzxqyz404PtiGenqlSelection,
+  SearchHighlight_2f5601182cb62396388c3: {
+    root: SearchHighlight_2f5601182cb62396388c3,
+    selection: SearchHighlight_2f5601182cb62396388c3GenqlSelection,
 }
-  SearchHighlight_7c6c746eb4c3d9ac2d3e1: {
-    root: SearchHighlight_7c6c746eb4c3d9ac2d3e1,
-    selection: SearchHighlight_7c6c746eb4c3d9ac2d3e1GenqlSelection,
+  SearchHighlight_4662cc29ecb4132588cc0: {
+    root: SearchHighlight_4662cc29ecb4132588cc0,
+    selection: SearchHighlight_4662cc29ecb4132588cc0GenqlSelection,
 }
-  SearchHighlight_BqluItM67eIFYP6P4HpNX: {
-    root: SearchHighlight_BqluItM67eIFYP6P4HpNX,
-    selection: SearchHighlight_BqluItM67eIFYP6P4HpNXGenqlSelection,
+  SearchHighlight_769e9caa5c362ef7561a3: {
+    root: SearchHighlight_769e9caa5c362ef7561a3,
+    selection: SearchHighlight_769e9caa5c362ef7561a3GenqlSelection,
 }
-  SearchHighlight_RXQAKvhosL2dgLKJ8SaLx: {
-    root: SearchHighlight_RXQAKvhosL2dgLKJ8SaLx,
-    selection: SearchHighlight_RXQAKvhosL2dgLKJ8SaLxGenqlSelection,
+  SearchHighlight_b04630ba11df7a8f5c865: {
+    root: SearchHighlight_b04630ba11df7a8f5c865,
+    selection: SearchHighlight_b04630ba11df7a8f5c865GenqlSelection,
 }
-  SearchHighlight_da595a5a418a57167c8b4: {
-    root: SearchHighlight_da595a5a418a57167c8b4,
-    selection: SearchHighlight_da595a5a418a57167c8b4GenqlSelection,
+  SearchHighlight_c3a106766df8e1f2910dc: {
+    root: SearchHighlight_c3a106766df8e1f2910dc,
+    selection: SearchHighlight_c3a106766df8e1f2910dcGenqlSelection,
 }
-  SearchHighlight_z1l5L3M9ZpPwZtTj1Uia0: {
-    root: SearchHighlight_z1l5L3M9ZpPwZtTj1Uia0,
-    selection: SearchHighlight_z1l5L3M9ZpPwZtTj1Uia0GenqlSelection,
-}
-  Settings: {
-    root: Settings,
-    selection: SettingsGenqlSelection,
+  SearchHighlight_dac20f43675eef992a54d: {
+    root: SearchHighlight_dac20f43675eef992a54d,
+    selection: SearchHighlight_dac20f43675eef992a54dGenqlSelection,
 }
   Tags: {
     root: Tags,
@@ -2157,10 +1946,6 @@ export interface FragmentsMap {
   TagsItem: {
     root: TagsItem,
     selection: TagsItemGenqlSelection,
-}
-  Theme: {
-    root: Theme,
-    selection: ThemeGenqlSelection,
 }
   TransactionStatus: {
     root: TransactionStatus,

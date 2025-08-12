@@ -42,28 +42,31 @@ export default function Chat({ initialName }: ChatProps = {}) {
 		rateLimited,
 	} = useMessages();
 
-  // Resolve current gateway from localStorage and keep in sync
-  const [gateway, setGateway] = useState<
-    "llm-gateway" | "vercel-ai-gateway"
-  >("llm-gateway");
-  useEffect(() => {
-    const read = () => {
-      try {
-        const src = window.localStorage.getItem("chaichat_models_source");
-        setGateway(src === "aigateway" ? "vercel-ai-gateway" : "llm-gateway");
-      } catch {
-        setGateway("llm-gateway");
-      }
-    };
-    read();
-    const handler = () => read();
-    window.addEventListener("modelsSourceChanged", handler as EventListener);
-    window.addEventListener("storage", handler);
-    return () => {
-      window.removeEventListener("modelsSourceChanged", handler as EventListener);
-      window.removeEventListener("storage", handler);
-    };
-  }, []);
+	// Resolve current gateway from localStorage and keep in sync
+	const [gateway, setGateway] = useState<"llm-gateway" | "vercel-ai-gateway">(
+		"llm-gateway",
+	);
+	useEffect(() => {
+		const read = () => {
+			try {
+				const src = window.localStorage.getItem("chaichat_models_source");
+				setGateway(src === "aigateway" ? "vercel-ai-gateway" : "llm-gateway");
+			} catch {
+				setGateway("llm-gateway");
+			}
+		};
+		read();
+		const handler = () => read();
+		window.addEventListener("modelsSourceChanged", handler as EventListener);
+		window.addEventListener("storage", handler);
+		return () => {
+			window.removeEventListener(
+				"modelsSourceChanged",
+				handler as EventListener,
+			);
+			window.removeEventListener("storage", handler);
+		};
+	}, []);
 
 	const chatIdString = Array.isArray(chatId) ? chatId[0] : chatId;
 
@@ -218,7 +221,7 @@ export default function Chat({ initialName }: ChatProps = {}) {
 							registerScrollApi={(api) => {
 								conversationScrollApiRef.current = api;
 							}}
-              gateway={gateway}
+							gateway={gateway}
 						/>
 					</div>
 				)}

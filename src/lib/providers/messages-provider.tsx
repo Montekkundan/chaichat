@@ -35,7 +35,7 @@ type ExtendedMessage = UIMessage & {
 	parentMessageId?: string;
 	model?: string;
 	_creationTime?: number;
-  	gateway?: "llm-gateway" | "vercel-ai-gateway";
+	gateway?: "llm-gateway" | "vercel-ai-gateway";
 };
 
 type ModelConfig = {
@@ -187,9 +187,9 @@ export function MessagesProvider({ children, chatId }: MessagesProviderProps) {
 	useEffect(() => {
 		selectedModelRef.current = selectedModel;
 	}, [selectedModel]);
-  const currentGatewayRef = useRef<"llm-gateway" | "vercel-ai-gateway">(
-    "llm-gateway",
-  );
+	const currentGatewayRef = useRef<"llm-gateway" | "vercel-ai-gateway">(
+		"llm-gateway",
+	);
 
 	// Save selected model to localStorage whenever it changes
 	useEffect(() => {
@@ -217,18 +217,17 @@ export function MessagesProvider({ children, chatId }: MessagesProviderProps) {
 		}
 	}, [user?.id]);
 
-  // Resolve current gateway label from localStorage (client-only)
-  const getGatewayLabel = useCallback(
-    (): "llm-gateway" | "vercel-ai-gateway" => {
-      try {
-        const src = window.localStorage.getItem("chaichat_models_source");
-        return src === "aigateway" ? "vercel-ai-gateway" : "llm-gateway";
-      } catch {
-        return "llm-gateway";
-      }
-    },
-    [],
-  );
+	// Resolve current gateway label from localStorage (client-only)
+	const getGatewayLabel = useCallback(():
+		| "llm-gateway"
+		| "vercel-ai-gateway" => {
+		try {
+			const src = window.localStorage.getItem("chaichat_models_source");
+			return src === "aigateway" ? "vercel-ai-gateway" : "llm-gateway";
+		} catch {
+			return "llm-gateway";
+		}
+	}, []);
 
 	// TODO: add regenerate message option
 	const {
@@ -247,16 +246,16 @@ export function MessagesProvider({ children, chatId }: MessagesProviderProps) {
 					throw new Error("No model selected");
 				}
 
-        const userApiKeys = await getUserApiKeys();
-        const gateway = (() => {
-          try {
-            const src = window.localStorage.getItem("chaichat_models_source");
-            return src === "aigateway" ? "vercel-ai-gateway" : "llm-gateway";
-          } catch {
-            return "llm-gateway";
-          }
-        })();
-        currentGatewayRef.current = gateway;
+				const userApiKeys = await getUserApiKeys();
+				const gateway = (() => {
+					try {
+						const src = window.localStorage.getItem("chaichat_models_source");
+						return src === "aigateway" ? "vercel-ai-gateway" : "llm-gateway";
+					} catch {
+						return "llm-gateway";
+					}
+				})();
+				currentGatewayRef.current = gateway;
 				// Include provider-specific sub-configs based on ANY segment in the model path.
 				// This supports nested providers like "groq/openai/..." where OpenAI-specific
 				// options (e.g., reasoningEffort) should still be forwarded.
@@ -301,9 +300,9 @@ export function MessagesProvider({ children, chatId }: MessagesProviderProps) {
 				})();
 
 				// Add model information to the message immediately
-          const extendedMessage = message as ExtendedMessage;
-          extendedMessage.model = currentModel;
-          extendedMessage.gateway = currentGatewayRef.current;
+				const extendedMessage = message as ExtendedMessage;
+				extendedMessage.model = currentModel;
+				extendedMessage.gateway = currentGatewayRef.current;
 				// Force UI update by updating the messages state
 				setMessages((prevMessages) => {
 					const updatedMessages = [...prevMessages];
@@ -314,34 +313,34 @@ export function MessagesProvider({ children, chatId }: MessagesProviderProps) {
 						updatedMessages[lastMessageIndex] &&
 						updatedMessages[lastMessageIndex].role === "assistant"
 					) {
-              (updatedMessages[lastMessageIndex] as ExtendedMessage).model =
-                currentModel;
-              (updatedMessages[lastMessageIndex] as ExtendedMessage).gateway =
-                currentGatewayRef.current;
+						(updatedMessages[lastMessageIndex] as ExtendedMessage).model =
+							currentModel;
+						(updatedMessages[lastMessageIndex] as ExtendedMessage).gateway =
+							currentGatewayRef.current;
 					}
 
 					return updatedMessages;
 				});
 
-                try {
-                    // Persist assistant message to cache
-                    if (chatId && chatId !== "new") {
-                        await cache.addMessage({
-                            chatId,
-                            userId: currentUserId || "local_user",
-                            role: "assistant",
-                            content: textContent,
-                            ...(partsJson ? { partsJson } : {}),
-                            model: currentModel,
-                            attachments: [],
-                            parentMessageId: undefined,
-                            version: 1,
-                            isActive: true,
-                            createdAt: Date.now(),
-                            gateway: getGatewayLabel(),
-                        });
-                    }
-                } catch (error) {
+				try {
+					// Persist assistant message to cache
+					if (chatId && chatId !== "new") {
+						await cache.addMessage({
+							chatId,
+							userId: currentUserId || "local_user",
+							role: "assistant",
+							content: textContent,
+							...(partsJson ? { partsJson } : {}),
+							model: currentModel,
+							attachments: [],
+							parentMessageId: undefined,
+							version: 1,
+							isActive: true,
+							createdAt: Date.now(),
+							gateway: getGatewayLabel(),
+						});
+					}
+				} catch (error) {
 					console.error("Failed to persist assistant message:", error);
 				}
 			}
@@ -354,7 +353,7 @@ export function MessagesProvider({ children, chatId }: MessagesProviderProps) {
 					role: "assistant" as const,
 					parts: createTextParts(content),
 					model: currentModel,
-            gateway: getGatewayLabel(),
+					gateway: getGatewayLabel(),
 				}) as ExtendedMessage;
 
 			const addAssistantErrorMessage = (msg: ExtendedMessage) => {
@@ -445,7 +444,7 @@ export function MessagesProvider({ children, chatId }: MessagesProviderProps) {
 					const cachedMessages = await cache.getMessages(chatId);
 
 					// Convert cached messages to v5 UIMessage format, preferring partsJson when present
-                    const v5Messages: ExtendedMessage[] = cachedMessages.map((msg) => {
+					const v5Messages: ExtendedMessage[] = cachedMessages.map((msg) => {
 						let parts: UIMessage["parts"];
 						if (msg.partsJson) {
 							try {
@@ -463,10 +462,10 @@ export function MessagesProvider({ children, chatId }: MessagesProviderProps) {
 							convexId: msg._id,
 							parentMessageId: msg.parentMessageId,
 							model: msg.model,
-                            gateway: msg.gateway as
-                                | "llm-gateway"
-                                | "vercel-ai-gateway"
-                                | undefined,
+							gateway: msg.gateway as
+								| "llm-gateway"
+								| "vercel-ai-gateway"
+								| undefined,
 							_creationTime: msg._creationTime,
 						} as ExtendedMessage;
 					});
@@ -539,7 +538,7 @@ export function MessagesProvider({ children, chatId }: MessagesProviderProps) {
 
 			try {
 				// Persist user message to cache first
-                if (targetChatId && targetChatId !== "new") {
+				if (targetChatId && targetChatId !== "new") {
 					await cache.addMessage({
 						chatId: targetChatId,
 						userId: currentUserId,
@@ -553,7 +552,7 @@ export function MessagesProvider({ children, chatId }: MessagesProviderProps) {
 						version: 1,
 						isActive: true,
 						createdAt: Date.now(),
-                        gateway: getGatewayLabel(),
+						gateway: getGatewayLabel(),
 					});
 				}
 
@@ -572,8 +571,8 @@ export function MessagesProvider({ children, chatId }: MessagesProviderProps) {
 						for (let i = updatedMessages.length - 1; i >= 0; i--) {
 							const msg = updatedMessages[i] as ExtendedMessage;
 							if (msg && msg.role === "user" && !msg.model) {
-                msg.model = selectedModel;
-                msg.gateway = getGatewayLabel();
+								msg.model = selectedModel;
+								msg.gateway = getGatewayLabel();
 								break;
 							}
 						}
@@ -587,18 +586,18 @@ export function MessagesProvider({ children, chatId }: MessagesProviderProps) {
 				setIsSubmitting(false);
 			}
 		},
-    [
-      currentUserId,
-      chatId,
-      isSubmitting,
-      selectedModel,
-      chatSendMessage,
-      cache,
-      createNewChat,
-      router,
-      setMessages,
-      getGatewayLabel,
-    ],
+		[
+			currentUserId,
+			chatId,
+			isSubmitting,
+			selectedModel,
+			chatSendMessage,
+			cache,
+			createNewChat,
+			router,
+			setMessages,
+			getGatewayLabel,
+		],
 	);
 
 	// Handle automatic message sending from query parameter

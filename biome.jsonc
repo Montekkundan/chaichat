@@ -5,7 +5,10 @@
 		"clientKind": "git",
 		"useIgnoreFile": true
 	},
-	"files": { "ignoreUnknown": false, "ignore": ["convex"] },
+	"files": {
+		"ignoreUnknown": false,
+		"ignore": ["convex", "basehub-types.d.ts"]
+	},
 	"formatter": { "enabled": true },
 	"organizeImports": { "enabled": true },
 	"linter": {

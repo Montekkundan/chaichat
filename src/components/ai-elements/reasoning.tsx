@@ -3,7 +3,14 @@
 import { useControllableState } from "@radix-ui/react-use-controllable-state";
 import { ChevronDownIcon } from "lucide-react";
 import type { ComponentProps } from "react";
-import { createContext, memo, useContext, useEffect, useRef, useState } from "react";
+import {
+	createContext,
+	memo,
+	useContext,
+	useEffect,
+	useRef,
+	useState,
+} from "react";
 import {
 	Collapsible,
 	CollapsibleContent,
@@ -58,8 +65,8 @@ export const Reasoning = memo(
 			defaultProp: 0,
 		});
 
-        const [hasAutoClosedRef, setHasAutoClosedRef] = useState(false);
-        const hasUserInteractedRef = useRef(false);
+		const [hasAutoClosedRef, setHasAutoClosedRef] = useState(false);
+		const hasUserInteractedRef = useRef(false);
 		const [startTime, setStartTime] = useState<number | null>(null);
 
 		// Track duration when streaming starts and ends
@@ -74,10 +81,10 @@ export const Reasoning = memo(
 			}
 		}, [isStreaming, startTime, setDuration]);
 
-        // Auto-open when streaming starts (unless user manually closed),
-        // auto-close when streaming ends (once only)
+		// Auto-open when streaming starts (unless user manually closed),
+		// auto-close when streaming ends (once only)
 		useEffect(() => {
-            if (isStreaming && !isOpen && !hasUserInteractedRef.current) {
+			if (isStreaming && !isOpen && !hasUserInteractedRef.current) {
 				setIsOpen(true);
 			} else if (!isStreaming && isOpen && !defaultOpen && !hasAutoClosedRef) {
 				// Add a small delay before closing to allow user to see the content
@@ -87,10 +94,10 @@ export const Reasoning = memo(
 				}, 1000);
 				return () => clearTimeout(timer);
 			}
-        }, [isStreaming, isOpen, defaultOpen, setIsOpen, hasAutoClosedRef]);
+		}, [isStreaming, isOpen, defaultOpen, setIsOpen, hasAutoClosedRef]);
 
-        const handleOpenChange = (open: boolean) => {
-            hasUserInteractedRef.current = true;
+		const handleOpenChange = (open: boolean) => {
+			hasUserInteractedRef.current = true;
 			setIsOpen(open);
 		};
 
@@ -120,7 +127,7 @@ export type ReasoningTriggerProps = ComponentProps<
 export const ReasoningTrigger = memo(
 	({
 		className,
-        title: _title = "Reasoning",
+		title: _title = "Reasoning",
 		children,
 		...props
 	}: ReasoningTriggerProps) => {

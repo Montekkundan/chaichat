@@ -33,7 +33,7 @@ export interface Message {
 		contentType: string;
 		size: number;
 	}[];
-  	gateway?: "llm-gateway" | "vercel-ai-gateway";
+	gateway?: "llm-gateway" | "vercel-ai-gateway";
 }
 
 export interface UserProfile {
@@ -76,12 +76,12 @@ export class ChaiChatDB extends Dexie {
 
 	constructor() {
 		super("ChaiChatDB");
-    this.version(9)
+		this.version(9)
 			.stores({
 				chats:
 					"_id, userId, name, createdAt, currentModel, parentChatId, isPublic",
 				messages:
-          "_id, chatId, userId, createdAt, parentMessageId, version, isActive, model, attachments, partsJson, gateway",
+					"_id, chatId, userId, createdAt, parentMessageId, version, isActive, model, attachments, partsJson, gateway",
 				users: "id, fullName",
 				playgrounds: "_id, userId, createdAt",
 				playgroundMessages:
@@ -96,7 +96,7 @@ export class ChaiChatDB extends Dexie {
 						if (!message.model) message.model = "gpt-4o";
 						if (message.attachments === undefined) message.attachments = [];
 						if (message.partsJson === undefined) message.partsJson = undefined;
-            if (message.gateway === undefined) message.gateway = undefined;
+						if (message.gateway === undefined) message.gateway = undefined;
 					});
 
 				// Ensure new parentChatId field exists on chats
