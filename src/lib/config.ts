@@ -32,6 +32,7 @@ export const generateOGImageURL = (params: {
 export const PLAYGROUND_MAX_COLUMNS_MIN = 1;
 export const PLAYGROUND_MAX_COLUMNS_MAX = 30;
 export const PLAYGROUND_MAX_COLUMNS_DEFAULT = 3;
-export const PLAYGROUND_MAX_COLUMNS_STORAGE_KEY = "chaichat_playground_max_columns";
+export const PLAYGROUND_MAX_COLUMNS_STORAGE_KEY =
+	"chaichat_playground_max_columns";
 export const PLAYGROUND_MAX_COLUMNS_CHANGED_EVENT =
-  "cc-playground-max-columns-changed";
+	"cc-playground-max-columns-changed";

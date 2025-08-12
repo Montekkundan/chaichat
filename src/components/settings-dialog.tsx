@@ -26,6 +26,13 @@ import {
 } from "~/components/ui/sidebar";
 import { toast } from "~/components/ui/toast";
 import {
+	PLAYGROUND_MAX_COLUMNS_CHANGED_EVENT,
+	PLAYGROUND_MAX_COLUMNS_DEFAULT,
+	PLAYGROUND_MAX_COLUMNS_MAX,
+	PLAYGROUND_MAX_COLUMNS_MIN,
+	PLAYGROUND_MAX_COLUMNS_STORAGE_KEY,
+} from "~/lib/config";
+import {
 	TWEAKCN_THEME_RESET_EVENT,
 	type TweakcnThemeState,
 	applyTweakcnTheme,
@@ -35,13 +42,6 @@ import {
 	resetToDefaultTheme,
 } from "~/lib/tweakcn-theme";
 import { cn } from "~/lib/utils";
-import {
-  PLAYGROUND_MAX_COLUMNS_CHANGED_EVENT,
-  PLAYGROUND_MAX_COLUMNS_DEFAULT,
-  PLAYGROUND_MAX_COLUMNS_MAX,
-  PLAYGROUND_MAX_COLUMNS_MIN,
-  PLAYGROUND_MAX_COLUMNS_STORAGE_KEY,
-} from "~/lib/config";
 
 const data = {
 	nav: [
@@ -69,9 +69,9 @@ export function SettingsDialog({
 	const [themeUrl, setThemeUrl] = React.useState("");
 	const [isLoading, setIsLoading] = React.useState(false);
 	const [isRestoringUrl, setIsRestoringUrl] = React.useState(true);
-    const [isUserAction, setIsUserAction] = React.useState(false);
-    const [maxColumns, setMaxColumns] = React.useState<number>(3);
-    const [maxColumnsInput, setMaxColumnsInput] = React.useState<string>("3");
+	const [isUserAction, setIsUserAction] = React.useState(false);
+	const [maxColumns, setMaxColumns] = React.useState<number>(3);
+	const [maxColumnsInput, setMaxColumnsInput] = React.useState<string>("3");
 
 	const apiKeyManagerComponent = React.useMemo(() => <ApiKeyManager />, []);
 
@@ -132,36 +132,38 @@ export function SettingsDialog({
 		}
 	}, [resolvedTheme, tweakcnTheme]);
 
-    React.useEffect(() => {
+	React.useEffect(() => {
 		try {
-      const raw = localStorage.getItem(PLAYGROUND_MAX_COLUMNS_STORAGE_KEY);
-      const parsed = raw ? Number.parseInt(raw) : PLAYGROUND_MAX_COLUMNS_DEFAULT;
-      const clamped = Math.min(
-        Math.max(
-          Number.isNaN(parsed) ? PLAYGROUND_MAX_COLUMNS_DEFAULT : parsed,
-          PLAYGROUND_MAX_COLUMNS_MIN,
-        ),
-        PLAYGROUND_MAX_COLUMNS_MAX,
-      );
+			const raw = localStorage.getItem(PLAYGROUND_MAX_COLUMNS_STORAGE_KEY);
+			const parsed = raw
+				? Number.parseInt(raw)
+				: PLAYGROUND_MAX_COLUMNS_DEFAULT;
+			const clamped = Math.min(
+				Math.max(
+					Number.isNaN(parsed) ? PLAYGROUND_MAX_COLUMNS_DEFAULT : parsed,
+					PLAYGROUND_MAX_COLUMNS_MIN,
+				),
+				PLAYGROUND_MAX_COLUMNS_MAX,
+			);
 			setMaxColumns(clamped);
-        setMaxColumnsInput(String(clamped));
-		} catch { }
+			setMaxColumnsInput(String(clamped));
+		} catch {}
 	}, []);
 
-    const commitMaxColumns = (value: number) => {
-    const clamped = Math.min(
-      Math.max(
-        Number.isNaN(value) ? PLAYGROUND_MAX_COLUMNS_DEFAULT : value,
-        PLAYGROUND_MAX_COLUMNS_MIN,
-      ),
-      PLAYGROUND_MAX_COLUMNS_MAX,
-    );
+	const commitMaxColumns = (value: number) => {
+		const clamped = Math.min(
+			Math.max(
+				Number.isNaN(value) ? PLAYGROUND_MAX_COLUMNS_DEFAULT : value,
+				PLAYGROUND_MAX_COLUMNS_MIN,
+			),
+			PLAYGROUND_MAX_COLUMNS_MAX,
+		);
 		setMaxColumns(clamped);
-      setMaxColumnsInput(String(clamped));
+		setMaxColumnsInput(String(clamped));
 		try {
-      localStorage.setItem(PLAYGROUND_MAX_COLUMNS_STORAGE_KEY, String(clamped));
+			localStorage.setItem(PLAYGROUND_MAX_COLUMNS_STORAGE_KEY, String(clamped));
 			window.dispatchEvent(
-        new CustomEvent<number>(PLAYGROUND_MAX_COLUMNS_CHANGED_EVENT, {
+				new CustomEvent<number>(PLAYGROUND_MAX_COLUMNS_CHANGED_EVENT, {
 					detail: clamped,
 				}),
 			);
@@ -171,13 +173,13 @@ export function SettingsDialog({
 			toast({ title: "Failed to save setting", status: "error" });
 		}
 	};
-    const handleMaxColumnsInputChange = (value: string) => {
-      setMaxColumnsInput(value);
-      const parsed = Number.parseInt(value);
-      if (!Number.isNaN(parsed)) {
-        commitMaxColumns(parsed);
-      }
-    };
+	const handleMaxColumnsInputChange = (value: string) => {
+		setMaxColumnsInput(value);
+		const parsed = Number.parseInt(value);
+		if (!Number.isNaN(parsed)) {
+			commitMaxColumns(parsed);
+		}
+	};
 
 	React.useEffect(() => {
 		// Don't process empty URLs during restoration phase
@@ -408,30 +410,40 @@ export function SettingsDialog({
 					<div className="space-y-6">
 						<div>
 							<h3 className="font-semibold text-lg">Playground</h3>
-							<p className="text-sm" style={{ color: "var(--foreground)", opacity: 0.8 }}>
+							<p
+								className="text-sm"
+								style={{ color: "var(--foreground)", opacity: 0.8 }}
+							>
 								Configure playground limits
 							</p>
 						</div>
 						{/* biome-ignore lint/nursery/useSortedClasses: keep logical grouping */}
 						<div className={cn("bg-card border p-4 rounded-lg space-y-3")}>
 							<h4 className="font-medium">Max Columns</h4>
-                            <p className="text-muted-foreground text-xs">Minimum {PLAYGROUND_MAX_COLUMNS_MIN}, maximum {PLAYGROUND_MAX_COLUMNS_MAX}. Default is {PLAYGROUND_MAX_COLUMNS_DEFAULT}.</p>
-                            <div className="flex items-center gap-2">
-                              <Input
-                                id="max-columns"
-                                type="number"
-                                min={PLAYGROUND_MAX_COLUMNS_MIN}
-                                max={PLAYGROUND_MAX_COLUMNS_MAX}
-                                value={maxColumnsInput}
-                                onChange={(e) => handleMaxColumnsInputChange(e.target.value)}
-                                onBlur={() => {
-                                  if (maxColumnsInput.trim() === "" || Number.isNaN(Number.parseInt(maxColumnsInput))) {
-                                    setMaxColumnsInput(String(maxColumns));
-                                  }
-                                }}
-                                className="h-8 w-24"
-                              />
-                            </div>
+							<p className="text-muted-foreground text-xs">
+								Minimum {PLAYGROUND_MAX_COLUMNS_MIN}, maximum{" "}
+								{PLAYGROUND_MAX_COLUMNS_MAX}. Default is{" "}
+								{PLAYGROUND_MAX_COLUMNS_DEFAULT}.
+							</p>
+							<div className="flex items-center gap-2">
+								<Input
+									id="max-columns"
+									type="number"
+									min={PLAYGROUND_MAX_COLUMNS_MIN}
+									max={PLAYGROUND_MAX_COLUMNS_MAX}
+									value={maxColumnsInput}
+									onChange={(e) => handleMaxColumnsInputChange(e.target.value)}
+									onBlur={() => {
+										if (
+											maxColumnsInput.trim() === "" ||
+											Number.isNaN(Number.parseInt(maxColumnsInput))
+										) {
+											setMaxColumnsInput(String(maxColumns));
+										}
+									}}
+									className="h-8 w-24"
+								/>
+							</div>
 						</div>
 					</div>
 				);

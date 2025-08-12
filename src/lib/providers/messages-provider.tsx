@@ -38,59 +38,59 @@ type ExtendedMessage = UIMessage & {
 };
 
 type ModelConfig = {
-  temperature: number;
-  maxOutputTokens: number;
-  topP: number;
-  topK: number;
-  frequencyPenalty: number;
-  presencePenalty: number;
-  openai?: {
-    reasoningEffort?: "minimal" | "low" | "medium" | "high";
-    reasoningSummary?: "auto" | "detailed";
-    textVerbosity?: "low" | "medium" | "high";
-    serviceTier?: "auto" | "flex" | "priority";
-    parallelToolCalls?: boolean;
-    store?: boolean;
-    strictJsonSchema?: boolean;
-    maxCompletionTokens?: number;
-    user?: string;
-    metadata?: Record<string, string>;
-  };
-  google?: {
-    cachedContent?: string;
-    structuredOutputs?: boolean;
-    safetySettings?: Array<{ category: string; threshold: string }>;
-    responseModalities?: string[];
-    thinkingConfig?: { thinkingBudget?: number; includeThoughts?: boolean };
-  };
+	temperature: number;
+	maxOutputTokens: number;
+	topP: number;
+	topK: number;
+	frequencyPenalty: number;
+	presencePenalty: number;
+	openai?: {
+		reasoningEffort?: "minimal" | "low" | "medium" | "high";
+		reasoningSummary?: "auto" | "detailed";
+		textVerbosity?: "low" | "medium" | "high";
+		serviceTier?: "auto" | "flex" | "priority";
+		parallelToolCalls?: boolean;
+		store?: boolean;
+		strictJsonSchema?: boolean;
+		maxCompletionTokens?: number;
+		user?: string;
+		metadata?: Record<string, string>;
+	};
+	google?: {
+		cachedContent?: string;
+		structuredOutputs?: boolean;
+		safetySettings?: Array<{ category: string; threshold: string }>;
+		responseModalities?: string[];
+		thinkingConfig?: { thinkingBudget?: number; includeThoughts?: boolean };
+	};
 };
 
 const createDefaultConfig = (): ModelConfig => ({
-  temperature: 0.7,
-  maxOutputTokens: 1024,
-  topP: 1,
-  topK: 0,
-  frequencyPenalty: 0,
-  presencePenalty: 0,
-  openai: {
-    reasoningEffort: undefined,
-    reasoningSummary: undefined,
-    textVerbosity: undefined,
-    serviceTier: undefined,
-    parallelToolCalls: undefined,
-    store: undefined,
-    strictJsonSchema: undefined,
-    maxCompletionTokens: undefined,
-    user: undefined,
-    metadata: undefined,
-  },
-  google: {
-    cachedContent: undefined,
-    structuredOutputs: undefined,
-    safetySettings: undefined,
-    responseModalities: undefined,
-    thinkingConfig: undefined,
-  },
+	temperature: 0.7,
+	maxOutputTokens: 1024,
+	topP: 1,
+	topK: 0,
+	frequencyPenalty: 0,
+	presencePenalty: 0,
+	openai: {
+		reasoningEffort: undefined,
+		reasoningSummary: undefined,
+		textVerbosity: undefined,
+		serviceTier: undefined,
+		parallelToolCalls: undefined,
+		store: undefined,
+		strictJsonSchema: undefined,
+		maxCompletionTokens: undefined,
+		user: undefined,
+		metadata: undefined,
+	},
+	google: {
+		cachedContent: undefined,
+		structuredOutputs: undefined,
+		safetySettings: undefined,
+		responseModalities: undefined,
+		thinkingConfig: undefined,
+	},
 });
 
 interface MessagesContextType {
@@ -105,8 +105,8 @@ interface MessagesContextType {
 	isSubmitting: boolean;
 	selectedModel: string;
 	setSelectedModel: (model: string) => void;
-  modelConfig: ModelConfig;
-  setModelConfig: (update: Partial<ModelConfig>) => void;
+	modelConfig: ModelConfig;
+	setModelConfig: (update: Partial<ModelConfig>) => void;
 	status: "ready" | "streaming" | "submitted" | "error";
 	quotaExceeded: boolean;
 	rateLimited: boolean;
@@ -178,7 +178,9 @@ export function MessagesProvider({ children, chatId }: MessagesProviderProps) {
 	const [quotaExceeded, setQuotaExceeded] = useState(false);
 	const [rateLimited, setRateLimited] = useState(false);
 	const currentUserId = user?.id ?? userSessionManager.getStorageUserId();
-  const [modelConfigState, setModelConfigState] = useState<ModelConfig>(createDefaultConfig());
+	const [modelConfigState, setModelConfigState] = useState<ModelConfig>(
+		createDefaultConfig(),
+	);
 
 	const selectedModelRef = useRef(selectedModel);
 	useEffect(() => {
@@ -204,7 +206,7 @@ export function MessagesProvider({ children, chatId }: MessagesProviderProps) {
 		}
 		// For anonymous users, get from local secure storage
 		try {
-      return await getAllKeys();
+			return await getAllKeys();
 		} catch (error) {
 			console.error("Failed to get API keys:", error);
 			return {};
@@ -219,7 +221,7 @@ export function MessagesProvider({ children, chatId }: MessagesProviderProps) {
 		setMessages,
 		sendMessage: chatSendMessage,
 	} = useChat({
-    transport: new DefaultChatTransport({
+		transport: new DefaultChatTransport({
 			api: "/api/chat",
 			body: async () => {
 				// Ensure we have a model before proceeding
@@ -229,54 +231,56 @@ export function MessagesProvider({ children, chatId }: MessagesProviderProps) {
 				}
 
 				const userApiKeys = await getUserApiKeys();
-        const gateway = (() => {
-          try {
-            const src = window.localStorage.getItem("chaichat_models_source");
-            return src === "aigateway" ? "vercel-ai-gateway" : "llm-gateway";
-          } catch {
-            return "llm-gateway";
-          }
-        })();
-        // Include provider-specific sub-configs based on ANY segment in the model path.
-        // This supports nested providers like "groq/openai/..." where OpenAI-specific
-        // options (e.g., reasoningEffort) should still be forwarded.
-        const providersInPath = currentModel.toLowerCase().split("/");
-        const hasOpenAI = providersInPath.includes("openai");
-        const hasGoogleOrGemini = providersInPath.includes("google") || providersInPath.includes("gemini");
-        const config: ModelConfig = {
-          temperature: modelConfigState.temperature,
-          maxOutputTokens: modelConfigState.maxOutputTokens,
-          topP: modelConfigState.topP,
-          topK: modelConfigState.topK,
-          frequencyPenalty: modelConfigState.frequencyPenalty,
-          presencePenalty: modelConfigState.presencePenalty,
-          ...(hasOpenAI ? { openai: modelConfigState.openai } : {}),
-          ...(hasGoogleOrGemini ? { google: modelConfigState.google } : {}),
-        };
+				const gateway = (() => {
+					try {
+						const src = window.localStorage.getItem("chaichat_models_source");
+						return src === "aigateway" ? "vercel-ai-gateway" : "llm-gateway";
+					} catch {
+						return "llm-gateway";
+					}
+				})();
+				// Include provider-specific sub-configs based on ANY segment in the model path.
+				// This supports nested providers like "groq/openai/..." where OpenAI-specific
+				// options (e.g., reasoningEffort) should still be forwarded.
+				const providersInPath = currentModel.toLowerCase().split("/");
+				const hasOpenAI = providersInPath.includes("openai");
+				const hasGoogleOrGemini =
+					providersInPath.includes("google") ||
+					providersInPath.includes("gemini");
+				const config: ModelConfig = {
+					temperature: modelConfigState.temperature,
+					maxOutputTokens: modelConfigState.maxOutputTokens,
+					topP: modelConfigState.topP,
+					topK: modelConfigState.topK,
+					frequencyPenalty: modelConfigState.frequencyPenalty,
+					presencePenalty: modelConfigState.presencePenalty,
+					...(hasOpenAI ? { openai: modelConfigState.openai } : {}),
+					...(hasGoogleOrGemini ? { google: modelConfigState.google } : {}),
+				};
 				return {
 					model: currentModel,
 					system: SYSTEM_PROMPT_DEFAULT,
-          userApiKeys,
-          gateway,
-          temperature: modelConfigState.temperature,
-          config,
+					userApiKeys,
+					gateway,
+					temperature: modelConfigState.temperature,
+					config,
 				};
 			},
-    // biome-ignore lint/suspicious/noExplicitAny: Bridging type mismatch between `ai` and `@ai-sdk/react` transport types at compile time; runtime behavior is correct
-    }) as any,
+			// biome-ignore lint/suspicious/noExplicitAny: Bridging type mismatch between `ai` and `@ai-sdk/react` transport types at compile time; runtime behavior is correct
+		}) as any,
 		onFinish: async ({ message }) => {
 			const currentModel = selectedModelRef.current || "openai/gpt-4o-mini";
 
 			if (message.role === "assistant") {
 				const textContent = getTextContent(message.parts);
-        // Serialize parts for persistence (includes reasoning when present)
-        const partsJson = (() => {
-          try {
-            return JSON.stringify(message.parts ?? []);
-          } catch {
-            return undefined;
-          }
-        })();
+				// Serialize parts for persistence (includes reasoning when present)
+				const partsJson = (() => {
+					try {
+						return JSON.stringify(message.parts ?? []);
+					} catch {
+						return undefined;
+					}
+				})();
 
 				// Add model information to the message immediately
 				const extendedMessage = message as ExtendedMessage;
@@ -306,7 +310,7 @@ export function MessagesProvider({ children, chatId }: MessagesProviderProps) {
 							userId: currentUserId || "local_user",
 							role: "assistant",
 							content: textContent,
-              ...(partsJson ? { partsJson } : {}),
+							...(partsJson ? { partsJson } : {}),
 							model: currentModel,
 							attachments: [],
 							parentMessageId: undefined,
@@ -320,62 +324,62 @@ export function MessagesProvider({ children, chatId }: MessagesProviderProps) {
 				}
 			}
 		},
-    onError: (error) => {
-      const currentModel = selectedModelRef.current || "openai/gpt-4o-mini";
-      const createAssistantErrorMessage = (content: string) =>
-        ({
-          id: `assistant-error-${Date.now()}`,
-          role: "assistant" as const,
-          parts: createTextParts(content),
-          model: currentModel,
-        }) as ExtendedMessage;
+		onError: (error) => {
+			const currentModel = selectedModelRef.current || "openai/gpt-4o-mini";
+			const createAssistantErrorMessage = (content: string) =>
+				({
+					id: `assistant-error-${Date.now()}`,
+					role: "assistant" as const,
+					parts: createTextParts(content),
+					model: currentModel,
+				}) as ExtendedMessage;
 
-      const addAssistantErrorMessage = (msg: ExtendedMessage) => {
-        setMessages((prev) => [...prev, msg]);
-      };
+			const addAssistantErrorMessage = (msg: ExtendedMessage) => {
+				setMessages((prev) => [...prev, msg]);
+			};
 
-      try {
-        const errorData = JSON.parse(error.message);
+			try {
+				const errorData = JSON.parse(error.message);
 
-        if (errorData.code === "RATE_LIMITED") {
-          setRateLimited(true);
-          addAssistantErrorMessage(
-            createAssistantErrorMessage(
-              "⚠️ Rate limit exceeded. Please wait a moment before sending another message.",
-            ),
-          );
-          setTimeout(() => setRateLimited(false), 60000);
-        } else if (errorData.code === "QUOTA_EXCEEDED") {
-          setQuotaExceeded(true);
-          addAssistantErrorMessage(
-            createAssistantErrorMessage(
-              "⚠️ API quota exceeded. Please check your API key limits or try a different model.",
-            ),
-          );
-        } else if (errorData.code === "MODEL_NOT_SUPPORTED") {
-          addAssistantErrorMessage(
-            createAssistantErrorMessage(
-              "⚠️ Model not supported by the gateway. Please pick a different model.",
-            ),
-          );
-        } else if (errorData.code === "NO_API_KEY") {
-          addAssistantErrorMessage(
-            createAssistantErrorMessage(
-              "⚠️ No LLM Gateway API key configured. Please add your API key in settings.",
-            ),
-          );
-        } else {
-          addAssistantErrorMessage(
-            createAssistantErrorMessage(
-              `⚠️ Error: ${errorData.error || "An unexpected error occurred"}`,
-            ),
-          );
-        }
-      } catch {
-        addAssistantErrorMessage(
-          createAssistantErrorMessage(`⚠️ Error: ${error.message}`),
-        );
-      }
+				if (errorData.code === "RATE_LIMITED") {
+					setRateLimited(true);
+					addAssistantErrorMessage(
+						createAssistantErrorMessage(
+							"⚠️ Rate limit exceeded. Please wait a moment before sending another message.",
+						),
+					);
+					setTimeout(() => setRateLimited(false), 60000);
+				} else if (errorData.code === "QUOTA_EXCEEDED") {
+					setQuotaExceeded(true);
+					addAssistantErrorMessage(
+						createAssistantErrorMessage(
+							"⚠️ API quota exceeded. Please check your API key limits or try a different model.",
+						),
+					);
+				} else if (errorData.code === "MODEL_NOT_SUPPORTED") {
+					addAssistantErrorMessage(
+						createAssistantErrorMessage(
+							"⚠️ Model not supported by the gateway. Please pick a different model.",
+						),
+					);
+				} else if (errorData.code === "NO_API_KEY") {
+					addAssistantErrorMessage(
+						createAssistantErrorMessage(
+							"⚠️ No LLM Gateway API key configured. Please add your API key in settings.",
+						),
+					);
+				} else {
+					addAssistantErrorMessage(
+						createAssistantErrorMessage(
+							`⚠️ Error: ${errorData.error || "An unexpected error occurred"}`,
+						),
+					);
+				}
+			} catch {
+				addAssistantErrorMessage(
+					createAssistantErrorMessage(`⚠️ Error: ${error.message}`),
+				);
+			}
 
 			if ((error as Error).message?.includes("429")) {
 				setRateLimited(true);
@@ -417,28 +421,28 @@ export function MessagesProvider({ children, chatId }: MessagesProviderProps) {
 					// Load messages from cache
 					const cachedMessages = await cache.getMessages(chatId);
 
-          // Convert cached messages to v5 UIMessage format, preferring partsJson when present
-          const v5Messages: ExtendedMessage[] = cachedMessages.map((msg) => {
-            let parts: UIMessage["parts"];
-            if (msg.partsJson) {
-              try {
-                parts = JSON.parse(msg.partsJson);
-              } catch {
-                parts = createTextParts(msg.content);
-              }
-            } else {
-              parts = createTextParts(msg.content);
-            }
-            return {
-              id: msg._id,
-              role: msg.role as "user" | "assistant" | "system",
-              parts,
-              convexId: msg._id,
-              parentMessageId: msg.parentMessageId,
-              model: msg.model,
-              _creationTime: msg._creationTime,
-            } as ExtendedMessage;
-          });
+					// Convert cached messages to v5 UIMessage format, preferring partsJson when present
+					const v5Messages: ExtendedMessage[] = cachedMessages.map((msg) => {
+						let parts: UIMessage["parts"];
+						if (msg.partsJson) {
+							try {
+								parts = JSON.parse(msg.partsJson);
+							} catch {
+								parts = createTextParts(msg.content);
+							}
+						} else {
+							parts = createTextParts(msg.content);
+						}
+						return {
+							id: msg._id,
+							role: msg.role as "user" | "assistant" | "system",
+							parts,
+							convexId: msg._id,
+							parentMessageId: msg.parentMessageId,
+							model: msg.model,
+							_creationTime: msg._creationTime,
+						} as ExtendedMessage;
+					});
 
 					// Set messages in useChat hook
 					setMessages(v5Messages);
@@ -514,8 +518,8 @@ export function MessagesProvider({ children, chatId }: MessagesProviderProps) {
 						userId: currentUserId,
 						role: "user",
 						content: message,
-            // Persist the user's input as text parts for consistency with v5 structure
-            partsJson: JSON.stringify([{ type: "text", text: message }]),
+						// Persist the user's input as text parts for consistency with v5 structure
+						partsJson: JSON.stringify([{ type: "text", text: message }]),
 						model: selectedModel,
 						attachments: attachments || [],
 						parentMessageId: undefined,
@@ -609,9 +613,9 @@ export function MessagesProvider({ children, chatId }: MessagesProviderProps) {
 				isSubmitting,
 				selectedModel,
 				setSelectedModel,
-        modelConfig: modelConfigState,
-        setModelConfig: (update: Partial<ModelConfig>) =>
-          setModelConfigState((prev) => ({ ...prev, ...update })),
+				modelConfig: modelConfigState,
+				setModelConfig: (update: Partial<ModelConfig>) =>
+					setModelConfigState((prev) => ({ ...prev, ...update })),
 				status,
 				quotaExceeded,
 				rateLimited,

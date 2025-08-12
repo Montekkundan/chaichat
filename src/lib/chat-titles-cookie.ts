@@ -9,6 +9,7 @@ export interface ChatTitleEntry {
 	timestamp: number;
 }
 
+/* biome-ignore lint/complexity/noStaticOnlyClass: Used as a namespaced API across the app */
 export class ChatTitlesCookieManager {
 	private static readonly COOKIE_NAME = "cc_chat_titles";
 	private static readonly MAX_ENTRIES = 50; // Store up to 50 recent chat titles
@@ -30,12 +31,12 @@ export class ChatTitlesCookieManager {
 			);
 			if (Array.isArray(entries)) {
 				const now = Date.now();
-				entries.forEach((entry) => {
+				for (const entry of entries) {
 					// Only include non-expired entries
 					if (now - entry.timestamp < ChatTitlesCookieManager.MAX_AGE) {
 						titleMap.set(entry.id, entry.name);
 					}
-				});
+				}
 			}
 		} catch (error) {
 			console.warn("Failed to parse chat titles cookie:", error);

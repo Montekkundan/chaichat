@@ -22,10 +22,10 @@ export default function Chat({ initialName }: ChatProps = {}) {
 	const [hasNavigated, setHasNavigated] = useState(false);
 	const [attachments, setAttachments] = useState<UploadedFile[]>([]);
 
-    const conversationScrollApiRef = useRef<{
-        scrollToBottom: () => void;
-        getIsAtBottom: () => boolean;
-    } | null>(null);
+	const conversationScrollApiRef = useRef<{
+		scrollToBottom: () => void;
+		getIsAtBottom: () => boolean;
+	} | null>(null);
 
 	const {
 		messages,
@@ -134,15 +134,15 @@ export default function Chat({ initialName }: ChatProps = {}) {
 		}
 	};
 
-    const handleBranch = async (_idx: number) => {
+	const handleBranch = async (_idx: number) => {
 		// TODO: Implement branch functionality if needed
 		console.log("Branch not implemented yet");
 	};
 
 	const isLoading = isSubmitting || isCreatingChat || status === "streaming";
 
-    const { state } = useSidebar();
-    const _collapsed = state === "collapsed";
+	const { state } = useSidebar();
+	const _collapsed = state === "collapsed";
 
 	return (
 		<>
@@ -171,7 +171,7 @@ export default function Chat({ initialName }: ChatProps = {}) {
 					</div>
 				</div>
 			</div>
-            <div className="absolute inset-0 sm:pt-3.5">
+			<div className="absolute inset-0 sm:pt-3.5">
 				{showOnboarding ? (
 					<div className="mx-auto flex w-full max-w-3xl flex-col space-y-12 px-4 pt-safe-offset-10 pb-10">
 						<div className="flex h-[calc(100vh-20rem)] items-start justify-center">
@@ -183,19 +183,19 @@ export default function Chat({ initialName }: ChatProps = {}) {
 						</div>
 					</div>
 				) : (
-                    <div className="h-full min-h-0 w-full">
-					<Conversation
-						messages={messages}
-						status={status}
-						onDelete={handleDelete}
-						onEdit={handleEdit}
-						onReload={handleReload}
-						onBranch={handleBranch}
-						scrollButtonBottomClass="bottom-35 z-50 md:bottom-32"
-						registerScrollApi={(api) => {
-							conversationScrollApiRef.current = api;
-						}}
-					/>
+					<div className="h-full min-h-0 w-full">
+						<Conversation
+							messages={messages}
+							status={status}
+							onDelete={handleDelete}
+							onEdit={handleEdit}
+							onReload={handleReload}
+							onBranch={handleBranch}
+							scrollButtonBottomClass="bottom-35 z-50 md:bottom-32"
+							registerScrollApi={(api) => {
+								conversationScrollApiRef.current = api;
+							}}
+						/>
 					</div>
 				)}
 			</div>

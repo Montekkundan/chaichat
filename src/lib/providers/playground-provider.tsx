@@ -25,7 +25,7 @@ type PlaygroundMessage = UIMessage & {
 	createdAt?: Date;
 	model?: string;
 	_creationTime?: number;
-  gateway?: "llm-gateway" | "vercel-ai-gateway";
+	gateway?: "llm-gateway" | "vercel-ai-gateway";
 };
 
 type ModelConfig = {
@@ -35,26 +35,26 @@ type ModelConfig = {
 	topK: number;
 	frequencyPenalty: number;
 	presencePenalty: number;
-  openai?: {
-    reasoningEffort?: "minimal" | "low" | "medium" | "high";
-    reasoningSummary?: "auto" | "detailed";
-    textVerbosity?: "low" | "medium" | "high";
-    serviceTier?: "auto" | "flex" | "priority";
-    parallelToolCalls?: boolean;
-    store?: boolean;
-    strictJsonSchema?: boolean;
-    maxCompletionTokens?: number;
-    user?: string;
-    metadata?: Record<string, string>;
-  };
-  // Google-only provider options (applied when provider is `google`)
-  google?: {
-    cachedContent?: string;
-    structuredOutputs?: boolean;
-    safetySettings?: Array<{ category: string; threshold: string }>;
-    responseModalities?: string[];
-    thinkingConfig?: { thinkingBudget?: number; includeThoughts?: boolean };
-  };
+	openai?: {
+		reasoningEffort?: "minimal" | "low" | "medium" | "high";
+		reasoningSummary?: "auto" | "detailed";
+		textVerbosity?: "low" | "medium" | "high";
+		serviceTier?: "auto" | "flex" | "priority";
+		parallelToolCalls?: boolean;
+		store?: boolean;
+		strictJsonSchema?: boolean;
+		maxCompletionTokens?: number;
+		user?: string;
+		metadata?: Record<string, string>;
+	};
+	// Google-only provider options (applied when provider is `google`)
+	google?: {
+		cachedContent?: string;
+		structuredOutputs?: boolean;
+		safetySettings?: Array<{ category: string; threshold: string }>;
+		responseModalities?: string[];
+		thinkingConfig?: { thinkingBudget?: number; includeThoughts?: boolean };
+	};
 };
 
 export type ChatColumn = {
@@ -65,9 +65,9 @@ export type ChatColumn = {
 	synced: boolean;
 	config: ModelConfig;
 	isStreaming: boolean;
-  status?: "submitted" | "streaming" | "ready" | "error";
-  // Per-column gateway source ("aigateway" uses Vercel AI Gateway, otherwise LLM Gateway)
-  gatewaySource?: "aigateway" | "llmgateway";
+	status?: "submitted" | "streaming" | "ready" | "error";
+	// Per-column gateway source ("aigateway" uses Vercel AI Gateway, otherwise LLM Gateway)
+	gatewaySource?: "aigateway" | "llmgateway";
 };
 
 type PlaygroundState = {
@@ -83,8 +83,8 @@ interface PlaygroundContextType {
 	columns: ChatColumn[];
 	sharedInput: string;
 	playgroundId: string;
-  maxColumns: number;
-  setMaxColumns: (max: number) => void;
+	maxColumns: number;
+	setMaxColumns: (max: number) => void;
 	addColumn: () => void;
 	removeColumn: (columnId: string) => void;
 	updateColumn: (columnId: string, updates: Partial<ChatColumn>) => void;
@@ -96,10 +96,10 @@ interface PlaygroundContextType {
 	updateColumnInput: (columnId: string, input: string) => void;
 	sendToColumn: (columnId: string, message: string) => Promise<void>;
 	sendToSyncedColumns: (message: string) => Promise<void>;
-  registerColumnScrollApi: (
-    columnId: string,
-    api: { scrollToBottom: () => void; getIsAtBottom: () => boolean } | null,
-  ) => void;
+	registerColumnScrollApi: (
+		columnId: string,
+		api: { scrollToBottom: () => void; getIsAtBottom: () => boolean } | null,
+	) => void;
 	createNewPlayground: () => void;
 	savePlayground: () => Promise<void>;
 	loadPlayground: (playgroundId: string) => Promise<void>;
@@ -127,25 +127,25 @@ const createDefaultConfig = (): ModelConfig => ({
 	topK: 0,
 	frequencyPenalty: 0,
 	presencePenalty: 0,
-  openai: {
-    reasoningEffort: undefined,
-    reasoningSummary: undefined,
-    textVerbosity: undefined,
-    serviceTier: undefined,
-    parallelToolCalls: undefined,
-    store: undefined,
-    strictJsonSchema: undefined,
-    maxCompletionTokens: undefined,
-    user: undefined,
-    metadata: undefined,
-  },
-  google: {
-    cachedContent: undefined,
-    structuredOutputs: undefined,
-    safetySettings: undefined,
-    responseModalities: undefined,
-    thinkingConfig: undefined,
-  },
+	openai: {
+		reasoningEffort: undefined,
+		reasoningSummary: undefined,
+		textVerbosity: undefined,
+		serviceTier: undefined,
+		parallelToolCalls: undefined,
+		store: undefined,
+		strictJsonSchema: undefined,
+		maxCompletionTokens: undefined,
+		user: undefined,
+		metadata: undefined,
+	},
+	google: {
+		cachedContent: undefined,
+		structuredOutputs: undefined,
+		safetySettings: undefined,
+		responseModalities: undefined,
+		thinkingConfig: undefined,
+	},
 });
 
 let columnCounter = 0;
@@ -159,49 +159,52 @@ const createDefaultColumn = (modelId?: string): ChatColumn => {
 		input: "",
 		synced: false,
 		config: createDefaultConfig(),
-    isStreaming: false,
-    status: "ready",
-    gatewaySource: "llmgateway",
+		isStreaming: false,
+		status: "ready",
+		gatewaySource: "llmgateway",
 	};
 };
 
 const createTextParts = (content: string): UIMessage["parts"] => [
-  {
-    type: "text" as const,
-    text: content,
-  },
+	{
+		type: "text" as const,
+		text: content,
+	},
 ];
 
 function createAssistantParts(
-  text: string,
-  reasoning?: string,
+	text: string,
+	reasoning?: string,
 ): UIMessage["parts"] {
-  const parts: UIMessage["parts"] = [];
-  if (typeof reasoning === "string") {
-    // Reasoning part first (to match normal chat ordering)
-    // Casting to unknown first to avoid overly strict UIMessage part typing in older ai-sdk types
-    parts.push({ type: "reasoning", text: reasoning } as unknown as UIMessage["parts"][number]);
-  }
-  parts.push({ type: "text", text } as UIMessage["parts"][number]);
-  return parts;
+	const parts: UIMessage["parts"] = [];
+	if (typeof reasoning === "string") {
+		// Reasoning part first (to match normal chat ordering)
+		// Casting to unknown first to avoid overly strict UIMessage part typing in older ai-sdk types
+		parts.push({
+			type: "reasoning",
+			text: reasoning,
+		} as unknown as UIMessage["parts"][number]);
+	}
+	parts.push({ type: "text", text } as UIMessage["parts"][number]);
+	return parts;
 }
 
 const PLAYGROUND_LIST_KEY = "chaichat_playground_list";
 const PLAYGROUND_PREFIX = "chaichat_playground_";
 import {
-  PLAYGROUND_MAX_COLUMNS_CHANGED_EVENT,
-  PLAYGROUND_MAX_COLUMNS_DEFAULT,
-  PLAYGROUND_MAX_COLUMNS_MAX,
-  PLAYGROUND_MAX_COLUMNS_MIN,
-  PLAYGROUND_MAX_COLUMNS_STORAGE_KEY,
+	PLAYGROUND_MAX_COLUMNS_CHANGED_EVENT,
+	PLAYGROUND_MAX_COLUMNS_DEFAULT,
+	PLAYGROUND_MAX_COLUMNS_MAX,
+	PLAYGROUND_MAX_COLUMNS_MIN,
+	PLAYGROUND_MAX_COLUMNS_STORAGE_KEY,
 } from "~/lib/config";
 
 function clampMaxColumns(value: number): number {
-  if (Number.isNaN(value)) return PLAYGROUND_MAX_COLUMNS_DEFAULT;
-  return Math.min(
-    Math.max(value, PLAYGROUND_MAX_COLUMNS_MIN),
-    PLAYGROUND_MAX_COLUMNS_MAX,
-  );
+	if (Number.isNaN(value)) return PLAYGROUND_MAX_COLUMNS_DEFAULT;
+	return Math.min(
+		Math.max(value, PLAYGROUND_MAX_COLUMNS_MIN),
+		PLAYGROUND_MAX_COLUMNS_MAX,
+	);
 }
 
 function savePlaygroundToStorage(playgroundId: string, state: PlaygroundState) {
@@ -307,67 +310,73 @@ export function PlaygroundProvider({
 		};
 	});
 
-  // Settings: max columns
-  const [maxColumns, setMaxColumnsState] = useState<number>(() => {
-    if (typeof window === "undefined") return PLAYGROUND_MAX_COLUMNS_DEFAULT;
-    try {
-      const raw = window.localStorage.getItem(PLAYGROUND_MAX_COLUMNS_STORAGE_KEY);
-      if (!raw) return PLAYGROUND_MAX_COLUMNS_DEFAULT;
-      const parsed = Number.parseInt(raw);
-      return clampMaxColumns(parsed);
-    } catch {
-      return PLAYGROUND_MAX_COLUMNS_DEFAULT;
-    }
-  });
+	// Settings: max columns
+	const [maxColumns, setMaxColumnsState] = useState<number>(() => {
+		if (typeof window === "undefined") return PLAYGROUND_MAX_COLUMNS_DEFAULT;
+		try {
+			const raw = window.localStorage.getItem(
+				PLAYGROUND_MAX_COLUMNS_STORAGE_KEY,
+			);
+			if (!raw) return PLAYGROUND_MAX_COLUMNS_DEFAULT;
+			const parsed = Number.parseInt(raw);
+			return clampMaxColumns(parsed);
+		} catch {
+			return PLAYGROUND_MAX_COLUMNS_DEFAULT;
+		}
+	});
 
-  // Registry of per-column scroll APIs so we can trigger scrolling across synced columns
-  const columnScrollApisRef = useRef<
-    Map<string, { scrollToBottom: () => void; getIsAtBottom: () => boolean }>
-  >(new Map());
+	// Registry of per-column scroll APIs so we can trigger scrolling across synced columns
+	const columnScrollApisRef = useRef<
+		Map<string, { scrollToBottom: () => void; getIsAtBottom: () => boolean }>
+	>(new Map());
 
-  const registerColumnScrollApi = useCallback(
-    (
-      columnId: string,
-      api: { scrollToBottom: () => void; getIsAtBottom: () => boolean } | null,
-    ) => {
-      if (!api) {
-        columnScrollApisRef.current.delete(columnId);
-        return;
-      }
-      columnScrollApisRef.current.set(columnId, api);
-    },
-    [],
-  );
+	const registerColumnScrollApi = useCallback(
+		(
+			columnId: string,
+			api: { scrollToBottom: () => void; getIsAtBottom: () => boolean } | null,
+		) => {
+			if (!api) {
+				columnScrollApisRef.current.delete(columnId);
+				return;
+			}
+			columnScrollApisRef.current.set(columnId, api);
+		},
+		[],
+	);
 
-  const setMaxColumns = useCallback((value: number) => {
-    const clamped = clampMaxColumns(value);
-    setMaxColumnsState(clamped);
-    try {
-      if (typeof window !== "undefined") {
-        window.localStorage.setItem(
-          PLAYGROUND_MAX_COLUMNS_STORAGE_KEY,
-          String(clamped),
-        );
-      }
-    } catch {}
-  }, []);
+	const setMaxColumns = useCallback((value: number) => {
+		const clamped = clampMaxColumns(value);
+		setMaxColumnsState(clamped);
+		try {
+			if (typeof window !== "undefined") {
+				window.localStorage.setItem(
+					PLAYGROUND_MAX_COLUMNS_STORAGE_KEY,
+					String(clamped),
+				);
+			}
+		} catch {}
+	}, []);
 
-  const pickConfigForModel = useCallback(function pickConfigForModel(modelId: string, config: ModelConfig): ModelConfig {
-    const providersInPath = modelId.toLowerCase().split("/");
-    const hasOpenAI = providersInPath.includes("openai");
-    const hasGoogleOrGemini = providersInPath.includes("google") || providersInPath.includes("gemini");
-    const base: ModelConfig = {
-      temperature: config.temperature,
-      maxOutputTokens: config.maxOutputTokens,
-      topP: config.topP,
-      topK: config.topK,
-      frequencyPenalty: config.frequencyPenalty,
-      presencePenalty: config.presencePenalty,
-    } as ModelConfig;
-    if (hasOpenAI) return { ...base, openai: config.openai };
-    if (hasGoogleOrGemini) return { ...base, google: config.google };
-    return base;
-  }, []);
+	const pickConfigForModel = useCallback(function pickConfigForModel(
+		modelId: string,
+		config: ModelConfig,
+	): ModelConfig {
+		const providersInPath = modelId.toLowerCase().split("/");
+		const hasOpenAI = providersInPath.includes("openai");
+		const hasGoogleOrGemini =
+			providersInPath.includes("google") || providersInPath.includes("gemini");
+		const base: ModelConfig = {
+			temperature: config.temperature,
+			maxOutputTokens: config.maxOutputTokens,
+			topP: config.topP,
+			topK: config.topK,
+			frequencyPenalty: config.frequencyPenalty,
+			presencePenalty: config.presencePenalty,
+		} as ModelConfig;
+		if (hasOpenAI) return { ...base, openai: config.openai };
+		if (hasGoogleOrGemini) return { ...base, google: config.google };
+		return base;
+	}, []);
 
 	useEffect(() => {
 		if (!playgroundId) return;
@@ -440,33 +449,39 @@ export function PlaygroundProvider({
 		};
 	}, []);
 
-  // Sync maxColumns with external changes (settings dialog or other tabs)
-  useEffect(() => {
-    const onStorage = (e: StorageEvent) => {
-      if (e.key === PLAYGROUND_MAX_COLUMNS_STORAGE_KEY && e.newValue) {
-        const parsed = Number.parseInt(e.newValue);
-        setMaxColumnsState(clampMaxColumns(parsed));
-      }
-    };
-    const onCustom = (e: Event) => {
-      try {
-        const detail = (e as CustomEvent<number>).detail;
-        if (typeof detail === "number") {
-          setMaxColumns(detail);
-        }
-      } catch {}
-    };
-    if (typeof window !== "undefined") {
-      window.addEventListener("storage", onStorage);
-      window.addEventListener(PLAYGROUND_MAX_COLUMNS_CHANGED_EVENT, onCustom as EventListener);
-    }
-    return () => {
-      if (typeof window !== "undefined") {
-        window.removeEventListener("storage", onStorage);
-        window.removeEventListener(PLAYGROUND_MAX_COLUMNS_CHANGED_EVENT, onCustom as EventListener);
-      }
-    };
-  }, [setMaxColumns]);
+	// Sync maxColumns with external changes (settings dialog or other tabs)
+	useEffect(() => {
+		const onStorage = (e: StorageEvent) => {
+			if (e.key === PLAYGROUND_MAX_COLUMNS_STORAGE_KEY && e.newValue) {
+				const parsed = Number.parseInt(e.newValue);
+				setMaxColumnsState(clampMaxColumns(parsed));
+			}
+		};
+		const onCustom = (e: Event) => {
+			try {
+				const detail = (e as CustomEvent<number>).detail;
+				if (typeof detail === "number") {
+					setMaxColumns(detail);
+				}
+			} catch {}
+		};
+		if (typeof window !== "undefined") {
+			window.addEventListener("storage", onStorage);
+			window.addEventListener(
+				PLAYGROUND_MAX_COLUMNS_CHANGED_EVENT,
+				onCustom as EventListener,
+			);
+		}
+		return () => {
+			if (typeof window !== "undefined") {
+				window.removeEventListener("storage", onStorage);
+				window.removeEventListener(
+					PLAYGROUND_MAX_COLUMNS_CHANGED_EVENT,
+					onCustom as EventListener,
+				);
+			}
+		};
+	}, [setMaxColumns]);
 
 	const ensurePlaygroundId = useCallback((): {
 		id: string;
@@ -502,28 +517,28 @@ export function PlaygroundProvider({
 
 	// Column management
 	const addColumn = useCallback(() => {
-    setState((prev) => {
-      if (prev.columns.length >= maxColumns) {
-        return prev;
-      }
-      const newId = `column-${Date.now()}-${prev.columns.length}`;
-      const newColumn: ChatColumn = {
-        id: newId,
-        modelId: "openai/gpt-4o-mini",
-        messages: [],
-        input: "",
-        synced: false,
-        config: createDefaultConfig(),
-        isStreaming: false,
-        status: "ready",
-        gatewaySource: "llmgateway",
-      };
-      return {
-        ...prev,
-        columns: [...prev.columns, newColumn],
-      };
-    });
-  }, [maxColumns]);
+		setState((prev) => {
+			if (prev.columns.length >= maxColumns) {
+				return prev;
+			}
+			const newId = `column-${Date.now()}-${prev.columns.length}`;
+			const newColumn: ChatColumn = {
+				id: newId,
+				modelId: "openai/gpt-4o-mini",
+				messages: [],
+				input: "",
+				synced: false,
+				config: createDefaultConfig(),
+				isStreaming: false,
+				status: "ready",
+				gatewaySource: "llmgateway",
+			};
+			return {
+				...prev,
+				columns: [...prev.columns, newColumn],
+			};
+		});
+	}, [maxColumns]);
 
 	const removeColumn = useCallback((columnId: string) => {
 		setState((prev) => ({
@@ -559,7 +574,7 @@ export function PlaygroundProvider({
 			...prev,
 			columns: prev.columns.map((col) =>
 				col.id === columnId
-          ? { ...col, messages: [], isStreaming: false, status: "ready" }
+					? { ...col, messages: [], isStreaming: false, status: "ready" }
 					: col,
 			),
 		}));
@@ -631,20 +646,23 @@ export function PlaygroundProvider({
 		[],
 	);
 
-  const setColumnStatus = useCallback(
-    (columnId: string, status: "submitted" | "streaming" | "ready" | "error") => {
-      setState((prev) => ({
-        ...prev,
-        columns: prev.columns.map((col) =>
-          col.id === columnId ? { ...col, status } : col,
-        ),
-      }));
-    },
-    [],
-  );
+	const setColumnStatus = useCallback(
+		(
+			columnId: string,
+			status: "submitted" | "streaming" | "ready" | "error",
+		) => {
+			setState((prev) => ({
+				...prev,
+				columns: prev.columns.map((col) =>
+					col.id === columnId ? { ...col, status } : col,
+				),
+			}));
+		},
+		[],
+	);
 
 	// Message sending
-  const sendToColumn = useCallback(
+	const sendToColumn = useCallback(
 		async (columnId: string, messageText: string) => {
 			const column = state.columns.find((col) => col.id === columnId);
 			if (!column) return;
@@ -652,8 +670,8 @@ export function PlaygroundProvider({
 			try {
 				// Set streaming status to true
 				setColumnStreaming(columnId, true);
-        // Reflect useChat-like lifecycle
-        setColumnStatus(columnId, "submitted");
+				// Reflect useChat-like lifecycle
+				setColumnStatus(columnId, "submitted");
 
 				const userApiKeys = await getUserApiKeys();
 				const messageTimestamp = Date.now();
@@ -663,29 +681,32 @@ export function PlaygroundProvider({
 
 				// Ensure a Dexie playground record exists
 				try {
-      const pgRecord: DBPlayground = {
+					const pgRecord: DBPlayground = {
 						_id: ensured.id,
 						userId: currentUserId || "local_user",
 						name: `Playground (${new Date(ensured.created ? messageTimestamp : state.createdAt || Date.now()).toLocaleTimeString()})`,
 						createdAt: state.createdAt || messageTimestamp,
-        columns: state.columns.map((c) => ({
-          id: c.id,
-          modelId: c.modelId,
-          gatewaySource: c.gatewaySource ?? "llmgateway",
-        })),
+						columns: state.columns.map((c) => ({
+							id: c.id,
+							modelId: c.modelId,
+							gatewaySource: c.gatewaySource ?? "llmgateway",
+						})),
 					};
 					await db.playgrounds.put(pgRecord);
 				} catch {}
 
 				// Create user message
-                const userMessage: PlaygroundMessage = {
+				const userMessage: PlaygroundMessage = {
 					id: `user-${messageTimestamp}-${columnId}`,
 					role: "user",
 					content: messageText,
 					parts: createTextParts(messageText),
 					createdAt: new Date(),
 					model: column.modelId,
-                  gateway: column.gatewaySource === "aigateway" ? "vercel-ai-gateway" : "llm-gateway",
+					gateway:
+						column.gatewaySource === "aigateway"
+							? "vercel-ai-gateway"
+							: "llm-gateway",
 				};
 
 				// Add user message immediately
@@ -695,7 +716,7 @@ export function PlaygroundProvider({
 
 				// Persist user message into playgroundMessages (Dexie)
 				try {
-                  const dbMessage = {
+					const dbMessage = {
 						_id: `pmsg-${messageTimestamp}-${Math.random()}`,
 						playgroundId: ensured.id,
 						columnId,
@@ -705,8 +726,11 @@ export function PlaygroundProvider({
 						model: column.modelId,
 						createdAt: messageTimestamp,
 						_creationTime: messageTimestamp,
-                    gateway: column.gatewaySource === "aigateway" ? "vercel-ai-gateway" : "llm-gateway",
-                  } as DBPlaygroundMessage;
+						gateway:
+							column.gatewaySource === "aigateway"
+								? "vercel-ai-gateway"
+								: "llm-gateway",
+					} as DBPlaygroundMessage;
 					await db.playgroundMessages.put(dbMessage);
 				} catch {}
 
@@ -715,44 +739,48 @@ export function PlaygroundProvider({
 					try {
 						// Create Convex playground record on first send per session
 						if (!state.parentChatId) {
-            const pgColumns = state.columns.map((c) => ({
-              id: c.id,
-              modelId: c.modelId,
-              gatewaySource: c.gatewaySource ?? "llmgateway",
-            }));
-						// Using unknown here to bypass type until codegen includes playground endpoints
-						const convexPlaygroundId = await (convex as unknown as {
-							mutation: (
-								name: string,
-								args: Record<string, unknown>,
-							) => Promise<string>;
-						}).mutation(
-							"playground:createPlayground",
-							{
+							const pgColumns = state.columns.map((c) => ({
+								id: c.id,
+								modelId: c.modelId,
+								gatewaySource: c.gatewaySource ?? "llmgateway",
+							}));
+							// Using unknown here to bypass type until codegen includes playground endpoints
+							const convexPlaygroundId = await (
+								convex as unknown as {
+									mutation: (
+										name: string,
+										args: Record<string, unknown>,
+									) => Promise<string>;
+								}
+							).mutation("playground:createPlayground", {
 								userId: user.id,
 								name: `Playground ${new Date().toLocaleTimeString()}`,
 								columns: pgColumns,
-							},
-						);
+							});
 							setState((prev) => ({
 								...prev,
 								parentChatId: convexPlaygroundId,
 							}));
 						}
 						if (state.parentChatId) {
-                        await (convex as unknown as {
-							mutation: (
-								name: string,
-								args: Record<string, unknown>,
-							) => Promise<string>;
-						}).mutation("playground:addPlaygroundMessage", {
+							await (
+								convex as unknown as {
+									mutation: (
+										name: string,
+										args: Record<string, unknown>,
+									) => Promise<string>;
+								}
+							).mutation("playground:addPlaygroundMessage", {
 								playgroundId: state.parentChatId as unknown as string,
 								columnId: columnId,
 								userId: user.id,
 								role: "user",
 								content: messageText,
 								model: column.modelId,
-                            gateway: column.gatewaySource === "aigateway" ? "vercel-ai-gateway" : "llm-gateway",
+								gateway:
+									column.gatewaySource === "aigateway"
+										? "vercel-ai-gateway"
+										: "llm-gateway",
 							});
 						}
 					} catch {}
@@ -768,7 +796,7 @@ export function PlaygroundProvider({
 					new Set<AbortController>();
 				setForColumn.add(controller);
 				inFlightControllersRef.current.set(columnId, setForColumn);
-        const response = await fetch("/api/chat", {
+				const response = await fetch("/api/chat", {
 					method: "POST",
 					headers: {
 						"Content-Type": "application/json",
@@ -776,10 +804,13 @@ export function PlaygroundProvider({
 					body: JSON.stringify({
 						messages: messagesForAPI,
 						model: column.modelId,
-                        temperature: column.config.temperature,
-                        config: pickConfigForModel(column.modelId, column.config),
-            userApiKeys,
-            gateway: column.gatewaySource === "aigateway" ? "vercel-ai-gateway" : "llm-gateway",
+						temperature: column.config.temperature,
+						config: pickConfigForModel(column.modelId, column.config),
+						userApiKeys,
+						gateway:
+							column.gatewaySource === "aigateway"
+								? "vercel-ai-gateway"
+								: "llm-gateway",
 					}),
 					signal: controller.signal,
 				});
@@ -791,39 +822,48 @@ export function PlaygroundProvider({
 				// Handle streaming response
 				const reader = response.body?.getReader();
 				if (!reader) throw new Error("No reader available");
-        setColumnStatus(columnId, "streaming");
+				setColumnStatus(columnId, "streaming");
 
-                const decoder = new TextDecoder();
-                let assistantContent = "";
-                let reasoningContent = "";
-                // Use a mutable boolean flag across frames
-                let scheduled = false;
-                let pendingText = "";
-                let pendingReasoning = "";
-                const toolParts: UIMessage["parts"] = [];
+				const decoder = new TextDecoder();
+				let assistantContent = "";
+				let reasoningContent = "";
+				// Use a mutable boolean flag across frames
+				let scheduled = false;
+				let pendingText = "";
+				let pendingReasoning = "";
+				const toolParts: UIMessage["parts"] = [];
 
-                const buildAssistantParts = (): UIMessage["parts"] => {
-                  const parts: UIMessage["parts"] = [];
-                  // Include tool parts first (as they often precede final text)
-                  if (Array.isArray(toolParts) && toolParts.length > 0) {
-                    for (const p of toolParts) parts.push(p);
-                  }
-                  if (reasoningContent) {
-                    parts.push({ type: "reasoning", text: reasoningContent } as unknown as UIMessage["parts"][number]);
-                  }
-                  parts.push({ type: "text", text: assistantContent } as unknown as UIMessage["parts"][number]);
-                  return parts;
-                };
+				const buildAssistantParts = (): UIMessage["parts"] => {
+					const parts: UIMessage["parts"] = [];
+					// Include tool parts first (as they often precede final text)
+					if (Array.isArray(toolParts) && toolParts.length > 0) {
+						for (const p of toolParts) parts.push(p);
+					}
+					if (reasoningContent) {
+						parts.push({
+							type: "reasoning",
+							text: reasoningContent,
+						} as unknown as UIMessage["parts"][number]);
+					}
+					parts.push({
+						type: "text",
+						text: assistantContent,
+					} as unknown as UIMessage["parts"][number]);
+					return parts;
+				};
 
 				// Create assistant message
-                const assistantMessage: PlaygroundMessage = {
+				const assistantMessage: PlaygroundMessage = {
 					id: `assistant-${messageTimestamp}-${columnId}`,
 					role: "assistant",
 					content: "",
-                    parts: createTextParts(""),
+					parts: createTextParts(""),
 					createdAt: new Date(),
 					model: column.modelId,
-                  gateway: column.gatewaySource === "aigateway" ? "vercel-ai-gateway" : "llm-gateway",
+					gateway:
+						column.gatewaySource === "aigateway"
+							? "vercel-ai-gateway"
+							: "llm-gateway",
 				};
 
 				// Add assistant message placeholder
@@ -837,12 +877,12 @@ export function PlaygroundProvider({
 							col.id === columnId
 								? {
 										...col,
-                                        messages: [
-                                            ...col.messages.filter(
-                                                (m) => m.id !== assistantMessage.id,
-                                            ),
-                                            assistantMessage,
-                                        ],
+										messages: [
+											...col.messages.filter(
+												(m) => m.id !== assistantMessage.id,
+											),
+											assistantMessage,
+										],
 									}
 								: col,
 						),
@@ -851,7 +891,7 @@ export function PlaygroundProvider({
 
 				// Read stream
 				while (true) {
-                    const { done, value } = await reader.read();
+					const { done, value } = await reader.read();
 					if (done) break;
 
 					const chunk = decoder.decode(value, { stream: true });
@@ -865,184 +905,192 @@ export function PlaygroundProvider({
 
 								const data = JSON.parse(jsonStr);
 
-                                // Stream handling for UIMessageStream events
-                                if (data.type === "step-start") {
-                                  // Initialize a reasoning part so UI can show Reasoning block early
-                                  if (!scheduled) {
-                                    scheduled = true;
-                                    requestAnimationFrame(() => {
-                                      scheduled = false;
-                                      setState((prev) => ({
-                                        ...prev,
-                                        columns: prev.columns.map((col) =>
-                                          col.id === columnId
-                                            ? {
-                                                ...col,
-                                                messages: col.messages.map((msg) =>
-                                                  msg.id === assistantMessage.id
-                                                    ? {
-                                                        ...msg,
-                                                        parts: buildAssistantParts(),
-                                                      }
-                                                    : msg,
-                                                ),
-                                              }
-                                            : col,
-                                        ),
-                                      }));
-                                    });
-                                  }
-                                } else if (data.type === "reasoning-delta" && data.delta) {
-                                  reasoningContent += data.delta;
-                                  pendingReasoning = reasoningContent;
-                                  if (!scheduled) {
-                                    scheduled = true;
-                                    requestAnimationFrame(() => {
-                                      const _reasoning = pendingReasoning;
-                                      const _text = pendingText || assistantContent;
-                                      scheduled = false;
-                                      setState((prev) => ({
-                                        ...prev,
-                                        columns: prev.columns.map((col) =>
-                                          col.id === columnId
-                                            ? {
-                                                ...col,
-                                                messages: col.messages.map((msg) =>
-                                                  msg.id === assistantMessage.id
-                                                    ? {
-                                                        ...msg,
-                                                        parts: buildAssistantParts(),
-                                                      }
-                                                    : msg,
-                                                ),
-                                              }
-                                            : col,
-                                        ),
-                                      }));
-                                    });
-                                  }
-                                } else if (data.type === "reasoning" && typeof data.text === "string") {
-                                  reasoningContent = data.text;
-                                  pendingReasoning = reasoningContent;
-                                  if (!scheduled) {
-                                    scheduled = true;
-                                    requestAnimationFrame(() => {
-                                      const _reasoning = pendingReasoning;
-                                      const _text = pendingText || assistantContent;
-                                      scheduled = false;
-                                      setState((prev) => ({
-                                        ...prev,
-                                        columns: prev.columns.map((col) =>
-                                          col.id === columnId
-                                            ? {
-                                                ...col,
-                                                messages: col.messages.map((msg) =>
-                                                  msg.id === assistantMessage.id
-                                                    ? {
-                                                        ...msg,
-                                                        parts: buildAssistantParts(),
-                                                      }
-                                                    : msg,
-                                                ),
-                                              }
-                                            : col,
-                                        ),
-                                      }));
-                                    });
-                                  }
-                                } else if (data.type === "text-delta" && data.delta) {
-                                  assistantContent += data.delta;
-                                  pendingText = assistantContent;
-                                  if (!scheduled) {
-                                    scheduled = true;
-                                    requestAnimationFrame(() => {
-                                      const _text = pendingText;
-                                      const _reasoning = pendingReasoning || reasoningContent;
-                                      scheduled = false;
-                                      setState((prev) => ({
-                                        ...prev,
-                                        columns: prev.columns.map((col) =>
-                                          col.id === columnId
-                                            ? {
-                                                ...col,
-                                                messages: col.messages.map((msg) =>
-                                                  msg.id === assistantMessage.id
-                                                    ? {
-                                                        ...msg,
-                                                        content: assistantContent,
-                                                        parts: buildAssistantParts(),
-                                                      }
-                                                    : msg,
-                                                ),
-                                              }
-                                            : col,
-                                        ),
-                                      }));
-                                    });
-                                  }
-                                } else if (data.type === "text" && typeof data.text === "string") {
-                                  assistantContent = data.text;
-                                  pendingText = assistantContent;
-                                  if (!scheduled) {
-                                    scheduled = true;
-                                    requestAnimationFrame(() => {
-                                      const _text = pendingText;
-                                      const _reasoning = pendingReasoning || reasoningContent;
-                                      scheduled = false;
-                                      setState((prev) => ({
-                                        ...prev,
-                                        columns: prev.columns.map((col) =>
-                                          col.id === columnId
-                                            ? {
-                                                ...col,
-                                                messages: col.messages.map((msg) =>
-                                                  msg.id === assistantMessage.id
-                                                    ? {
-                                                        ...msg,
-                                                        content: assistantContent,
-                                                        parts: buildAssistantParts(),
-                                                      }
-                                                    : msg,
-                                                ),
-                                              }
-                                            : col,
-                                        ),
-                                      }));
-                                    });
-                                  }
-                                } else if (
-                                  typeof data.type === "string" &&
-                                  data.type.startsWith("tool")
-                                ) {
-                                  try {
-                                    // Push tool part as-is to preserve all fields; UI will render accordingly
-                                    toolParts.push(data as unknown as UIMessage["parts"][number]);
-                                  } catch {}
-                                  if (!scheduled) {
-                                    scheduled = true;
-                                    requestAnimationFrame(() => {
-                                      scheduled = false;
-                                      setState((prev) => ({
-                                        ...prev,
-                                        columns: prev.columns.map((col) =>
-                                          col.id === columnId
-                                            ? {
-                                                ...col,
-                                                messages: col.messages.map((msg) =>
-                                                  msg.id === assistantMessage.id
-                                                    ? {
-                                                        ...msg,
-                                                        parts: buildAssistantParts(),
-                                                      }
-                                                    : msg,
-                                                ),
-                                              }
-                                            : col,
-                                        ),
-                                      }));
-                                    });
-                                  }
-                                }
+								// Stream handling for UIMessageStream events
+								if (data.type === "step-start") {
+									// Initialize a reasoning part so UI can show Reasoning block early
+									if (!scheduled) {
+										scheduled = true;
+										requestAnimationFrame(() => {
+											scheduled = false;
+											setState((prev) => ({
+												...prev,
+												columns: prev.columns.map((col) =>
+													col.id === columnId
+														? {
+																...col,
+																messages: col.messages.map((msg) =>
+																	msg.id === assistantMessage.id
+																		? {
+																				...msg,
+																				parts: buildAssistantParts(),
+																			}
+																		: msg,
+																),
+															}
+														: col,
+												),
+											}));
+										});
+									}
+								} else if (data.type === "reasoning-delta" && data.delta) {
+									reasoningContent += data.delta;
+									pendingReasoning = reasoningContent;
+									if (!scheduled) {
+										scheduled = true;
+										requestAnimationFrame(() => {
+											const _reasoning = pendingReasoning;
+											const _text = pendingText || assistantContent;
+											scheduled = false;
+											setState((prev) => ({
+												...prev,
+												columns: prev.columns.map((col) =>
+													col.id === columnId
+														? {
+																...col,
+																messages: col.messages.map((msg) =>
+																	msg.id === assistantMessage.id
+																		? {
+																				...msg,
+																				parts: buildAssistantParts(),
+																			}
+																		: msg,
+																),
+															}
+														: col,
+												),
+											}));
+										});
+									}
+								} else if (
+									data.type === "reasoning" &&
+									typeof data.text === "string"
+								) {
+									reasoningContent = data.text;
+									pendingReasoning = reasoningContent;
+									if (!scheduled) {
+										scheduled = true;
+										requestAnimationFrame(() => {
+											const _reasoning = pendingReasoning;
+											const _text = pendingText || assistantContent;
+											scheduled = false;
+											setState((prev) => ({
+												...prev,
+												columns: prev.columns.map((col) =>
+													col.id === columnId
+														? {
+																...col,
+																messages: col.messages.map((msg) =>
+																	msg.id === assistantMessage.id
+																		? {
+																				...msg,
+																				parts: buildAssistantParts(),
+																			}
+																		: msg,
+																),
+															}
+														: col,
+												),
+											}));
+										});
+									}
+								} else if (data.type === "text-delta" && data.delta) {
+									assistantContent += data.delta;
+									pendingText = assistantContent;
+									if (!scheduled) {
+										scheduled = true;
+										requestAnimationFrame(() => {
+											const _text = pendingText;
+											const _reasoning = pendingReasoning || reasoningContent;
+											scheduled = false;
+											setState((prev) => ({
+												...prev,
+												columns: prev.columns.map((col) =>
+													col.id === columnId
+														? {
+																...col,
+																messages: col.messages.map((msg) =>
+																	msg.id === assistantMessage.id
+																		? {
+																				...msg,
+																				content: assistantContent,
+																				parts: buildAssistantParts(),
+																			}
+																		: msg,
+																),
+															}
+														: col,
+												),
+											}));
+										});
+									}
+								} else if (
+									data.type === "text" &&
+									typeof data.text === "string"
+								) {
+									assistantContent = data.text;
+									pendingText = assistantContent;
+									if (!scheduled) {
+										scheduled = true;
+										requestAnimationFrame(() => {
+											const _text = pendingText;
+											const _reasoning = pendingReasoning || reasoningContent;
+											scheduled = false;
+											setState((prev) => ({
+												...prev,
+												columns: prev.columns.map((col) =>
+													col.id === columnId
+														? {
+																...col,
+																messages: col.messages.map((msg) =>
+																	msg.id === assistantMessage.id
+																		? {
+																				...msg,
+																				content: assistantContent,
+																				parts: buildAssistantParts(),
+																			}
+																		: msg,
+																),
+															}
+														: col,
+												),
+											}));
+										});
+									}
+								} else if (
+									typeof data.type === "string" &&
+									data.type.startsWith("tool")
+								) {
+									try {
+										// Push tool part as-is to preserve all fields; UI will render accordingly
+										toolParts.push(
+											data as unknown as UIMessage["parts"][number],
+										);
+									} catch {}
+									if (!scheduled) {
+										scheduled = true;
+										requestAnimationFrame(() => {
+											scheduled = false;
+											setState((prev) => ({
+												...prev,
+												columns: prev.columns.map((col) =>
+													col.id === columnId
+														? {
+																...col,
+																messages: col.messages.map((msg) =>
+																	msg.id === assistantMessage.id
+																		? {
+																				...msg,
+																				parts: buildAssistantParts(),
+																			}
+																		: msg,
+																),
+															}
+														: col,
+												),
+											}));
+										});
+									}
+								}
 							} catch {
 								// Ignore parse errors
 							}
@@ -1051,7 +1099,7 @@ export function PlaygroundProvider({
 				}
 
 				// Final flush to ensure the latest content is committed
-                if (assistantContent || reasoningContent || toolParts.length > 0) {
+				if (assistantContent || reasoningContent || toolParts.length > 0) {
 					setState((prev) => {
 						const newState = {
 							...prev,
@@ -1059,15 +1107,15 @@ export function PlaygroundProvider({
 								col.id === columnId
 									? {
 											...col,
-                                            messages: col.messages.map((msg) =>
-                                              msg.id === assistantMessage.id
-                                                ? {
-                                                    ...msg,
-                                                    content: assistantContent,
-                                                    parts: buildAssistantParts(),
-                                                  }
-                                                : msg,
-                                            ),
+											messages: col.messages.map((msg) =>
+												msg.id === assistantMessage.id
+													? {
+															...msg,
+															content: assistantContent,
+															parts: buildAssistantParts(),
+														}
+													: msg,
+											),
 										}
 									: col,
 							),
@@ -1082,7 +1130,7 @@ export function PlaygroundProvider({
 
 				// Set streaming status to false when done
 				setColumnStreaming(columnId, false);
-        setColumnStatus(columnId, "ready");
+				setColumnStatus(columnId, "ready");
 				// Remove controller from tracking
 				try {
 					const setForCol = inFlightControllersRef.current.get(columnId);
@@ -1094,21 +1142,24 @@ export function PlaygroundProvider({
 				} catch {}
 
 				// Persist assistant message after stream completes
-                if (assistantContent) {
+				if (assistantContent) {
 					try {
 						const ts = Date.now();
-                        const dbMessage = {
+						const dbMessage = {
 							_id: `pmsg-${ts}-${Math.random()}`,
 							playgroundId: ensured.id,
 							columnId: column.id,
 							userId: currentUserId || "local_user",
 							role: "assistant",
-                            content: assistantContent,
+							content: assistantContent,
 							model: column.modelId,
 							createdAt: ts,
 							_creationTime: ts,
-                          gateway: column.gatewaySource === "aigateway" ? "vercel-ai-gateway" : "llm-gateway",
-                        } as DBPlaygroundMessage;
+							gateway:
+								column.gatewaySource === "aigateway"
+									? "vercel-ai-gateway"
+									: "llm-gateway",
+						} as DBPlaygroundMessage;
 						await db.playgroundMessages.put(dbMessage);
 					} catch {}
 				}
@@ -1116,14 +1167,17 @@ export function PlaygroundProvider({
 				if (user?.id && state.parentChatId && assistantContent) {
 					try {
 						// @ts-expect-error: using string ref until codegen includes playground endpoints
-                        await convex.mutation("playground:addPlaygroundMessage", {
+						await convex.mutation("playground:addPlaygroundMessage", {
 							playgroundId: state.parentChatId as unknown as string,
 							columnId: column.id,
 							userId: user.id,
 							role: "assistant",
-                            content: assistantContent,
+							content: assistantContent,
 							model: column.modelId,
-                          gateway: column.gatewaySource === "aigateway" ? "vercel-ai-gateway" : "llm-gateway",
+							gateway:
+								column.gatewaySource === "aigateway"
+									? "vercel-ai-gateway"
+									: "llm-gateway",
 						});
 					} catch {}
 				}
@@ -1139,7 +1193,7 @@ export function PlaygroundProvider({
 
 				// Set streaming status to false on error
 				setColumnStreaming(columnId, false);
-        setColumnStatus(columnId, "error");
+				setColumnStatus(columnId, "error");
 
 				// Add error message
 				const errorMessage: PlaygroundMessage = {
@@ -1172,12 +1226,12 @@ export function PlaygroundProvider({
 				});
 			}
 		},
-    [
+		[
 			state.columns,
 			getUserApiKeys,
 			updateColumn,
 			setColumnStreaming,
-      setColumnStatus,
+			setColumnStatus,
 			user?.id,
 			currentUserId,
 			ensurePlaygroundId,
@@ -1185,11 +1239,11 @@ export function PlaygroundProvider({
 			convex,
 			state.parentChatId,
 			state.createdAt,
-      pickConfigForModel,
-    ],
+			pickConfigForModel,
+		],
 	);
 
-  const sendToSyncedColumns = useCallback(
+	const sendToSyncedColumns = useCallback(
 		async (message: string) => {
 			const syncedColumns = state.columns.filter((col) => col.synced);
 
@@ -1205,18 +1259,18 @@ export function PlaygroundProvider({
 			// Set all synced columns to streaming
 			for (const column of syncedColumns) {
 				setColumnStreaming(column.id, true);
-        setColumnStatus(column.id, "submitted");
+				setColumnStatus(column.id, "submitted");
 			}
 
-      // On enter in any synced column, scroll all synced columns to bottom if needed
-      try {
-        for (const column of syncedColumns) {
-          const api = columnScrollApisRef.current.get(column.id);
-          if (api && !api.getIsAtBottom()) {
-            api.scrollToBottom();
-          }
-        }
-      } catch {}
+			// On enter in any synced column, scroll all synced columns to bottom if needed
+			try {
+				for (const column of syncedColumns) {
+					const api = columnScrollApisRef.current.get(column.id);
+					if (api && !api.getIsAtBottom()) {
+						api.scrollToBottom();
+					}
+				}
+			} catch {}
 
 			try {
 				const userApiKeys = await getUserApiKeys();
@@ -1293,7 +1347,7 @@ export function PlaygroundProvider({
 								new Set<AbortController>();
 							setForCol.add(controller);
 							inFlightControllersRef.current.set(column.id, setForCol);
-            const response = await fetch("/api/chat", {
+							const response = await fetch("/api/chat", {
 								method: "POST",
 								headers: {
 									"Content-Type": "application/json",
@@ -1301,10 +1355,13 @@ export function PlaygroundProvider({
 								body: JSON.stringify({
 									messages: messagesForAPI,
 									model: column.modelId,
-                                    temperature: column.config.temperature,
-                                    config: pickConfigForModel(column.modelId, column.config),
+									temperature: column.config.temperature,
+									config: pickConfigForModel(column.modelId, column.config),
 									userApiKeys,
-                gateway: column.gatewaySource === "aigateway" ? "vercel-ai-gateway" : "llm-gateway",
+									gateway:
+										column.gatewaySource === "aigateway"
+											? "vercel-ai-gateway"
+											: "llm-gateway",
 								}),
 								signal: controller.signal,
 							});
@@ -1316,17 +1373,17 @@ export function PlaygroundProvider({
 							// Handle streaming response
 							const reader = response.body?.getReader();
 							if (!reader) throw new Error("No reader available");
-            setColumnStatus(column.id, "streaming");
+							setColumnStatus(column.id, "streaming");
 
-                            const decoder = new TextDecoder();
-                            let assistantContent = "";
-                            let reasoningContent = "";
-                            let scheduled = false;
-                            let pendingText = "";
-                            let pendingReasoning = "";
+							const decoder = new TextDecoder();
+							let assistantContent = "";
+							let reasoningContent = "";
+							let scheduled = false;
+							let pendingText = "";
+							let pendingReasoning = "";
 
 							// Read stream
-                            while (true) {
+							while (true) {
 								const { done, value } = await reader.read();
 								if (done) break;
 
@@ -1334,101 +1391,111 @@ export function PlaygroundProvider({
 								const lines = chunk.split("\n");
 
 								for (const line of lines) {
-                                    if (line.startsWith("data: ")) {
+									if (line.startsWith("data: ")) {
 										try {
 											const jsonStr = line.slice(6);
 											if (jsonStr === "[DONE]") break;
 
 											const data = JSON.parse(jsonStr);
 
-                                            if (data.type === "step-start") {
-                                              if (!scheduled) {
-                                                scheduled = true;
-                                                requestAnimationFrame(() => {
-                                                  scheduled = false;
-                                                  setState((prev) => ({
-                                                    ...prev,
-                                                    columns: prev.columns.map((col) =>
-                                                      col.id === column.id
-                                                        ? {
-                                                            ...col,
-                                                            messages: col.messages.map((msg) =>
-                                                              msg.id === assistantMessage.id
-                                                                ? {
-                                                                    ...msg,
-                                                                    parts: createAssistantParts(
-                                                                      assistantContent,
-                                                                      reasoningContent,
-                                                                    ),
-                                                                  }
-                                                                : msg,
-                                                            ),
-                                                          }
-                                                        : col,
-                                                    ),
-                                                  }));
-                                                });
-                                              }
-                                            } else if (data.type === "reasoning-delta" && data.delta) {
-                                              reasoningContent += data.delta;
-                                              pendingReasoning = reasoningContent;
-                                              if (!scheduled) {
-                                                scheduled = true;
-                                                requestAnimationFrame(() => {
-                                                  const reasoning = pendingReasoning;
-                                                  const text = pendingText || assistantContent;
-                                                  scheduled = false;
-                                                  setState((prev) => ({
-                                                    ...prev,
-                                                    columns: prev.columns.map((col) =>
-                                                      col.id === column.id
-                                                        ? {
-                                                            ...col,
-                                                            messages: col.messages.map((msg) =>
-                                                              msg.id === assistantMessage.id
-                                                                ? {
-                                                                    ...msg,
-                                                                    parts: createAssistantParts(text, reasoning),
-                                                                  }
-                                                                : msg,
-                                                            ),
-                                                          }
-                                                        : col,
-                                                    ),
-                                                  }));
-                                                });
-                                              }
-                                            } else if (data.type === "text-delta" && data.delta) {
-                                              assistantContent += data.delta;
-                                              pendingText = assistantContent;
-                                              if (!scheduled) {
-                                                scheduled = true;
-                                                requestAnimationFrame(() => {
-                                                  const text = pendingText;
-                                                  const reasoning = pendingReasoning || reasoningContent;
-                                                  scheduled = false;
-                                                  setState((prev) => ({
-                                                    ...prev,
-                                                    columns: prev.columns.map((col) =>
-                                                      col.id === column.id
-                                                        ? {
-                                                            ...col,
-                                                            messages: col.messages.map((msg) =>
-                                                              msg.id === assistantMessage.id
-                                                                ? {
-                                                                    ...msg,
-                                                                    content: text,
-                                                                    parts: createAssistantParts(text, reasoning),
-                                                                  }
-                                                                : msg,
-                                                            ),
-                                                          }
-                                                        : col,
-                                                    ),
-                                                  }));
-                                                });
-                                              }
-                                            }
+											if (data.type === "step-start") {
+												if (!scheduled) {
+													scheduled = true;
+													requestAnimationFrame(() => {
+														scheduled = false;
+														setState((prev) => ({
+															...prev,
+															columns: prev.columns.map((col) =>
+																col.id === column.id
+																	? {
+																			...col,
+																			messages: col.messages.map((msg) =>
+																				msg.id === assistantMessage.id
+																					? {
+																							...msg,
+																							parts: createAssistantParts(
+																								assistantContent,
+																								reasoningContent,
+																							),
+																						}
+																					: msg,
+																			),
+																		}
+																	: col,
+															),
+														}));
+													});
+												}
+											} else if (
+												data.type === "reasoning-delta" &&
+												data.delta
+											) {
+												reasoningContent += data.delta;
+												pendingReasoning = reasoningContent;
+												if (!scheduled) {
+													scheduled = true;
+													requestAnimationFrame(() => {
+														const reasoning = pendingReasoning;
+														const text = pendingText || assistantContent;
+														scheduled = false;
+														setState((prev) => ({
+															...prev,
+															columns: prev.columns.map((col) =>
+																col.id === column.id
+																	? {
+																			...col,
+																			messages: col.messages.map((msg) =>
+																				msg.id === assistantMessage.id
+																					? {
+																							...msg,
+																							parts: createAssistantParts(
+																								text,
+																								reasoning,
+																							),
+																						}
+																					: msg,
+																			),
+																		}
+																	: col,
+															),
+														}));
+													});
+												}
+											} else if (data.type === "text-delta" && data.delta) {
+												assistantContent += data.delta;
+												pendingText = assistantContent;
+												if (!scheduled) {
+													scheduled = true;
+													requestAnimationFrame(() => {
+														const text = pendingText;
+														const reasoning =
+															pendingReasoning || reasoningContent;
+														scheduled = false;
+														setState((prev) => ({
+															...prev,
+															columns: prev.columns.map((col) =>
+																col.id === column.id
+																	? {
+																			...col,
+																			messages: col.messages.map((msg) =>
+																				msg.id === assistantMessage.id
+																					? {
+																							...msg,
+																							content: text,
+																							parts: createAssistantParts(
+																								text,
+																								reasoning,
+																							),
+																						}
+																					: msg,
+																			),
+																		}
+																	: col,
+															),
+														}));
+													});
+												}
+											}
 										} catch {
 											// Ignore parse errors
 										}
@@ -1437,7 +1504,7 @@ export function PlaygroundProvider({
 							}
 
 							// Final flush to ensure the latest content is committed
-                            if (assistantContent || reasoningContent) {
+							if (assistantContent || reasoningContent) {
 								setState((prev) => ({
 									...prev,
 									columns: prev.columns.map((col) =>
@@ -1448,11 +1515,11 @@ export function PlaygroundProvider({
 														msg.id === assistantMessage.id
 															? {
 																	...msg,
-                                                                    content: assistantContent,
-                                                                    parts: createAssistantParts(
-                                                                      assistantContent,
-                                                                      reasoningContent || undefined,
-                                                                    ),
+																	content: assistantContent,
+																	parts: createAssistantParts(
+																		assistantContent,
+																		reasoningContent || undefined,
+																	),
 																}
 															: msg,
 													),
@@ -1472,8 +1539,8 @@ export function PlaygroundProvider({
 								}
 							} catch {}
 
-            setColumnStatus(column.id, "ready");
-            return { columnId: column.id, success: true };
+							setColumnStatus(column.id, "ready");
+							return { columnId: column.id, success: true };
 						} catch (error) {
 							console.error(
 								`Failed to send message to column ${column.id}:`,
@@ -1509,8 +1576,8 @@ export function PlaygroundProvider({
 										: col,
 								),
 							}));
-            setColumnStreaming(column.id, false);
-            setColumnStatus(column.id, "error");
+							setColumnStreaming(column.id, false);
+							setColumnStatus(column.id, "error");
 
 							return { columnId: column.id, success: false, error };
 						}
@@ -1525,22 +1592,22 @@ export function PlaygroundProvider({
 					results,
 				);
 
-      // Set all synced columns streaming status to false and mark ready where appropriate
-      for (const column of syncedColumns) {
-        setColumnStreaming(column.id, false);
-      }
-      // Preserve any 'error' statuses; only transition submitted/streaming -> ready
-      setState((prev) => ({
-        ...prev,
-        columns: prev.columns.map((col) => {
-          if (!syncedColumns.find((c) => c.id === col.id)) return col;
-          if (col.status === "error") return col;
-          if (col.status === "submitted" || col.status === "streaming") {
-            return { ...col, status: "ready" as const };
-          }
-          return col;
-        }),
-      }));
+				// Set all synced columns streaming status to false and mark ready where appropriate
+				for (const column of syncedColumns) {
+					setColumnStreaming(column.id, false);
+				}
+				// Preserve any 'error' statuses; only transition submitted/streaming -> ready
+				setState((prev) => ({
+					...prev,
+					columns: prev.columns.map((col) => {
+						if (!syncedColumns.find((c) => c.id === col.id)) return col;
+						if (col.status === "error") return col;
+						if (col.status === "submitted" || col.status === "streaming") {
+							return { ...col, status: "ready" as const };
+						}
+						return col;
+					}),
+				}));
 
 				// Persist latest state so assistant messages are available after navigation
 				try {
@@ -1570,16 +1637,16 @@ export function PlaygroundProvider({
 				} catch {}
 			}
 		},
-    [
+		[
 			state.columns,
 			getUserApiKeys,
 			updateSharedInput,
 			setColumnStreaming,
 			ensurePlaygroundId,
 			router.replace,
-      pickConfigForModel,
-      setColumnStatus,
-        ],
+			pickConfigForModel,
+			setColumnStatus,
+		],
 	);
 
 	// Playground management
@@ -1615,8 +1682,8 @@ export function PlaygroundProvider({
 				columns: state.columns,
 				sharedInput: state.sharedInput,
 				playgroundId: state.currentPlaygroundId,
-        maxColumns,
-        setMaxColumns,
+				maxColumns,
+				setMaxColumns,
 
 				// Column management
 				addColumn,
@@ -1634,7 +1701,7 @@ export function PlaygroundProvider({
 				// Message sending
 				sendToColumn,
 				sendToSyncedColumns,
-      registerColumnScrollApi,
+				registerColumnScrollApi,
 
 				// Playground management
 				createNewPlayground,

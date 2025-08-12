@@ -95,13 +95,13 @@ export default async function ChangelogPage() {
 			{/* Timeline */}
 			<div className="mx-auto max-w-5xl px-6 pt-10 lg:px-10">
 				<div className="relative">
-					{sortedChangelogs.map((changelog, index) => {
+					{sortedChangelogs.map((changelog) => {
 						const date = new Date(changelog.date || changelog._sys.createdAt);
 						const formattedDate = formatDate(date);
 						const tags = changelog.tags?.items.map((tag) => tag._title) || [];
 
 						return (
-							<div key={index} className="relative">
+							<div key={changelog._sys.createdAt} className="relative">
 								<div className="flex flex-col gap-y-6 md:flex-row">
 									<div className="flex-shrink-0 md:w-48">
 										<div className="pb-10 md:sticky md:top-8">
@@ -161,7 +161,9 @@ export default async function ChangelogPage() {
 															blocks={changelog.content.json.blocks}
 															components={{
 																// Custom components matching your MDX setup
-																TweetComponent: (props: any) => {
+																TweetComponent: (props: {
+																	tweetId?: string | null;
+																}) => {
 																	const tweetId = props.tweetId;
 																	if (!tweetId) return null;
 																	return (
@@ -188,7 +190,9 @@ export default async function ChangelogPage() {
 																	);
 																},
 
-																YoutubeComponent: (props: any) => {
+																YoutubeComponent: (props: {
+																	youtubeId?: string | null;
+																}) => {
 																	const youtubeId = props.youtubeId;
 																	if (!youtubeId) return null;
 																	return (
@@ -208,11 +212,14 @@ export default async function ChangelogPage() {
 																	);
 																},
 
-																VideoComponent: (props: any) => {
+																VideoComponent: (props: {
+																	url?: string | null;
+																}) => {
 																	const url = props.url;
 																	if (!url) return null;
 																	return (
 																		<div className="my-6">
+																			{/* biome-ignore lint/a11y/useMediaCaption: No captions available for embedded video content */}
 																			<video
 																				className="w-full rounded-md border"
 																				controls
@@ -223,7 +230,10 @@ export default async function ChangelogPage() {
 																	);
 																},
 
-																ImageComponent: (props: any) => {
+																ImageComponent: (props: {
+																	url?: string | null;
+																	_title?: string | null;
+																}) => {
 																	const url = props.url;
 																	const title = props._title;
 																	if (!url) return null;
@@ -242,6 +252,7 @@ export default async function ChangelogPage() {
 														/>
 													) : changelog.content.markdown ? (
 														// Fallback markdown content
+														/* biome-ignore lint/security/noDangerouslySetInnerHtml: Content comes from Basehub and is trusted */
 														<div
 															dangerouslySetInnerHTML={{
 																__html: changelog.content.markdown,

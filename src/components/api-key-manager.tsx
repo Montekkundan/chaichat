@@ -22,7 +22,7 @@ export function ApiKeyManager() {
 	const { user } = useUser();
 	const isLoggedIn = !!user?.id;
 	const [llmGatewayKey, setLlmGatewayKey] = useState("");
-  const [aiGatewayKey, setAiGatewayKey] = useState("");
+	const [aiGatewayKey, setAiGatewayKey] = useState("");
 	const [showKey, setShowKey] = useState(false);
 	const [isLoading, setIsLoading] = useState(true);
 	const [useSessionStorage, setUseSessionStorage] = useState(false);
@@ -41,17 +41,17 @@ export function ApiKeyManager() {
 					if (convexKeys?.llmGatewayApiKey) {
 						setLlmGatewayKey(convexKeys.llmGatewayApiKey);
 					}
-          if (convexKeys?.aiGatewayApiKey) {
-            setAiGatewayKey(convexKeys.aiGatewayApiKey);
-          }
+					if (convexKeys?.aiGatewayApiKey) {
+						setAiGatewayKey(convexKeys.aiGatewayApiKey);
+					}
 				} else {
 					const localKeys = getAllKeys();
 					if (localKeys.llmGatewayApiKey) {
 						setLlmGatewayKey(localKeys.llmGatewayApiKey);
 					}
-          if (localKeys.aiGatewayApiKey) {
-            setAiGatewayKey(localKeys.aiGatewayApiKey);
-          }
+					if (localKeys.aiGatewayApiKey) {
+						setAiGatewayKey(localKeys.aiGatewayApiKey);
+					}
 				}
 			} catch (error) {
 				console.error("Failed to load existing key:", error);
@@ -66,7 +66,7 @@ export function ApiKeyManager() {
 	const handleRemoveKey = async () => {
 		try {
 			if (isLoggedIn) {
-        await removeKeyMutation({ provider: "llmgateway" });
+				await removeKeyMutation({ provider: "llmgateway" });
 			} else {
 				removeLocalKey("llmgateway");
 				removeSessionKey("llmgateway");
@@ -83,22 +83,22 @@ export function ApiKeyManager() {
 		}
 	};
 
-  const handleRemoveAiGatewayKey = async () => {
-    try {
-      if (isLoggedIn) {
-        await removeKeyMutation({ provider: "aigateway" });
-      } else {
-        removeLocalKey("aigateway");
-        removeSessionKey("aigateway");
-      }
-      setAiGatewayKey("");
-      toast.success("Vercel AI Gateway API key removed");
-      window.dispatchEvent(new CustomEvent("apiKeysChanged"));
-    } catch (error) {
-      console.error("Failed to remove AI Gateway API key:", error);
-      toast.error("Failed to remove AI Gateway API key");
-    }
-  };
+	const handleRemoveAiGatewayKey = async () => {
+		try {
+			if (isLoggedIn) {
+				await removeKeyMutation({ provider: "aigateway" });
+			} else {
+				removeLocalKey("aigateway");
+				removeSessionKey("aigateway");
+			}
+			setAiGatewayKey("");
+			toast.success("Vercel AI Gateway API key removed");
+			window.dispatchEvent(new CustomEvent("apiKeysChanged"));
+		} catch (error) {
+			console.error("Failed to remove AI Gateway API key:", error);
+			toast.error("Failed to remove AI Gateway API key");
+		}
+	};
 
 	const toggleKeyVisibility = () => {
 		setShowKey((prev) => !prev);
@@ -118,7 +118,7 @@ export function ApiKeyManager() {
 		try {
 			if (isLoggedIn) {
 				await storeKeyMutation({
-            provider: "llmgateway",
+					provider: "llmgateway",
 					apiKey: trimmedKey,
 				});
 			} else {
@@ -135,28 +135,28 @@ export function ApiKeyManager() {
 		}
 	};
 
-  const handleAiGatewayKeyChange = async (value: string) => {
-    setAiGatewayKey(value);
-    const trimmedKey = value.trim();
-    if (!trimmedKey) {
-      await handleRemoveAiGatewayKey();
-      return;
-    }
-    try {
-      if (isLoggedIn) {
-        await storeKeyMutation({ provider: "aigateway", apiKey: trimmedKey });
-      } else {
-        if (useSessionStorage) {
-          await setSessionKey("aigateway", trimmedKey);
-        } else {
-          await setLocalKey("aigateway", trimmedKey);
-        }
-      }
-      window.dispatchEvent(new CustomEvent("apiKeysChanged"));
-    } catch (error) {
-      console.error("Failed to save AI Gateway API key:", error);
-    }
-  };
+	const handleAiGatewayKeyChange = async (value: string) => {
+		setAiGatewayKey(value);
+		const trimmedKey = value.trim();
+		if (!trimmedKey) {
+			await handleRemoveAiGatewayKey();
+			return;
+		}
+		try {
+			if (isLoggedIn) {
+				await storeKeyMutation({ provider: "aigateway", apiKey: trimmedKey });
+			} else {
+				if (useSessionStorage) {
+					await setSessionKey("aigateway", trimmedKey);
+				} else {
+					await setLocalKey("aigateway", trimmedKey);
+				}
+			}
+			window.dispatchEvent(new CustomEvent("apiKeysChanged"));
+		} catch (error) {
+			console.error("Failed to save AI Gateway API key:", error);
+		}
+	};
 
 	if (isLoading) {
 		return (
@@ -170,7 +170,7 @@ export function ApiKeyManager() {
 
 	const hasKey = Boolean(llmGatewayKey);
 	const status = hasKey ? "Active" : "Missing";
-  const aiStatus = aiGatewayKey ? "Active" : "Missing";
+	const aiStatus = aiGatewayKey ? "Active" : "Missing";
 
 	return (
 		<div className="space-y-4">
@@ -286,82 +286,89 @@ export function ApiKeyManager() {
 				</p>
 			</div>
 
-      {/* Vercel AI Gateway Key Configuration */}
-      <div className="rounded-lg border bg-card p-4">
-        <div className="mb-3 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2">
-              <span className="font-medium">Vercel AI Gateway</span>
-              <Badge
-                className={cn(
-                  aiStatus === "Missing" && "bg-muted-foreground/60 text-primary-foreground",
-                  aiStatus === "Active" && "bg-green-600 text-white",
-                )}
-              >
-                {aiStatus}
-              </Badge>
-            </div>
-          </div>
-          <div className="flex gap-1">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-8 w-8 p-0"
-              onClick={() => window.open("https://vercel.com/docs/ai-gateway", "_blank")}
-              title="Docs"
-            >
-              <ExternalLink className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
+			{/* Vercel AI Gateway Key Configuration */}
+			<div className="rounded-lg border bg-card p-4">
+				<div className="mb-3 flex items-center justify-between">
+					<div className="flex items-center gap-3">
+						<div className="flex items-center gap-2">
+							<span className="font-medium">Vercel AI Gateway</span>
+							<Badge
+								className={cn(
+									aiStatus === "Missing" &&
+										"bg-muted-foreground/60 text-primary-foreground",
+									aiStatus === "Active" && "bg-green-600 text-white",
+								)}
+							>
+								{aiStatus}
+							</Badge>
+						</div>
+					</div>
+					<div className="flex gap-1">
+						<Button
+							variant="ghost"
+							size="sm"
+							className="h-8 w-8 p-0"
+							onClick={() =>
+								window.open("https://vercel.com/docs/ai-gateway", "_blank")
+							}
+							title="Docs"
+						>
+							<ExternalLink className="h-4 w-4" />
+						</Button>
+					</div>
+				</div>
 
-        <div className="flex items-center gap-2">
-          <div className="relative flex-1">
-            <Input
-              type={showKey ? "text" : "password"}
-              placeholder="Enter your Vercel AI Gateway API key"
-              value={aiGatewayKey}
-              onChange={(e) => handleAiGatewayKeyChange(e.target.value)}
-              className="pr-20 text-sm"
-            />
-            <div className="-translate-y-1/2 absolute top-1/2 right-2 flex gap-1">
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="h-6 w-6 p-0"
-                onClick={toggleKeyVisibility}
-                title={showKey ? "Hide key" : "Show key"}
-              >
-                {showKey ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
-              </Button>
-              {aiGatewayKey && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="h-6 px-2"
-                  onClick={handleRemoveAiGatewayKey}
-                >
-                  Remove
-                </Button>
-              )}
-            </div>
-          </div>
-        </div>
+				<div className="flex items-center gap-2">
+					<div className="relative flex-1">
+						<Input
+							type={showKey ? "text" : "password"}
+							placeholder="Enter your Vercel AI Gateway API key"
+							value={aiGatewayKey}
+							onChange={(e) => handleAiGatewayKeyChange(e.target.value)}
+							className="pr-20 text-sm"
+						/>
+						<div className="-translate-y-1/2 absolute top-1/2 right-2 flex gap-1">
+							<Button
+								type="button"
+								variant="ghost"
+								size="sm"
+								className="h-6 w-6 p-0"
+								onClick={toggleKeyVisibility}
+								title={showKey ? "Hide key" : "Show key"}
+							>
+								{showKey ? (
+									<EyeOff className="h-3 w-3" />
+								) : (
+									<Eye className="h-3 w-3" />
+								)}
+							</Button>
+							{aiGatewayKey && (
+								<Button
+									type="button"
+									variant="ghost"
+									size="sm"
+									className="h-6 px-2"
+									onClick={handleRemoveAiGatewayKey}
+								>
+									Remove
+								</Button>
+							)}
+						</div>
+					</div>
+				</div>
 
-        <p className="mt-2 text-muted-foreground text-xs">
-          See docs at {" "}
-          <a
-            href="https://vercel.com/docs/ai-gateway"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="underline hover:no-underline"
-          >
-            Vercel AI Gateway
-          </a>
-        </p>
-      </div>
+				<p className="mt-2 text-muted-foreground text-xs">
+					See docs at{" "}
+					<a
+						href="https://vercel.com/docs/ai-gateway"
+						target="_blank"
+						rel="noopener noreferrer"
+						className="underline hover:no-underline"
+					>
+						Vercel AI Gateway
+					</a>
+				</p>
+			</div>
 		</div>
 	);
 }

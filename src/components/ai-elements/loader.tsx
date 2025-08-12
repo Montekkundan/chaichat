@@ -6,16 +6,16 @@ type LoaderIconProps = {
 };
 
 const LoaderIcon = ({ size = 16 }: LoaderIconProps) => (
-    <svg
-        role="img"
-        aria-label="Loading"
-        height={size}
-        strokeLinejoin="round"
-        viewBox="0 0 16 16"
-        width={size}
-        style={{ color: "currentcolor" }}
-    >
-        <title>Loading</title>
+	<svg
+		role="img"
+		aria-label="Loading"
+		height={size}
+		strokeLinejoin="round"
+		viewBox="0 0 16 16"
+		width={size}
+		style={{ color: "currentcolor" }}
+	>
+		<title>Loading</title>
 		<g clipPath="url(#clip0_2393_1490)">
 			<path d="M8 0V4" stroke="currentColor" strokeWidth="1.5" />
 			<path

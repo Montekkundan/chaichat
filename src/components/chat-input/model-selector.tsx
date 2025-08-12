@@ -53,10 +53,10 @@ type ModelSelectorProps = {
 	setSelectedModelId: (modelId: string) => void;
 	className?: string;
 	isUserAuthenticated?: boolean;
-  // Optional controlled gateway source for per-instance usage (e.g., Playground columns)
-  source?: "aigateway" | "llmgateway";
-  // Notify parent when source toggles in controlled mode
-  onSourceChange?: (source: "aigateway" | "llmgateway") => void;
+	// Optional controlled gateway source for per-instance usage (e.g., Playground columns)
+	source?: "aigateway" | "llmgateway";
+	// Notify parent when source toggles in controlled mode
+	onSourceChange?: (source: "aigateway" | "llmgateway") => void;
 };
 
 import type { LLMGatewayModel } from "~/types/llmgateway";
@@ -68,17 +68,17 @@ export function ModelSelector({
 	setSelectedModelId,
 	className,
 	isUserAuthenticated: _isUserAuthenticated,
-  source,
-  onSourceChange,
+	source,
+	onSourceChange,
 }: ModelSelectorProps) {
 	const isControlled = typeof source === "string";
 	const { models, isLoading, error } = useLLMModels(
-    isControlled ? { source, controlled: true } : undefined,
-  );
+		isControlled ? { source, controlled: true } : undefined,
+	);
 	const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-    const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-    const [searchQuery, setSearchQuery] = useState("");
-    const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
+	const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+	const [searchQuery, setSearchQuery] = useState("");
+	const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
 	const [expandedModels, setExpandedModels] = useState<Set<string>>(new Set());
 	const [filters, setFilters] = useState({
 		streaming: false,
@@ -109,55 +109,61 @@ export function ModelSelector({
 		}
 	}, [isDropdownOpen, isMobile]);
 
-  useEffect(() => {
-    if (isControlled) {
-      setUseAiGateway(source === "aigateway");
-      return;
-    }
-    try {
-      const raw = window.localStorage.getItem("chaichat_models_source");
-      setUseAiGateway(raw === "aigateway");
-    } catch {}
-  }, [isControlled, source]);
+	useEffect(() => {
+		if (isControlled) {
+			setUseAiGateway(source === "aigateway");
+			return;
+		}
+		try {
+			const raw = window.localStorage.getItem("chaichat_models_source");
+			setUseAiGateway(raw === "aigateway");
+		} catch {}
+	}, [isControlled, source]);
 
-  // Keep local UI toggle state in sync with global source changes
-  useEffect(() => {
-    if (isControlled) return;
-    const syncFromStorage = () => {
-      try {
-        const raw = window.localStorage.getItem("chaichat_models_source");
-        setUseAiGateway(raw === "aigateway");
-      } catch {}
-    };
-    window.addEventListener("modelsSourceChanged", syncFromStorage as EventListener);
-    window.addEventListener("storage", syncFromStorage);
-    return () => {
-      window.removeEventListener("modelsSourceChanged", syncFromStorage as EventListener);
-      window.removeEventListener("storage", syncFromStorage);
-    };
-  }, [isControlled]);
+	// Keep local UI toggle state in sync with global source changes
+	useEffect(() => {
+		if (isControlled) return;
+		const syncFromStorage = () => {
+			try {
+				const raw = window.localStorage.getItem("chaichat_models_source");
+				setUseAiGateway(raw === "aigateway");
+			} catch {}
+		};
+		window.addEventListener(
+			"modelsSourceChanged",
+			syncFromStorage as EventListener,
+		);
+		window.addEventListener("storage", syncFromStorage);
+		return () => {
+			window.removeEventListener(
+				"modelsSourceChanged",
+				syncFromStorage as EventListener,
+			);
+			window.removeEventListener("storage", syncFromStorage);
+		};
+	}, [isControlled]);
 
-  // Setter that updates global source + notifies listeners, then syncs local state
-  const setModelsSource = useCallback(
-    (next: boolean) => {
-      if (isControlled) {
-        setUseAiGateway(next);
-        onSourceChange?.(next ? "aigateway" : "llmgateway");
-        return;
-      }
-      try {
-        window.localStorage.setItem(
-          "chaichat_models_source",
-          next ? "aigateway" : "llmgateway",
-        );
-        window.dispatchEvent(new CustomEvent("modelsSourceChanged"));
-        setUseAiGateway(next);
-      } catch {
-        setUseAiGateway(next);
-      }
-    },
-    [isControlled, onSourceChange],
-  );
+	// Setter that updates global source + notifies listeners, then syncs local state
+	const setModelsSource = useCallback(
+		(next: boolean) => {
+			if (isControlled) {
+				setUseAiGateway(next);
+				onSourceChange?.(next ? "aigateway" : "llmgateway");
+				return;
+			}
+			try {
+				window.localStorage.setItem(
+					"chaichat_models_source",
+					next ? "aigateway" : "llmgateway",
+				);
+				window.dispatchEvent(new CustomEvent("modelsSourceChanged"));
+				setUseAiGateway(next);
+			} catch {
+				setUseAiGateway(next);
+			}
+		},
+		[isControlled, onSourceChange],
+	);
 
 	useEffect(() => {
 		// Focus search input when the drawer opens on mobile
@@ -292,7 +298,9 @@ export function ModelSelector({
 			if (selectedProvider !== providerId) return false;
 			// Only show the provider selected state for the canonical selected model
 			if (canonicalSelectedKey !== `${model.id}::${model.name}`) return false;
-			const provider = model.providers?.find((p) => p.providerId === providerId);
+			const provider = model.providers?.find(
+				(p) => p.providerId === providerId,
+			);
 			return provider?.modelName === selectedModelName;
 		},
 		[selectedModelId, canonicalSelectedKey],
@@ -331,11 +339,11 @@ export function ModelSelector({
 		[isMobile, setSelectedModelId],
 	);
 
-    const filteredModels = useMemo(
+	const filteredModels = useMemo(
 		() =>
 			models
 				.filter((model) => {
-                    const query = debouncedSearchQuery.toLowerCase();
+					const query = debouncedSearchQuery.toLowerCase();
 					const textMatch =
 						model.name.toLowerCase().includes(query) ||
 						(model.family?.toLowerCase().includes(query) ?? false) ||
@@ -432,8 +440,8 @@ export function ModelSelector({
 					if (aProviders !== bProviders) return bProviders - aProviders;
 
 					return (b.context_length || 0) - (a.context_length || 0);
-                }),
-        [models, debouncedSearchQuery, filters],
+				}),
+		[models, debouncedSearchQuery, filters],
 	);
 
 	const formatPrice = useCallback((price: string | undefined) => {
@@ -445,14 +453,21 @@ export function ModelSelector({
 		return `$${num.toFixed(2)}`;
 	}, []);
 
-  // Helper to safely read dynamic pricing keys that may differ across sources
-  const readDynamicPrice = useCallback((obj: unknown, key: string): string | undefined => {
-    if (obj && typeof obj === "object" && key in (obj as Record<string, unknown>)) {
-      const val = (obj as Record<string, unknown>)[key];
-      return typeof val === "string" ? val : undefined;
-    }
-    return undefined;
-  }, []);
+	// Helper to safely read dynamic pricing keys that may differ across sources
+	const readDynamicPrice = useCallback(
+		(obj: unknown, key: string): string | undefined => {
+			if (
+				obj &&
+				typeof obj === "object" &&
+				key in (obj as Record<string, unknown>)
+			) {
+				const val = (obj as Record<string, unknown>)[key];
+				return typeof val === "string" ? val : undefined;
+			}
+			return undefined;
+		},
+		[],
+	);
 
 	const getStatusText = useCallback((model: LLMGatewayModel) => {
 		if (!model) return "Unknown";
@@ -497,191 +512,232 @@ export function ModelSelector({
 		[],
 	);
 
-  useEffect(() => {
-    const id = window.setTimeout(() => setDebouncedSearchQuery(searchQuery), 150);
-    return () => window.clearTimeout(id);
-  }, [searchQuery]);
+	useEffect(() => {
+		const id = window.setTimeout(
+			() => setDebouncedSearchQuery(searchQuery),
+			150,
+		);
+		return () => window.clearTimeout(id);
+	}, [searchQuery]);
 
-    const renderModelTooltip = useCallback(
-        (model: LLMGatewayModel) => {
-            // For AI Gateway: show name + description only
-            if (useAiGateway) {
-                return (
-                    <div className="w-80 space-y-0 bg-popover text-popover-foreground">
-                        <div className="p-4 pb-3">
-                            <div className="min-w-0">
-                                <div className="font-semibold text-foreground text-sm">{model.name}</div>
-                                <div className="mt-1 text-muted-foreground text-xs leading-relaxed">
-                                    {model.description || "No description available"}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                );
-            }
+	const renderModelTooltip = useCallback(
+		(model: LLMGatewayModel) => {
+			// For AI Gateway: show name + description only
+			if (useAiGateway) {
+				return (
+					<div className="w-80 space-y-0 bg-popover text-popover-foreground">
+						<div className="p-4 pb-3">
+							<div className="min-w-0">
+								<div className="font-semibold text-foreground text-sm">
+									{model.name}
+								</div>
+								<div className="mt-1 text-muted-foreground text-xs leading-relaxed">
+									{model.description || "No description available"}
+								</div>
+							</div>
+						</div>
+					</div>
+				);
+			}
 
-            // For LLM Gateway: full details
-            return (
-                <div className="w-80 space-y-0 bg-popover text-popover-foreground">
-                    <div className="p-4 pb-3">
-                        <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0 flex-1">
-                                <div className="font-semibold text-foreground text-sm">{model.name}</div>
-                                <div className="mt-1 text-muted-foreground text-xs leading-relaxed">
-                                    {model.description || "No description available"}
-                                </div>
-                            </div>
-                            <span
-                                className={cn(
-                                    "flex-shrink-0 rounded-full px-2 py-1 font-medium text-xs",
-                                    model.deactivated_at
-                                        ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300"
-                                        : model.deprecated_at
-                                            ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300"
-                                            : "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300",
-                                )}
-                            >
-                                {getStatusText(model)}
-                            </span>
-                        </div>
-                    </div>
+			// For LLM Gateway: full details
+			return (
+				<div className="w-80 space-y-0 bg-popover text-popover-foreground">
+					<div className="p-4 pb-3">
+						<div className="flex items-start justify-between gap-3">
+							<div className="min-w-0 flex-1">
+								<div className="font-semibold text-foreground text-sm">
+									{model.name}
+								</div>
+								<div className="mt-1 text-muted-foreground text-xs leading-relaxed">
+									{model.description || "No description available"}
+								</div>
+							</div>
+							<span
+								className={cn(
+									"flex-shrink-0 rounded-full px-2 py-1 font-medium text-xs",
+									model.deactivated_at
+										? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300"
+										: model.deprecated_at
+											? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300"
+											: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300",
+								)}
+							>
+								{getStatusText(model)}
+							</span>
+						</div>
+					</div>
 
-                    <Separator />
+					<Separator />
 
-                    <div className="p-4 py-3">
-                        <div className="grid grid-cols-2 gap-4 text-xs">
-                            <div>
-                                <div className="mb-2 font-medium text-foreground">Architecture</div>
-                                <div className="space-y-1.5 text-muted-foreground">
-                                    <div>
-                                        <span className="font-medium">Input:</span>{" "}
-                                        {model.architecture?.input_modalities?.join(", ") || "text"}
-                                    </div>
-                                    <div>
-                                        <span className="font-medium">Output:</span>{" "}
-                                        {model.architecture?.output_modalities?.join(", ") || "text"}
-                                    </div>
-                                    <div>
-                                        <span className="font-medium">Tokenizer:</span>{" "}
-                                        {model.architecture?.tokenizer || "GPT"}
-                                    </div>
-                                </div>
-                            </div>
+					<div className="p-4 py-3">
+						<div className="grid grid-cols-2 gap-4 text-xs">
+							<div>
+								<div className="mb-2 font-medium text-foreground">
+									Architecture
+								</div>
+								<div className="space-y-1.5 text-muted-foreground">
+									<div>
+										<span className="font-medium">Input:</span>{" "}
+										{model.architecture?.input_modalities?.join(", ") || "text"}
+									</div>
+									<div>
+										<span className="font-medium">Output:</span>{" "}
+										{model.architecture?.output_modalities?.join(", ") ||
+											"text"}
+									</div>
+									<div>
+										<span className="font-medium">Tokenizer:</span>{" "}
+										{model.architecture?.tokenizer || "GPT"}
+									</div>
+								</div>
+							</div>
 
-                            <div>
-                                <div className="mb-2 font-medium text-foreground">Features</div>
-                                <div className="space-y-1.5">
-                                    <div className="flex items-center gap-2 text-muted-foreground">
-                                        {model.providers?.[0]?.streaming ? (
-                                            <CheckCircle className="size-3 flex-shrink-0 text-green-500" />
-                                        ) : (
-                                            <XCircle className="size-3 flex-shrink-0 text-red-500" />
-                                        )}
-                                        <span>Streaming</span>
-                                    </div>
-                                    <div className="flex items-center gap-2 text-muted-foreground">
-                                        {model.providers?.[0]?.vision ? (
-                                            <CheckCircle className="size-3 flex-shrink-0 text-green-500" />
-                                        ) : (
-                                            <XCircle className="size-3 flex-shrink-0 text-red-500" />
-                                        )}
-                                        <span>Vision</span>
-                                    </div>
-                                    <div className="flex items-center gap-2 text-muted-foreground">
-                                        {model.providers?.[0]?.tools ? (
-                                            <CheckCircle className="size-3 flex-shrink-0 text-green-500" />
-                                        ) : (
-                                            <XCircle className="size-3 flex-shrink-0 text-red-500" />
-                                        )}
-                                        <span>Function Calling</span>
-                                    </div>
-                                    <div className="flex items-center gap-2 text-muted-foreground">
-                                        {model.json_output ? (
-                                            <CheckCircle className="size-3 flex-shrink-0 text-green-500" />
-                                        ) : (
-                                            <XCircle className="size-3 flex-shrink-0 text-red-500" />
-                                        )}
-                                        <span>JSON Output</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+							<div>
+								<div className="mb-2 font-medium text-foreground">Features</div>
+								<div className="space-y-1.5">
+									<div className="flex items-center gap-2 text-muted-foreground">
+										{model.providers?.[0]?.streaming ? (
+											<CheckCircle className="size-3 flex-shrink-0 text-green-500" />
+										) : (
+											<XCircle className="size-3 flex-shrink-0 text-red-500" />
+										)}
+										<span>Streaming</span>
+									</div>
+									<div className="flex items-center gap-2 text-muted-foreground">
+										{model.providers?.[0]?.vision ? (
+											<CheckCircle className="size-3 flex-shrink-0 text-green-500" />
+										) : (
+											<XCircle className="size-3 flex-shrink-0 text-red-500" />
+										)}
+										<span>Vision</span>
+									</div>
+									<div className="flex items-center gap-2 text-muted-foreground">
+										{model.providers?.[0]?.tools ? (
+											<CheckCircle className="size-3 flex-shrink-0 text-green-500" />
+										) : (
+											<XCircle className="size-3 flex-shrink-0 text-red-500" />
+										)}
+										<span>Function Calling</span>
+									</div>
+									<div className="flex items-center gap-2 text-muted-foreground">
+										{model.json_output ? (
+											<CheckCircle className="size-3 flex-shrink-0 text-green-500" />
+										) : (
+											<XCircle className="size-3 flex-shrink-0 text-red-500" />
+										)}
+										<span>JSON Output</span>
+									</div>
+								</div>
+							</div>
+						</div>
+					</div>
 
-                    {model.providers && model.providers.length > 0 && (
-                        <div className="p-4 py-3">
-                            <div className="mb-3 font-medium text-foreground text-xs">Available Providers ({model.providers.length})</div>
-                            <div className="space-y-2">
-                                {model.providers.slice(0, 3).map((provider) => (
-                                    <button
-                                        key={`${provider.providerId}-${provider.modelName}`}
-                                        type="button"
-                                        className={cn(
-                                            "cursor-pointer rounded-md bg-muted/50 px-3 py-2 text-xs transition-colors hover:bg-muted",
-                                            isProviderSelected(model, provider.providerId) && "bg-primary/10 ring-2 ring-primary",
-                                        )}
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleModelSelect(model, provider.providerId);
-                                        }}
-                                    >
-                                        <div className="font-medium text-foreground">{provider.providerId}</div>
-                                        <div className="mt-0.5 text-muted-foreground">
-                                            {formatPrice(provider.pricing?.prompt || readDynamicPrice(provider.pricing, "input") || "0")}/1K tokens
-                                        </div>
-                                    </button>
-                                ))}
-                                {model.providers.length > 3 && (
-                                    <div className="pl-3 text-muted-foreground text-xs">+{model.providers.length - 3} more providers (click model to see all)</div>
-                                )}
-                            </div>
-                        </div>
-                    )}
+					{model.providers && model.providers.length > 0 && (
+						<div className="p-4 py-3">
+							<div className="mb-3 font-medium text-foreground text-xs">
+								Available Providers ({model.providers.length})
+							</div>
+							<div className="space-y-2">
+								{model.providers.slice(0, 3).map((provider) => (
+									<button
+										key={`${provider.providerId}-${provider.modelName}`}
+										type="button"
+										className={cn(
+											"cursor-pointer rounded-md bg-muted/50 px-3 py-2 text-xs transition-colors hover:bg-muted",
+											isProviderSelected(model, provider.providerId) &&
+												"bg-primary/10 ring-2 ring-primary",
+										)}
+										onClick={(e) => {
+											e.stopPropagation();
+											handleModelSelect(model, provider.providerId);
+										}}
+									>
+										<div className="font-medium text-foreground">
+											{provider.providerId}
+										</div>
+										<div className="mt-0.5 text-muted-foreground">
+											{formatPrice(
+												provider.pricing?.prompt ||
+													readDynamicPrice(provider.pricing, "input") ||
+													"0",
+											)}
+											/1K tokens
+										</div>
+									</button>
+								))}
+								{model.providers.length > 3 && (
+									<div className="pl-3 text-muted-foreground text-xs">
+										+{model.providers.length - 3} more providers (click model to
+										see all)
+									</div>
+								)}
+							</div>
+						</div>
+					)}
 
-                    {model.supported_parameters && model.supported_parameters.length > 0 && (
-                        <>
-                            <Separator />
-                            <div className="p-4 py-3">
-                                <div className="mb-3 font-medium text-foreground text-xs">Supported Parameters</div>
-                                <div className="flex flex-wrap gap-1.5">
-                                    {model.supported_parameters.slice(0, 8).map((param) => (
-                                        <Badge key={param} variant="outline" className="h-5 px-2 text-xs">{param}</Badge>
-                                    ))}
-                                    {model.supported_parameters.length > 8 && (
-                                        <Badge variant="outline" className="h-5 px-2 text-xs">+{model.supported_parameters.length - 8}</Badge>
-                                    )}
-                                </div>
-                            </div>
-                        </>
-                    )}
+					{model.supported_parameters &&
+						model.supported_parameters.length > 0 && (
+							<>
+								<Separator />
+								<div className="p-4 py-3">
+									<div className="mb-3 font-medium text-foreground text-xs">
+										Supported Parameters
+									</div>
+									<div className="flex flex-wrap gap-1.5">
+										{model.supported_parameters.slice(0, 8).map((param) => (
+											<Badge
+												key={param}
+												variant="outline"
+												className="h-5 px-2 text-xs"
+											>
+												{param}
+											</Badge>
+										))}
+										{model.supported_parameters.length > 8 && (
+											<Badge variant="outline" className="h-5 px-2 text-xs">
+												+{model.supported_parameters.length - 8}
+											</Badge>
+										)}
+									</div>
+								</div>
+							</>
+						)}
 
-                    {(model.deprecated_at || model.deactivated_at) && (
-                        <>
-                            <Separator />
-                            <div className="p-4 py-3">
-                                <div
-                                    className={cn(
-                                        "flex items-center gap-2 rounded-md p-2 text-xs",
-                                        model.deactivated_at
-                                            ? "border border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-300"
-                                            : "border border-yellow-200 bg-yellow-50 text-yellow-700 dark:border-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-300",
-                                    )}
-                                >
-                                    <Info className="size-3 flex-shrink-0" />
-                                    <span>
-                                        {model.deactivated_at
-                                            ? "This model has been deactivated and is no longer available."
-                                            : "This model is deprecated and may be removed in the future."}
-                                    </span>
-                                </div>
-                            </div>
-                        </>
-                    )}
-                </div>
-            );
-        },
-        [useAiGateway, getStatusText, isProviderSelected, handleModelSelect, formatPrice, readDynamicPrice],
-    );
+					{(model.deprecated_at || model.deactivated_at) && (
+						<>
+							<Separator />
+							<div className="p-4 py-3">
+								<div
+									className={cn(
+										"flex items-center gap-2 rounded-md p-2 text-xs",
+										model.deactivated_at
+											? "border border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-300"
+											: "border border-yellow-200 bg-yellow-50 text-yellow-700 dark:border-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-300",
+									)}
+								>
+									<Info className="size-3 flex-shrink-0" />
+									<span>
+										{model.deactivated_at
+											? "This model has been deactivated and is no longer available."
+											: "This model is deprecated and may be removed in the future."}
+									</span>
+								</div>
+							</div>
+						</>
+					)}
+				</div>
+			);
+		},
+		[
+			useAiGateway,
+			getStatusText,
+			isProviderSelected,
+			handleModelSelect,
+			formatPrice,
+			readDynamicPrice,
+		],
+	);
 
 	const duplicateModelIdsRef = useRef<Set<string>>(new Set());
 
@@ -710,7 +766,7 @@ export function ModelSelector({
 									className={cn(
 										"flex w-full flex-1 cursor-pointer items-center justify-between rounded-md px-3 py-2 transition-colors hover:bg-accent",
 										isModelSelected(model) &&
-										"border border-primary/30 bg-accent",
+											"border border-primary/30 bg-accent",
 										model.deactivated_at && "opacity-60",
 									)}
 									onClick={() => handleModelSelect(model)}
@@ -759,7 +815,7 @@ export function ModelSelector({
 												className={cn(
 													"flex cursor-pointer items-center justify-between rounded px-2 py-1 text-xs transition-colors hover:bg-accent/50",
 													isProviderSelected(model, provider.providerId) &&
-													"bg-accent/70 ring-1 ring-primary/50",
+														"bg-accent/70 ring-1 ring-primary/50",
 												)}
 												onClick={(e) => {
 													e.stopPropagation();
@@ -769,8 +825,13 @@ export function ModelSelector({
 												<span className="font-medium">
 													{provider.providerId}
 												</span>
-                                                <span className="text-muted-foreground">
-                                                    {formatPrice(provider.pricing?.prompt || readDynamicPrice(provider.pricing, "input") || "0")}/1K
+												<span className="text-muted-foreground">
+													{formatPrice(
+														provider.pricing?.prompt ||
+															readDynamicPrice(provider.pricing, "input") ||
+															"0",
+													)}
+													/1K
 												</span>
 											</button>
 										))}
@@ -787,7 +848,7 @@ export function ModelSelector({
 				</Tooltip>
 			</TooltipProvider>
 		),
-        [
+		[
 			isModelSelected,
 			handleModelSelect,
 			formatPrice,
@@ -795,11 +856,11 @@ export function ModelSelector({
 			toggleModelExpanded,
 			isProviderSelected,
 			renderModelTooltip,
-            readDynamicPrice,
-        ],
+			readDynamicPrice,
+		],
 	);
 
-// no-op label removed
+	// no-op label removed
 
 	const trigger = useMemo(
 		() => (
@@ -813,18 +874,18 @@ export function ModelSelector({
 		[className, getDisplayText],
 	);
 
-    if (isLoading && !isDropdownOpen && !isDrawerOpen) {
-        return (
-            <Button
-                variant="outline"
-                className={cn("justify-between", className)}
-                disabled
-            >
-                <span>Loading models...</span>
-                <CaretDown className="size-4 opacity-50" />
-            </Button>
-        );
-    }
+	if (isLoading && !isDropdownOpen && !isDrawerOpen) {
+		return (
+			<Button
+				variant="outline"
+				className={cn("justify-between", className)}
+				disabled
+			>
+				<span>Loading models...</span>
+				<CaretDown className="size-4 opacity-50" />
+			</Button>
+		);
+	}
 
 	if (error) {
 		return (
@@ -857,18 +918,18 @@ export function ModelSelector({
 							<DrawerTitle>Select Model</DrawerTitle>
 						</DrawerHeader>
 						<div className="px-4 pb-2">
-						<div className="relative">
+							<div className="relative">
 								<MagnifyingGlass className="absolute top-2.5 left-2.5 h-4 w-4 text-muted-foreground" />
 								<Input
 									ref={searchInputRef}
 									placeholder={`Search ${filteredModels.length} models...`}
-								className="pl-8 pr-10"
+									className="pr-10 pl-8"
 									autoFocus
 									value={searchQuery}
 									onChange={handleSearchChange}
 									onClick={(e) => e.stopPropagation()}
 								/>
-								<div className="absolute -top-9 right-0 flex items-center gap-2 text-xs">
+								<div className="-top-9 absolute right-0 flex items-center gap-2 text-xs">
 									<span className="text-muted-foreground">AI Gateway</span>
 									<Switch
 										checked={useAiGateway}
@@ -876,175 +937,175 @@ export function ModelSelector({
 										aria-label="Toggle AI Gateway models"
 									/>
 								</div>
-                            </div>
-                                {!useAiGateway && (
-                                    <Popover>
-                                        <PopoverTrigger asChild>
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                type="button"
-                                                aria-label="Open filters"
-                                                className="absolute right-1.5 top-1.5 h-7 w-7 p-0 hover:bg-accent/50"
-                                            >
-                                                <SlidersHorizontal className="h-4 w-4" />
-                                            </Button>
-                                        </PopoverTrigger>
-                                        <PopoverContent align="end" className="w-80 space-y-3 p-3">
-                                            <div className="grid grid-cols-2 gap-3">
-                                                <div className="flex items-center justify-between gap-2">
-                                                    <Label htmlFor="f-streaming" className="text-xs">
-                                                        Streaming
-                                                    </Label>
-                                                    <Switch
-                                                        id="f-streaming"
-                                                        checked={filters.streaming}
-                                                        onCheckedChange={(v) =>
-                                                            setFilters((p) => ({ ...p, streaming: v }))
-                                                        }
-                                                    />
-                                                </div>
-                                                <div className="flex items-center justify-between gap-2">
-                                                    <Label htmlFor="f-vision" className="text-xs">
-                                                        Vision
-                                                    </Label>
-                                                    <Switch
-                                                        id="f-vision"
-                                                        checked={filters.vision}
-                                                        onCheckedChange={(v) =>
-                                                            setFilters((p) => ({ ...p, vision: v }))
-                                                        }
-                                                    />
-                                                </div>
-                                                <div className="flex items-center justify-between gap-2">
-                                                    <Label htmlFor="f-tools" className="text-xs">
-                                                        Tools
-                                                    </Label>
-                                                    <Switch
-                                                        id="f-tools"
-                                                        checked={filters.tools}
-                                                        onCheckedChange={(v) =>
-                                                            setFilters((p) => ({ ...p, tools: v }))
-                                                        }
-                                                    />
-                                                </div>
-                                                <div className="flex items-center justify-between gap-2">
-                                                    <Label htmlFor="f-json" className="text-xs">
-                                                        JSON Output
-                                                    </Label>
-                                                    <Switch
-                                                        id="f-json"
-                                                        checked={filters.jsonOutput}
-                                                        onCheckedChange={(v) =>
-                                                            setFilters((p) => ({ ...p, jsonOutput: v }))
-                                                        }
-                                                    />
-                                                </div>
-                                            </div>
-                                            <div className="grid grid-cols-2 gap-3">
-                                                <div>
-                                                    <Label htmlFor="f-provider" className="text-xs">
-                                                        Provider
-                                                    </Label>
-                                                    <Input
-                                                        id="f-provider"
-                                                        placeholder="e.g. openai"
-                                                        value={String(filters.providerQuery)}
-                                                        onChange={(e) =>
-                                                            setFilters((p) => ({
-                                                                ...p,
-                                                                providerQuery: e.target.value,
-                                                            }))
-                                                        }
-                                                        className="h-8"
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <Label htmlFor="f-minctx" className="text-xs">
-                                                        Min context
-                                                    </Label>
-                                                    <Input
-                                                        id="f-minctx"
-                                                        type="number"
-                                                        min={0}
-                                                        value={String(filters.minContext)}
-                                                        onChange={(e) =>
-                                                            setFilters((p) => ({
-                                                                ...p,
-                                                                minContext: e.target.value,
-                                                            }))
-                                                        }
-                                                        className="h-8"
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <Label htmlFor="f-maxprice" className="text-xs">
-                                                        Max prompt $/1K
-                                                    </Label>
-                                                    <Input
-                                                        id="f-maxprice"
-                                                        type="number"
-                                                        min={0}
-                                                        step="0.0001"
-                                                        value={String(filters.maxPromptPrice)}
-                                                        onChange={(e) =>
-                                                            setFilters((p) => ({
-                                                                ...p,
-                                                                maxPromptPrice: e.target.value,
-                                                            }))
-                                                        }
-                                                        className="h-8"
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <Label htmlFor="f-status" className="text-xs">
-                                                        Status
-                                                    </Label>
-                                                    <select
-                                                        id="f-status"
-                                                        className="h-8 w-full rounded-md border bg-background px-2 text-sm"
-                                                        value={filters.status}
-                                                        onChange={(e) =>
-                                                            setFilters((p) => ({
-                                                                ...p,
-                                                                status: e.target.value as ModelStatusFilter,
-                                                            }))
-                                                        }
-                                                    >
-                                                        <option value="any">Any</option>
-                                                        <option value="active">Active</option>
-                                                        <option value="deprecated">Deprecated</option>
-                                                        <option value="deactivated">Deactivated</option>
-                                                    </select>
-                                                </div>
-                                            </div>
-                                            <div className="flex items-center justify-between">
-                                                <Button
-                                                    type="button"
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    onClick={() =>
-                                                        setFilters({
-                                                            streaming: false,
-                                                            vision: false,
-                                                            tools: false,
-                                                            jsonOutput: false,
-                                                            moderatedMode: "any",
-                                                            status: "any",
-                                                            providerQuery: "",
-                                                            minContext: "",
-                                                            maxPromptPrice: "",
-                                                        })
-                                                    }
-                                                >
-                                                    Reset
-                                                </Button>
-                                            </div>
-                                        </PopoverContent>
-                                    </Popover>
-                                )}
-                            </div>
-                        <div className="flex h-full flex-col space-y-0.5 overflow-y-auto px-4 pb-6">
+							</div>
+							{!useAiGateway && (
+								<Popover>
+									<PopoverTrigger asChild>
+										<Button
+											variant="ghost"
+											size="sm"
+											type="button"
+											aria-label="Open filters"
+											className="absolute top-1.5 right-1.5 h-7 w-7 p-0 hover:bg-accent/50"
+										>
+											<SlidersHorizontal className="h-4 w-4" />
+										</Button>
+									</PopoverTrigger>
+									<PopoverContent align="end" className="w-80 space-y-3 p-3">
+										<div className="grid grid-cols-2 gap-3">
+											<div className="flex items-center justify-between gap-2">
+												<Label htmlFor="f-streaming" className="text-xs">
+													Streaming
+												</Label>
+												<Switch
+													id="f-streaming"
+													checked={filters.streaming}
+													onCheckedChange={(v) =>
+														setFilters((p) => ({ ...p, streaming: v }))
+													}
+												/>
+											</div>
+											<div className="flex items-center justify-between gap-2">
+												<Label htmlFor="f-vision" className="text-xs">
+													Vision
+												</Label>
+												<Switch
+													id="f-vision"
+													checked={filters.vision}
+													onCheckedChange={(v) =>
+														setFilters((p) => ({ ...p, vision: v }))
+													}
+												/>
+											</div>
+											<div className="flex items-center justify-between gap-2">
+												<Label htmlFor="f-tools" className="text-xs">
+													Tools
+												</Label>
+												<Switch
+													id="f-tools"
+													checked={filters.tools}
+													onCheckedChange={(v) =>
+														setFilters((p) => ({ ...p, tools: v }))
+													}
+												/>
+											</div>
+											<div className="flex items-center justify-between gap-2">
+												<Label htmlFor="f-json" className="text-xs">
+													JSON Output
+												</Label>
+												<Switch
+													id="f-json"
+													checked={filters.jsonOutput}
+													onCheckedChange={(v) =>
+														setFilters((p) => ({ ...p, jsonOutput: v }))
+													}
+												/>
+											</div>
+										</div>
+										<div className="grid grid-cols-2 gap-3">
+											<div>
+												<Label htmlFor="f-provider" className="text-xs">
+													Provider
+												</Label>
+												<Input
+													id="f-provider"
+													placeholder="e.g. openai"
+													value={String(filters.providerQuery)}
+													onChange={(e) =>
+														setFilters((p) => ({
+															...p,
+															providerQuery: e.target.value,
+														}))
+													}
+													className="h-8"
+												/>
+											</div>
+											<div>
+												<Label htmlFor="f-minctx" className="text-xs">
+													Min context
+												</Label>
+												<Input
+													id="f-minctx"
+													type="number"
+													min={0}
+													value={String(filters.minContext)}
+													onChange={(e) =>
+														setFilters((p) => ({
+															...p,
+															minContext: e.target.value,
+														}))
+													}
+													className="h-8"
+												/>
+											</div>
+											<div>
+												<Label htmlFor="f-maxprice" className="text-xs">
+													Max prompt $/1K
+												</Label>
+												<Input
+													id="f-maxprice"
+													type="number"
+													min={0}
+													step="0.0001"
+													value={String(filters.maxPromptPrice)}
+													onChange={(e) =>
+														setFilters((p) => ({
+															...p,
+															maxPromptPrice: e.target.value,
+														}))
+													}
+													className="h-8"
+												/>
+											</div>
+											<div>
+												<Label htmlFor="f-status" className="text-xs">
+													Status
+												</Label>
+												<select
+													id="f-status"
+													className="h-8 w-full rounded-md border bg-background px-2 text-sm"
+													value={filters.status}
+													onChange={(e) =>
+														setFilters((p) => ({
+															...p,
+															status: e.target.value as ModelStatusFilter,
+														}))
+													}
+												>
+													<option value="any">Any</option>
+													<option value="active">Active</option>
+													<option value="deprecated">Deprecated</option>
+													<option value="deactivated">Deactivated</option>
+												</select>
+											</div>
+										</div>
+										<div className="flex items-center justify-between">
+											<Button
+												type="button"
+												variant="ghost"
+												size="sm"
+												onClick={() =>
+													setFilters({
+														streaming: false,
+														vision: false,
+														tools: false,
+														jsonOutput: false,
+														moderatedMode: "any",
+														status: "any",
+														providerQuery: "",
+														minContext: "",
+														maxPromptPrice: "",
+													})
+												}
+											>
+												Reset
+											</Button>
+										</div>
+									</PopoverContent>
+								</Popover>
+							)}
+						</div>
+						<div className="flex h-full flex-col space-y-0.5 overflow-y-auto px-4 pb-6">
 							{filteredModels.length > 0 ? (
 								filteredModels.map((model) => (
 									<div key={model.id} className="w-full">
@@ -1054,7 +1115,7 @@ export function ModelSelector({
 												className={cn(
 													"flex w-full flex-1 cursor-pointer items-center justify-between rounded-md px-3 py-2 transition-colors hover:bg-accent",
 													isModelSelected(model) &&
-													"border border-primary/30 bg-accent",
+														"border border-primary/30 bg-accent",
 													model.deactivated_at && "opacity-60",
 												)}
 												onClick={() => handleModelSelect(model)}
@@ -1116,7 +1177,14 @@ export function ModelSelector({
 																{provider.providerId}
 															</span>
 															<span className="text-muted-foreground">
-                                                    {formatPrice(provider.pricing?.prompt || readDynamicPrice(provider.pricing, "input") || "0")}
+																{formatPrice(
+																	provider.pricing?.prompt ||
+																		readDynamicPrice(
+																			provider.pricing,
+																			"input",
+																		) ||
+																		"0",
+																)}
 																/1K
 															</span>
 														</button>
@@ -1162,9 +1230,9 @@ export function ModelSelector({
 					<div className="sticky top-0 z-10 rounded-t-md border-b bg-background px-0 pt-0 pb-0">
 						<div className="relative">
 							<MagnifyingGlass className="absolute top-2.5 left-2.5 h-4 w-4 text-muted-foreground" />
-                            <Input
+							<Input
 								ref={searchInputRef}
-                                placeholder={`Search ${filteredModels.length} ${useAiGateway ? "AI Gateway" : "LLM Gateway"} models...`}
+								placeholder={`Search ${filteredModels.length} ${useAiGateway ? "AI Gateway" : "LLM Gateway"} models...`}
 								className="rounded-b-none border border-none pr-10 pl-8 shadow-none focus-visible:ring-0 dark:bg-popover"
 								autoFocus
 								value={searchQuery}
@@ -1173,47 +1241,72 @@ export function ModelSelector({
 								onFocus={(e) => e.stopPropagation()}
 								onKeyDown={(e) => e.stopPropagation()}
 							/>
-						{/* Desktop gateway toggle with icons */}
-                            <div className="absolute right-10 top-1.5 z-10 flex items-center gap-1">
-							<button
-								type="button"
-								aria-label="Use LLM Gateway"
-                                className={cn(
-                                    "flex h-6 w-6 items-center justify-center rounded border",
-                                    !useAiGateway ? "bg-accent border-primary" : "bg-transparent border-border",
-                                )}
-                                onClick={(e) => {
-									e.stopPropagation();
-                                    setModelsSource(false);
-									setIsDropdownOpen(true);
-								}}
-							>
-                                <svg role="img" aria-label="LLM Gateway" fill="none" className="h-3.5 w-3.5" viewBox="0 0 218 232" xmlns="http://www.w3.org/2000/svg">
-									<path d="M218 59.4686c0-4.1697-2.351-7.9813-6.071-9.8441L119.973 3.58361s2.926 3.32316 2.926 7.01529V218.833c0 4.081-2.926 7.016-2.926 7.016l15.24-7.468c2.964-2.232 7.187-7.443 7.438-16.006.293-9.976.61-84.847.732-121.0353.487-3.6678 4.096-11.0032 14.63-11.0032 10.535 0 29.262 5.1348 37.309 7.7022 2.439.7336 7.608 4.1812 8.779 12.1036 1.17 7.9223.975 59.0507.731 83.6247 0 2.445.137 7.069 6.653 7.069 6.515 0 6.515-7.069 6.515-7.069V59.4686Z" fill="currentColor"/>
-									<path d="M149.235 86.323c0-5.5921 5.132-9.7668 10.589-8.6132l31.457 6.6495c4.061.8585 6.967 4.4207 6.967 8.5824v81.9253c0 5.868 5.121 9.169 5.121 9.169l-51.9-12.658c-1.311-.32-2.234-1.498-2.234-2.852V86.323ZM99.7535 1.15076c7.2925-3.60996 15.8305 1.71119 15.8305 9.86634V220.983c0 8.155-8.538 13.476-15.8305 9.866L6.11596 184.496C2.37105 182.642 0 178.818 0 174.63v-17.868l49.7128 19.865c4.0474 1.617 8.4447-1.372 8.4449-5.741 0-2.66-1.6975-5.022-4.2142-5.863L0 146.992v-14.305l40.2756 7.708c3.9656.759 7.6405-2.289 7.6405-6.337 0-3.286-2.4628-6.048-5.7195-6.413L0 122.917V108.48l78.5181-3.014c4.1532-.16 7.4381-3.582 7.4383-7.7498 0-4.6256-4.0122-8.2229-8.5964-7.7073L0 98.7098V82.4399l53.447-17.8738c2.3764-.7948 3.9791-3.0254 3.9792-5.5374 0-4.0961-4.0978-6.9185-7.9106-5.4486L0 72.6695V57.3696c.0000304-4.1878 2.37107-8.0125 6.11596-9.8664L99.7535 1.15076Z" fill="currentColor"/>
-								</svg>
-							</button>
-							<button
-								type="button"
-								aria-label="Use Vercel AI Gateway"
-                                className={cn(
-                                    "flex h-6 w-6 items-center justify-center rounded border",
-                                    useAiGateway ? "bg-accent border-primary" : "bg-transparent border-border",
-                                )}
-                                onClick={(e) => {
-									e.stopPropagation();
-                                    setModelsSource(true);
-									setIsDropdownOpen(true);
-								}}
-							>
-                                <svg role="img" aria-label="Vercel AI Gateway" viewBox="0 0 256 222" width="12" height="10" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid">
-									<path fill="currentColor" d="m128 0 128 221.705H0z"/>
-								</svg>
-							</button>
+							{/* Desktop gateway toggle with icons */}
+							<div className="absolute top-1.5 right-10 z-10 flex items-center gap-1">
+								<button
+									type="button"
+									aria-label="Use LLM Gateway"
+									className={cn(
+										"flex h-6 w-6 items-center justify-center rounded border",
+										!useAiGateway
+											? "border-primary bg-accent"
+											: "border-border bg-transparent",
+									)}
+									onClick={(e) => {
+										e.stopPropagation();
+										setModelsSource(false);
+										setIsDropdownOpen(true);
+									}}
+								>
+									<svg
+										role="img"
+										aria-label="LLM Gateway"
+										fill="none"
+										className="h-3.5 w-3.5"
+										viewBox="0 0 218 232"
+										xmlns="http://www.w3.org/2000/svg"
+									>
+										<path
+											d="M218 59.4686c0-4.1697-2.351-7.9813-6.071-9.8441L119.973 3.58361s2.926 3.32316 2.926 7.01529V218.833c0 4.081-2.926 7.016-2.926 7.016l15.24-7.468c2.964-2.232 7.187-7.443 7.438-16.006.293-9.976.61-84.847.732-121.0353.487-3.6678 4.096-11.0032 14.63-11.0032 10.535 0 29.262 5.1348 37.309 7.7022 2.439.7336 7.608 4.1812 8.779 12.1036 1.17 7.9223.975 59.0507.731 83.6247 0 2.445.137 7.069 6.653 7.069 6.515 0 6.515-7.069 6.515-7.069V59.4686Z"
+											fill="currentColor"
+										/>
+										<path
+											d="M149.235 86.323c0-5.5921 5.132-9.7668 10.589-8.6132l31.457 6.6495c4.061.8585 6.967 4.4207 6.967 8.5824v81.9253c0 5.868 5.121 9.169 5.121 9.169l-51.9-12.658c-1.311-.32-2.234-1.498-2.234-2.852V86.323ZM99.7535 1.15076c7.2925-3.60996 15.8305 1.71119 15.8305 9.86634V220.983c0 8.155-8.538 13.476-15.8305 9.866L6.11596 184.496C2.37105 182.642 0 178.818 0 174.63v-17.868l49.7128 19.865c4.0474 1.617 8.4447-1.372 8.4449-5.741 0-2.66-1.6975-5.022-4.2142-5.863L0 146.992v-14.305l40.2756 7.708c3.9656.759 7.6405-2.289 7.6405-6.337 0-3.286-2.4628-6.048-5.7195-6.413L0 122.917V108.48l78.5181-3.014c4.1532-.16 7.4381-3.582 7.4383-7.7498 0-4.6256-4.0122-8.2229-8.5964-7.7073L0 98.7098V82.4399l53.447-17.8738c2.3764-.7948 3.9791-3.0254 3.9792-5.5374 0-4.0961-4.0978-6.9185-7.9106-5.4486L0 72.6695V57.3696c.0000304-4.1878 2.37107-8.0125 6.11596-9.8664L99.7535 1.15076Z"
+											fill="currentColor"
+										/>
+									</svg>
+								</button>
+								<button
+									type="button"
+									aria-label="Use Vercel AI Gateway"
+									className={cn(
+										"flex h-6 w-6 items-center justify-center rounded border",
+										useAiGateway
+											? "border-primary bg-accent"
+											: "border-border bg-transparent",
+									)}
+									onClick={(e) => {
+										e.stopPropagation();
+										setModelsSource(true);
+										setIsDropdownOpen(true);
+									}}
+								>
+									<svg
+										role="img"
+										aria-label="Vercel AI Gateway"
+										viewBox="0 0 256 222"
+										width="12"
+										height="10"
+										xmlns="http://www.w3.org/2000/svg"
+										preserveAspectRatio="xMidYMid"
+									>
+										<path fill="currentColor" d="m128 0 128 221.705H0z" />
+									</svg>
+								</button>
+							</div>
 						</div>
-                        </div>
-                            {!useAiGateway && (
-                            <Popover>
+						{!useAiGateway && (
+							<Popover>
 								<PopoverTrigger asChild>
 									<Button
 										variant="ghost"
@@ -1386,8 +1479,8 @@ export function ModelSelector({
 										</Button>
 									</div>
 								</PopoverContent>
-                            </Popover>
-                            )}
+							</Popover>
+						)}
 					</div>
 					<div className="flex h-full flex-col space-y-0.5 overflow-y-auto px-1 pt-1 pb-0">
 						{filteredModels.length > 0 ? (

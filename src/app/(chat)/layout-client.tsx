@@ -14,8 +14,12 @@ export type MinimalUser = {
 export default function ChatLayoutClient({
 	children,
 	initialUser,
-  defaultSidebarOpen = true,
-}: { children: ReactNode; initialUser?: MinimalUser; defaultSidebarOpen?: boolean }) {
+	defaultSidebarOpen = true,
+}: {
+	children: ReactNode;
+	initialUser?: MinimalUser;
+	defaultSidebarOpen?: boolean;
+}) {
 	useEffect(() => {
 		document.body.classList.add("overflow-hidden");
 		return () => {
@@ -24,7 +28,7 @@ export default function ChatLayoutClient({
 	}, []);
 
 	return (
-    <SidebarProvider defaultOpen={defaultSidebarOpen}>
+		<SidebarProvider defaultOpen={defaultSidebarOpen}>
 			<AppSidebar initialUser={initialUser} />
 			<MainContentWithInset>{children}</MainContentWithInset>
 		</SidebarProvider>

@@ -72,21 +72,21 @@ function SidebarProvider({
 	const isMobile = useIsMobile();
 	const [openMobile, setOpenMobile] = React.useState(false);
 
-  // This is the internal state of the sidebar.
-  // We use openProp and setOpenProp for control from outside the component.
-  // Read from cookie synchronously on the client to avoid an initial
-  // open-then-collapse flash (flicker) when a persisted closed state exists.
-  const [_open, _setOpen] = React.useState<boolean>(() => {
-    if (typeof document === "undefined") return defaultOpen;
-    try {
-      const match = document.cookie.match(
-        new RegExp(`${SIDEBAR_COOKIE_NAME}=([^;]+)`),
-      );
-      return match ? match[1] === "true" : defaultOpen;
-    } catch {
-      return defaultOpen;
-    }
-  });
+	// This is the internal state of the sidebar.
+	// We use openProp and setOpenProp for control from outside the component.
+	// Read from cookie synchronously on the client to avoid an initial
+	// open-then-collapse flash (flicker) when a persisted closed state exists.
+	const [_open, _setOpen] = React.useState<boolean>(() => {
+		if (typeof document === "undefined") return defaultOpen;
+		try {
+			const match = document.cookie.match(
+				new RegExp(`${SIDEBAR_COOKIE_NAME}=([^;]+)`),
+			);
+			return match ? match[1] === "true" : defaultOpen;
+		} catch {
+			return defaultOpen;
+		}
+	});
 	const open = openProp ?? _open;
 	const setOpen = React.useCallback(
 		(value: boolean | ((value: boolean) => boolean)) => {
@@ -130,25 +130,25 @@ function SidebarProvider({
 	// This makes it easier to style the sidebar with Tailwind classes.
 	const state = open ? "expanded" : "collapsed";
 
-  // After mount, only honor the one-shot force-open flag for playground.
-  // Cookie was already read synchronously above to avoid flicker.
-  React.useEffect(() => {
-    try {
-      if (typeof window !== "undefined") {
-        if (window.location.pathname.startsWith("/playground")) {
-          const force = sessionStorage.getItem(
-            "cc_force_open_playground_sidebar",
-          );
-          if (force) {
-            setOpen(true);
-            if (isMobile) setOpenMobile(true);
-            sessionStorage.removeItem("cc_force_open_playground_sidebar");
-            return;
-          }
-        }
-      }
-    } catch {}
-  }, [isMobile, setOpen]);
+	// After mount, only honor the one-shot force-open flag for playground.
+	// Cookie was already read synchronously above to avoid flicker.
+	React.useEffect(() => {
+		try {
+			if (typeof window !== "undefined") {
+				if (window.location.pathname.startsWith("/playground")) {
+					const force = sessionStorage.getItem(
+						"cc_force_open_playground_sidebar",
+					);
+					if (force) {
+						setOpen(true);
+						if (isMobile) setOpenMobile(true);
+						sessionStorage.removeItem("cc_force_open_playground_sidebar");
+						return;
+					}
+				}
+			}
+		} catch {}
+	}, [isMobile, setOpen]);
 
 	React.useEffect(() => {}, []);
 

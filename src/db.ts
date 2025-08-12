@@ -18,8 +18,8 @@ export interface Message {
 	userId: string;
 	role: "user" | "assistant" | "system";
 	content: string;
-  // full message parts including reasoning/tool calls, not just text content.
-  partsJson?: string;
+	// full message parts including reasoning/tool calls, not just text content.
+	partsJson?: string;
 	model: string;
 	createdAt: number;
 	_creationTime: number;
@@ -46,7 +46,11 @@ export interface Playground {
 	userId: string;
 	name: string;
 	createdAt: number;
-  columns: { id: string; modelId: string; gatewaySource?: "aigateway" | "llmgateway" }[];
+	columns: {
+		id: string;
+		modelId: string;
+		gatewaySource?: "aigateway" | "llmgateway";
+	}[];
 }
 
 export interface PlaygroundMessage {
@@ -59,7 +63,7 @@ export interface PlaygroundMessage {
 	model: string;
 	createdAt: number;
 	_creationTime: number;
-  gateway?: "llm-gateway" | "vercel-ai-gateway";
+	gateway?: "llm-gateway" | "vercel-ai-gateway";
 }
 
 export class ChaiChatDB extends Dexie {
@@ -71,16 +75,16 @@ export class ChaiChatDB extends Dexie {
 
 	constructor() {
 		super("ChaiChatDB");
-    this.version(8)
+		this.version(8)
 			.stores({
 				chats:
 					"_id, userId, name, createdAt, currentModel, parentChatId, isPublic",
-        messages:
-          "_id, chatId, userId, createdAt, parentMessageId, version, isActive, model, attachments, partsJson",
+				messages:
+					"_id, chatId, userId, createdAt, parentMessageId, version, isActive, model, attachments, partsJson",
 				users: "id, fullName",
 				playgrounds: "_id, userId, createdAt",
-        playgroundMessages:
-          "_id, playgroundId, columnId, userId, createdAt, model, gateway",
+				playgroundMessages:
+					"_id, playgroundId, columnId, userId, createdAt, model, gateway",
 			})
 			.upgrade((tx) => {
 				// Ensure message fields exist
@@ -90,7 +94,7 @@ export class ChaiChatDB extends Dexie {
 						if (message.isActive === undefined) message.isActive = true;
 						if (!message.model) message.model = "gpt-4o";
 						if (message.attachments === undefined) message.attachments = [];
-            if (message.partsJson === undefined) message.partsJson = undefined;
+						if (message.partsJson === undefined) message.partsJson = undefined;
 					});
 
 				// Ensure new parentChatId field exists on chats
@@ -100,12 +104,12 @@ export class ChaiChatDB extends Dexie {
 						if (chat.parentChatId === undefined) chat.parentChatId = undefined;
 						if (chat.isPublic === undefined) chat.isPublic = false;
 					});
-        // Ensure gateway on playgroundMessages
-        tx.table("playgroundMessages")
-          .toCollection()
-          .modify((msg) => {
-            if (msg.gateway === undefined) msg.gateway = undefined;
-          });
+				// Ensure gateway on playgroundMessages
+				tx.table("playgroundMessages")
+					.toCollection()
+					.modify((msg) => {
+						if (msg.gateway === undefined) msg.gateway = undefined;
+					});
 			});
 	}
 }

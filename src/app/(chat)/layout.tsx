@@ -16,10 +16,10 @@ export default async function ChatLayout({
 			}
 		: undefined;
 
-  // Keep SSR and client hydration in sync for sidebar open state
-  const cookieStore = await cookies();
-  const sidebarCookie = cookieStore.get("sidebar_state")?.value;
-  const defaultSidebarOpen = sidebarCookie ? sidebarCookie === "true" : true;
+	// Keep SSR and client hydration in sync for sidebar open state
+	const cookieStore = await cookies();
+	const sidebarCookie = cookieStore.get("sidebar_state")?.value;
+	const defaultSidebarOpen = sidebarCookie ? sidebarCookie === "true" : true;
 
 	return (
 		<ChatLayoutClient

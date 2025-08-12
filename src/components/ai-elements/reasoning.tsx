@@ -167,7 +167,9 @@ export const ReasoningContent = memo(
 			)}
 			{...props}
 		>
-			<Response className="grid gap-2 text-muted-foreground">{children}</Response>
+			<Response className="grid gap-2 text-muted-foreground">
+				{children}
+			</Response>
 		</CollapsibleContent>
 	),
 );
