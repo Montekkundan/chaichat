@@ -1249,10 +1249,6 @@ export function PlaygroundProvider({
 
 			if (syncedColumns.length === 0) return;
 
-			console.log(
-				`🚀 Sending to ${syncedColumns.length} synced columns in parallel`,
-			);
-
 			// Create a saved playground id on first send and navigate
 			const ensured = ensurePlaygroundId();
 
@@ -1590,13 +1586,6 @@ export function PlaygroundProvider({
 					},
 				);
 
-				// Wait for all API calls to complete
-				const results = await Promise.all(apiPromises);
-
-				console.log(
-					`✅ Completed ${results.length} parallel requests:`,
-					results,
-				);
 
 				// Set all synced columns streaming status to false and mark ready where appropriate
 				for (const column of syncedColumns) {
