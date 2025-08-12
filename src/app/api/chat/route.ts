@@ -17,7 +17,10 @@ import {
 	buildProviderOptions,
 	combineTextFromUIMessages,
 	isGoogleModel,
-	isOpenAIReasoningModel,
+  	isOpenAIReasoningModel,
+  	isOpenAIProvider,
+  cleanMessagesForTools,
+  removeEmptyModelMessages,
 } from "./utils";
 // import type { LLMGatewayModel } from "~/types/llmgateway";
 
@@ -30,12 +33,6 @@ export const runtime = "edge";
 // Disable caching for chat streams
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
-
-// model list prefetch removed to avoid extra hop prior to streaming
-
-// removed preflight streaming support check to cut latency
-
-// Do not override temperature or any provider-specific defaults at the route level
 
 type ChatRequest = {
 	messages: UIMessage[];
@@ -138,7 +135,9 @@ export async function POST(req: Request) {
 			);
 		}
 
-		const convertedMessages = convertToModelMessages(messages);
+    // Sanitize UI messages: strip tool content and placeholders
+    const sanitizedUiMessages = cleanMessagesForTools(messages, false);
+    const convertedMessages = convertToModelMessages(sanitizedUiMessages);
 
 		modelToUse = model || "openai/gpt-4o";
 
@@ -231,9 +230,10 @@ export async function POST(req: Request) {
 					})
 				: baseModel;
 
-			const isOAIReasoning = isOpenAIReasoningModel(modelToUse);
+      const isOAIReasoning = isOpenAIReasoningModel(modelToUse);
+      const isOpenAI = isOpenAIProvider(modelToUse);
 			const isGoogle = isGoogleModel(modelToUse);
-			const result = await streamText({
+      const result = await streamText({
 				model: modelForRequest,
 				...(isGoogle
 					? (() => {
@@ -246,20 +246,27 @@ export async function POST(req: Request) {
 							];
 							return { system, messages: googleMessages };
 						})()
-					: { system, messages: convertedMessages }),
-				...(isOAIReasoning
-					? {}
-					: {
-							temperature,
-							maxOutputTokens: config?.maxOutputTokens,
-							topP: config?.topP,
-							topK:
-								typeof config?.topK === "number" && config.topK > 0
-									? config.topK
-									: undefined,
-							frequencyPenalty: config?.frequencyPenalty,
-							presencePenalty: config?.presencePenalty,
-						}),
+          : {
+              system,
+              messages: removeEmptyModelMessages(convertedMessages),
+            }),
+        ...(isOAIReasoning
+          ? {}
+          : {
+              temperature,
+              maxOutputTokens: config?.maxOutputTokens,
+              topP: config?.topP,
+              topK:
+                typeof config?.topK === "number" && config.topK > 0
+                  ? config.topK
+                  : undefined,
+              ...(isOpenAI
+                ? {
+                    frequencyPenalty: config?.frequencyPenalty,
+                    presencePenalty: config?.presencePenalty,
+                  }
+                : {}),
+            }),
 				providerOptions: buildProviderOptions({
 					modelId: modelToUse,
 					isOAIReasoning,
@@ -318,9 +325,10 @@ export async function POST(req: Request) {
 					middleware: simulateStreamingMiddleware(),
 				});
 
-				const isOAIReasoning2 = isOpenAIReasoningModel(modelToUse);
+        const isOAIReasoning2 = isOpenAIReasoningModel(modelToUse);
+        const isOpenAI2 = isOpenAIProvider(modelToUse);
 				const isGoogle2 = isGoogleModel(modelToUse);
-				const result = await streamText({
+        const result = await streamText({
 					model: simulatedStreamingModel,
 					...(isGoogle2
 						? (() => {
@@ -335,7 +343,10 @@ export async function POST(req: Request) {
 								];
 								return { system, messages: googleMessages };
 							})()
-						: { system, messages: convertedMessages }),
+            : {
+                system,
+                messages: removeEmptyModelMessages(convertedMessages),
+              }),
 					...(isOAIReasoning2 ? {} : { temperature }),
 					...(isOAIReasoning2
 						? {}
@@ -349,12 +360,16 @@ export async function POST(req: Request) {
 										? config.topK
 										: undefined,
 							}),
-					...(isOAIReasoning2
-						? {}
-						: { frequencyPenalty: config?.frequencyPenalty }),
-					...(isOAIReasoning2
-						? {}
-						: { presencePenalty: config?.presencePenalty }),
+          ...(isOAIReasoning2
+            ? {}
+            : isOpenAI2
+              ? { frequencyPenalty: config?.frequencyPenalty }
+              : {}),
+          ...(isOAIReasoning2
+            ? {}
+            : isOpenAI2
+              ? { presencePenalty: config?.presencePenalty }
+              : {}),
 					providerOptions: buildProviderOptions({
 						modelId: modelToUse,
 						isOAIReasoning: isOAIReasoning2,
