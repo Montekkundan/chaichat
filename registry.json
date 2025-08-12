@@ -1,0 +1,22 @@
+{
+	"$schema": "https://ui.shadcn.com/schema/registry.json",
+	"name": "acme",
+	"homepage": "https://acme.com",
+	"items": [
+		{
+			"name": "settings-appearance",
+			"type": "registry:block",
+			"title": "Settings Appearance",
+			"description": "A settings panel for theme selection with light/dark toggle and Tweakcn theme URL input. Requires existing tweakcn-theme utilities.",
+			"dependencies": ["next-themes", "lucide-react"],
+			"registryDependencies": ["button", "card", "input", "label", "badge"],
+			"files": [
+				{
+					"path": "src/registry/blocks/settings-appearance/settings-appearance.tsx",
+					"type": "registry:component"
+				}
+			],
+			"docs": "This component integrates with your existing ~/lib/tweakcn-theme utilities and theme provider. Make sure you have the tweakcn-theme system set up in your project."
+		}
+	]
+}

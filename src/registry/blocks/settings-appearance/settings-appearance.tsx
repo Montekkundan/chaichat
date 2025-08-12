@@ -96,7 +96,7 @@ export function SettingsAppearance({ className }: SettingsAppearanceProps) {
 				applyTweakcnTheme(syncedTheme, true);
 			}
 		}
-	}, [resolvedTheme, tweakcnTheme?.currentMode]); // Only depend on the mode, not the entire theme
+	}, [resolvedTheme, tweakcnTheme]);
 
 	React.useEffect(() => {
 		// Don't process empty URLs during initial mount when restoring from localStorage
@@ -153,7 +153,7 @@ export function SettingsAppearance({ className }: SettingsAppearanceProps) {
 		}, 1000);
 
 		return () => clearTimeout(timeoutId);
-	}, [themeUrl, resolvedTheme, mounted, isRestoringUrl]); // Added isRestoringUrl to dependencies
+	}, [themeUrl, resolvedTheme, mounted, isRestoringUrl, tweakcnTheme]);
 
 	const handleResetTheme = () => {
 		resetToDefaultTheme();
