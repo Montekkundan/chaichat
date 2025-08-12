@@ -5,7 +5,13 @@ export const createPlayground = mutation({
   args: {
     userId: v.string(),
     name: v.string(),
-    columns: v.array(v.object({ id: v.string(), modelId: v.string() })),
+    columns: v.array(
+      v.object({
+        id: v.string(),
+        modelId: v.string(),
+        gatewaySource: v.optional(v.union(v.literal("aigateway"), v.literal("llmgateway"))),
+      }),
+    ),
   },
   handler: async (ctx, { userId, name, columns }) => {
     const identity = await ctx.auth.getUserIdentity();

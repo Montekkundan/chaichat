@@ -15,6 +15,7 @@ import {
 } from "react";
 import { toast } from "~/components/ui/toast";
 import { type Chat, type Message, db } from "~/db";
+import { userSessionManager } from "~/lib/user-session-manager";
 import { ChatTitlesCookieManager } from "~/lib/chat-titles-cookie";
 import { getSelectedModel, setSelectedModel } from "~/lib/local-model-storage";
 
@@ -141,10 +142,10 @@ export function CacheProvider({
 
 	// Initialize cache from Dexie on mount
 	useEffect(() => {
-		const initializeCache = async () => {
+    const initializeCache = async () => {
 			setIsLoading(true);
 			try {
-				if (user?.id) {
+        if (user?.id) {
 					// For authenticated users: Load chats from Dexie
 					const localChats = await db.chats
 						.where("userId")
@@ -167,6 +168,31 @@ export function CacheProvider({
 						);
 						messagesCache.current.set(chat._id, sortedMessages);
 					}
+        } else {
+          // Anonymous users: hydrate from Dexie using storage user id
+          const localUserId = userSessionManager.getStorageUserId();
+          try {
+            const localChats = await db.chats
+              .where("userId")
+              .equals(localUserId)
+              .toArray();
+            setChats(localChats);
+
+            const recentChats = localChats.slice(0, 5);
+            for (const chat of recentChats) {
+              const messages = await db.messages
+                .where("chatId")
+                .equals(chat._id)
+                .and((msg) => msg.isActive === true || msg.isActive === undefined)
+                .toArray();
+              const sortedMessages = messages.sort(
+                (a, b) => a._creationTime - b._creationTime,
+              );
+              messagesCache.current.set(chat._id, sortedMessages);
+            }
+          } catch (error) {
+            console.error("Failed to hydrate anonymous cache from Dexie:", error);
+          }
 				}
 				// For non-authenticated users, we'll rely on the effectiveChats from convex
 			} catch (error) {
@@ -256,7 +282,7 @@ export function CacheProvider({
 	);
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: router is stable and intentional
-	const createChat = useCallback(
+    const createChat = useCallback(
 		async (
 			name: string,
 			model: string,
@@ -282,6 +308,13 @@ export function CacheProvider({
 			setChats((prev) => [optimisticChat, ...prev]);
 			messagesCache.current.set(optimisticId, []);
 
+        // Persist the optimistic chat immediately so anonymous users don't lose it
+        try {
+          await db.chats.put(optimisticChat);
+        } catch {
+          /* ignore dexie errors */
+        }
+
 			const mutationArgs: {
 				name: string;
 				userId: string;
@@ -296,8 +329,8 @@ export function CacheProvider({
 
 			void createChatMutation(mutationArgs)
 				.then(async (realId) => {
-					const realChat = { ...optimisticChat, _id: realId };
-					await db.chats.put(realChat);
+          const realChat = { ...optimisticChat, _id: realId };
+          await db.chats.put(realChat);
 					setChats((prev) =>
 						prev.map((c) => (c._id === optimisticId ? realChat : c)),
 					);
@@ -346,8 +379,10 @@ export function CacheProvider({
 					// Record mapping so future message writes use the real id
 					optimisticToRealChatId.current.set(optimisticId, realId);
 
-					// --- Clean up any leftover optimistic rows in Dexie & memory ---
+          // --- Clean up any leftover optimistic rows in Dexie & memory ---
 					try {
+            // Remove the optimistic chat record now that we have the real id
+            await db.chats.delete(optimisticId);
 						await db.messages
 							.where("chatId")
 							.equals(realId)

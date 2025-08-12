@@ -1,6 +1,7 @@
 import { api } from "@/convex/_generated/api";
 import { currentUser } from "@clerk/nextjs/server";
 import { createLLMGateway } from "@llmgateway/ai-sdk-provider";
+import { createGateway as createVercelGateway } from "@ai-sdk/gateway";
 import {
   JsonToSseTransformStream,
   type UIMessage,
@@ -9,121 +10,27 @@ import {
   simulateStreamingMiddleware,
   streamText,
   wrapLanguageModel,
-  type JSONValue,
 } from "ai";
 import { ConvexHttpClient } from "convex/browser";
+import { combineTextFromUIMessages, isGoogleModel, isOpenAIReasoningModel, buildProviderOptions } from "./utils";
 import { env } from "~/env";
-import type { LLMGatewayModel } from "~/types/llmgateway";
+// import type { LLMGatewayModel } from "~/types/llmgateway";
 
 const convex = new ConvexHttpClient(env.NEXT_PUBLIC_CONVEX_URL);
 
 // todo make simpler
 export const maxDuration = 60;
+// Run on the Edge to reduce cold start and improve streaming latency
+export const runtime = "edge";
+// Disable caching for chat streams
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
-let llmGatewayModelsCache: {
-  data: LLMGatewayModel[];
-  timestamp: number;
-} | null = null;
+// model list prefetch removed to avoid extra hop prior to streaming
 
-async function getLLMGatewayModels(): Promise<LLMGatewayModel[]> {
-  const now = Date.now();
-  if (
-    llmGatewayModelsCache &&
-    now - llmGatewayModelsCache.timestamp < 5 * 60 * 1000
-  ) {
-    return llmGatewayModelsCache.data;
-  }
-  try {
-    const res = await fetch("https://api.llmgateway.io/v1/models", {
-      cache: "no-store",
-    });
-    const json = (await res.json()) as { data?: LLMGatewayModel[] };
-    const models = Array.isArray(json.data) ? json.data : [];
-    llmGatewayModelsCache = { data: models, timestamp: now };
-    return models;
-  } catch {
-    return [];
-  }
-}
+// removed preflight streaming support check to cut latency
 
-function parseProviderAndModel(modelId: string): {
-  providerId?: string;
-  modelName: string;
-} {
-  if (!modelId.includes("/")) {
-    return { modelName: modelId };
-  }
-  const firstSlash = modelId.indexOf("/");
-  const providerId = modelId.slice(0, firstSlash);
-  const modelName = modelId.slice(firstSlash + 1);
-  return { providerId, modelName };
-}
-
-async function isStreamingSupportedByProviderModel(
-  modelId: string
-): Promise<boolean | undefined> {
-  const models = await getLLMGatewayModels();
-  const { providerId, modelName } = parseProviderAndModel(modelId);
-
-  const match = models.find(
-    (m) =>
-      m?.id === modelName ||
-      m?.name === modelName ||
-      m?.id === modelId ||
-      m?.name === modelId
-  );
-  if (!match) return undefined;
-  const providers = Array.isArray(match?.providers) ? match.providers : [];
-  if (providerId) {
-    const p = providers.find(
-      (prov) =>
-        prov?.providerId === providerId &&
-        (prov?.modelName === modelName || prov?.modelName === modelId)
-    );
-    if (p && typeof p.streaming === "boolean") return p.streaming;
-    return undefined;
-  }
-  const anyStreaming = providers.some((prov) => prov?.streaming === true);
-  const allFalse = providers.every((prov) => prov?.streaming === false);
-  if (anyStreaming) return true;
-  if (allFalse) return false;
-  return undefined;
-}
-
-function requiresDefaultTemperatureOne(modelId: string): boolean {
-  const { providerId, modelName } = parseProviderAndModel(modelId);
-  if (
-    (providerId === "openai" || !providerId) &&
-    typeof modelName === "string"
-  ) {
-    return modelName === "o3" || modelName.startsWith("o3-");
-  }
-  return false;
-}
-
-function normalizeTemperatureForModel(
-  modelId: string,
-  requested: number | undefined
-): number | undefined {
-  if (requiresDefaultTemperatureOne(modelId)) {
-    return 1;
-  }
-  return requested;
-}
-
-function isOpenAIReasoningModel(modelId: string): boolean {
-  const { providerId, modelName } = parseProviderAndModel(modelId);
-  if (providerId && providerId !== "openai") return false;
-  if (!modelName) return false;
-  return (
-    modelName === "o1" ||
-    modelName.startsWith("o1-") ||
-    modelName === "o3" ||
-    modelName.startsWith("o3-") ||
-    modelName === "o4-mini" ||
-    modelName.startsWith("o4-mini-")
-  );
-}
+// Do not override temperature or any provider-specific defaults at the route level
 
 type ChatRequest = {
   messages: UIMessage[];
@@ -157,6 +64,8 @@ type ChatRequest = {
     };
   };
   userApiKeys?: Record<string, string | undefined>;
+  // Preferred: which gateway to use (e.g. "llm-gateway" | "vercel-ai-gateway")
+  gateway?: string;
 };
 
 export async function POST(req: Request) {
@@ -169,10 +78,52 @@ export async function POST(req: Request) {
       messages,
       model,
       system,
-      temperature = 0.7,
+      temperature,
       config,
       userApiKeys = {},
+      gateway,
     }: ChatRequest = body;
+
+    // Determine which gateway to use (string parameter only)
+    const normalizedGateway = (() => {
+      if (typeof gateway === "string" && gateway.trim().length > 0) {
+        const g = gateway.trim().toLowerCase();
+        if (
+          g === "llm-gateway" ||
+          g === "llm" ||
+          g === "llmgateway" ||
+          g === "gateway-llm"
+        )
+          return "llm-gateway" as const;
+        if (
+          g === "vercel-ai-gateway" ||
+          g === "vercel" ||
+          g === "ai-gateway" ||
+          g === "vercel-ai" ||
+          g === "vercelaigateway"
+        )
+          return "vercel-ai-gateway" as const;
+        return "unsupported" as const;
+      }
+      return "llm-gateway" as const;
+    })();
+
+    if (normalizedGateway === "unsupported") {
+      const headers = new Headers({
+        "Content-Type": "application/json",
+        "X-Used-Gateway": "unsupported",
+      });
+      return new Response(
+        JSON.stringify({
+          error: "Unsupported gateway specified. Supported values: 'llm-gateway', 'vercel-ai-gateway'.",
+          code: "GATEWAY_NOT_SUPPORTED",
+          usedGateway: "unsupported",
+        }),
+        { status: 400, headers }
+      );
+    }
+
+    const usedGateway = normalizedGateway;
 
     if (!messages?.length || !model) {
       return new Response(
@@ -186,10 +137,16 @@ export async function POST(req: Request) {
     modelToUse = model || "openai/gpt-4o";
 
     let apiKey: string | undefined;
+    let aiGatewayApiKey: string | undefined;
 
     if (userApiKeys?.llmGatewayApiKey) {
       apiKey = userApiKeys.llmGatewayApiKey;
-    } else {
+    }
+    if (userApiKeys?.aiGatewayApiKey) {
+      aiGatewayApiKey = userApiKeys.aiGatewayApiKey;
+    }
+
+    if (!apiKey || !aiGatewayApiKey) {
       try {
         const user = await currentUser();
         if (user?.id) {
@@ -199,8 +156,11 @@ export async function POST(req: Request) {
               userId: user.id,
             }
           );
-          if (convexKeys?.llmGatewayApiKey) {
+          if (!apiKey && convexKeys?.llmGatewayApiKey) {
             apiKey = convexKeys.llmGatewayApiKey;
+          }
+          if (!aiGatewayApiKey && convexKeys?.aiGatewayApiKey) {
+            aiGatewayApiKey = convexKeys.aiGatewayApiKey;
           }
         }
       } catch (error) {
@@ -208,33 +168,54 @@ export async function POST(req: Request) {
       }
     }
 
-    if (!apiKey) {
+    if (!apiKey && usedGateway === "llm-gateway") {
+      const headers = new Headers({
+        "Content-Type": "application/json",
+        "X-Used-Gateway": usedGateway,
+      });
       return new Response(
         JSON.stringify({
           error:
             "No LLM Gateway API key configured. Please add your API key in settings.",
           code: "NO_API_KEY",
+          usedGateway,
         }),
-        { status: 401, headers: { "Content-Type": "application/json" } }
+        { status: 401, headers }
+      );
+    }
+
+    if (usedGateway === "vercel-ai-gateway" && !aiGatewayApiKey) {
+      const headers = new Headers({
+        "Content-Type": "application/json",
+        "X-Used-Gateway": usedGateway,
+      });
+      return new Response(
+        JSON.stringify({
+          error:
+            "No Vercel AI Gateway API key configured. Please add your API key in settings.",
+          code: "NO_API_KEY",
+          usedGateway,
+        }),
+        { status: 401, headers }
       );
     }
 
     const llmGatewayProvider = createLLMGateway({
-      apiKey: apiKey,
+      apiKey: apiKey ?? "",
       compatibility: "strict",
     });
+    const vercelGatewayProvider = createVercelGateway({
+      apiKey: aiGatewayApiKey ?? "",
+    });
 
-    let shouldUseSimulatedStreaming = false;
-    try {
-      const supportsStreaming =
-        await isStreamingSupportedByProviderModel(modelToUse);
-      if (supportsStreaming === false) {
-        shouldUseSimulatedStreaming = true;
-      }
-    } catch {}
+    // Skip preflight streaming-support lookup to avoid an extra network hop.
+    // Proactively simulate streaming for OpenAI reasoning models (e.g. o1/o3/o4-mini) which don't support chat streaming.
+    const shouldUseSimulatedStreaming = isOpenAIReasoningModel(modelToUse);
 
     try {
-      const baseModel = llmGatewayProvider(modelToUse);
+      const baseModel = usedGateway === "vercel-ai-gateway"
+        ? vercelGatewayProvider(modelToUse)
+        : llmGatewayProvider(modelToUse);
       // No <think> extraction: handle responses as-is per DeepSeek v5 docs and unified reasoning
       const modelForRequest = shouldUseSimulatedStreaming
         ? wrapLanguageModel({
@@ -243,83 +224,43 @@ export async function POST(req: Request) {
           })
         : baseModel;
 
-      const effectiveTemperature = normalizeTemperatureForModel(
-        modelToUse,
-        temperature
-      );
-
       const isOAIReasoning = isOpenAIReasoningModel(modelToUse);
+      const isGoogle = isGoogleModel(modelToUse);
       const result = await streamText({
         model: modelForRequest,
-        system,
-        messages: convertedMessages,
-        temperature: effectiveTemperature,
-        ...(isOAIReasoning ? {} : { maxOutputTokens: config?.maxOutputTokens }),
-        topP: config?.topP,
-        topK: config?.topK,
-        frequencyPenalty: config?.frequencyPenalty,
-        presencePenalty: config?.presencePenalty,
-         providerOptions: (():
-           | Record<string, Record<string, JSONValue>>
-           | undefined => {
-          const { providerId } = parseProviderAndModel(modelToUse);
-          const rootProvider = providerId || modelToUse.split("/")[0];
-          const options: Record<string, Record<string, JSONValue>> = {};
-          if (/openai/i.test(rootProvider ?? "") && config?.openai) {
-             const {
-               reasoningEffort,
-               reasoningSummary,
-               textVerbosity,
-               serviceTier,
-               parallelToolCalls,
-               store,
-               strictJsonSchema,
-               maxCompletionTokens,
-               user,
-               metadata,
-             } = config.openai;
-            const openaiOpts: Record<string, JSONValue> = {};
-            const mc = isOAIReasoning
-              ? (maxCompletionTokens ?? config?.maxOutputTokens)
-              : maxCompletionTokens;
-            if (typeof mc === "number") openaiOpts.maxCompletionTokens = mc;
-            if (typeof reasoningEffort === "string") openaiOpts.reasoningEffort = reasoningEffort as JSONValue;
-            if (typeof reasoningSummary === "string") openaiOpts.reasoningSummary = reasoningSummary as JSONValue;
-            if (typeof textVerbosity === "string") openaiOpts.textVerbosity = textVerbosity as JSONValue;
-            if (typeof serviceTier === "string") openaiOpts.serviceTier = serviceTier as JSONValue;
-            if (typeof parallelToolCalls === "boolean") openaiOpts.parallelToolCalls = parallelToolCalls;
-            if (typeof store === "boolean") openaiOpts.store = store;
-            if (typeof strictJsonSchema === "boolean") openaiOpts.strictJsonSchema = strictJsonSchema;
-            if (typeof user === "string" && user.length > 0) openaiOpts.user = user;
-            if (metadata && Object.keys(metadata).length > 0) openaiOpts.metadata = metadata as unknown as JSONValue;
-            if (Object.keys(openaiOpts).length > 0) options.openai = openaiOpts;
-          }
-          if (/^(google|gemini)$/i.test(rootProvider ?? "") && config?.google) {
-             const {
-               cachedContent,
-               structuredOutputs,
-               safetySettings,
-               responseModalities,
-               thinkingConfig,
-             } = config.google;
-            const googleOpts: Record<string, JSONValue> = {};
-            if (typeof cachedContent === "string" && cachedContent.length > 0)
-              googleOpts.cachedContent = cachedContent;
-            if (typeof structuredOutputs === "boolean")
-              googleOpts.structuredOutputs = structuredOutputs;
-            if (Array.isArray(safetySettings) && safetySettings.length > 0)
-              googleOpts.safetySettings = safetySettings as unknown as JSONValue;
-            if (Array.isArray(responseModalities) && responseModalities.length > 0)
-              googleOpts.responseModalities = responseModalities as unknown as JSONValue;
-            if (thinkingConfig && (typeof thinkingConfig.thinkingBudget === "number" || typeof thinkingConfig.includeThoughts === "boolean"))
-              googleOpts.thinkingConfig = thinkingConfig as unknown as JSONValue;
-            if (Object.keys(googleOpts).length > 0) options.google = googleOpts;
-           }
-           return Object.keys(options).length ? options : undefined;
-        })(),
+        ...(isGoogle
+          ? (() => {
+              const prompt = combineTextFromUIMessages(messages as UIMessage[]);
+              const googleMessages = [
+                { role: "user" as const, content: prompt && prompt.length > 0 ? prompt : "" },
+              ];
+              return { system, messages: googleMessages };
+            })()
+          : { system, messages: convertedMessages }),
+        ...(isOAIReasoning
+          ? {}
+          : {
+              temperature,
+              maxOutputTokens: config?.maxOutputTokens,
+              topP: config?.topP,
+              topK:
+                typeof config?.topK === "number" && config.topK > 0
+                  ? config.topK
+                  : undefined,
+              frequencyPenalty: config?.frequencyPenalty,
+              presencePenalty: config?.presencePenalty,
+            }),
+         providerOptions: buildProviderOptions({
+           modelId: modelToUse,
+           isOAIReasoning,
+           openai: config?.openai,
+           google: config?.google,
+           maxOutputTokens: config?.maxOutputTokens,
+           system,
+         }),
       });
 
-      const stream = createUIMessageStream({
+      const _stream = createUIMessageStream({
         execute: ({ writer }) => {
           result.consumeStream();
           writer.merge(
@@ -330,10 +271,17 @@ export async function POST(req: Request) {
         },
       });
 
-    //   return new Response(stream.pipeThrough(new JsonToSseTransformStream()));
-	return result.toUIMessageStreamResponse({
-		sendReasoning: true,
-	  });
+      // Return streaming response with gateway header
+      const baseResponse = result.toUIMessageStreamResponse({
+        sendReasoning: true,
+      });
+      const headers = new Headers(baseResponse.headers);
+      headers.set("X-Used-Gateway", usedGateway);
+      headers.set("Cache-Control", "no-store");
+      return new Response(baseResponse.body, {
+        status: baseResponse.status,
+        headers,
+      });
     } catch (streamErr: unknown) {
       const errMsg =
         streamErr instanceof Error ? streamErr.message : String(streamErr);
@@ -351,84 +299,49 @@ export async function POST(req: Request) {
         lowerBody.includes("streaming is not supported");
 
       if (indicatesNoStreaming) {
+        const providerForFallback =
+          usedGateway === "vercel-ai-gateway"
+            ? vercelGatewayProvider
+            : llmGatewayProvider;
         const simulatedStreamingModel = wrapLanguageModel({
-          model: llmGatewayProvider(modelToUse),
+          model: providerForFallback(modelToUse),
           middleware: simulateStreamingMiddleware(),
         });
 
-        const effectiveTemperature = normalizeTemperatureForModel(
-          modelToUse,
-          temperature
-        );
         const isOAIReasoning2 = isOpenAIReasoningModel(modelToUse);
+        const isGoogle2 = isGoogleModel(modelToUse);
         const result = await streamText({
           model: simulatedStreamingModel,
-          system,
-          messages: convertedMessages,
-          temperature: effectiveTemperature,
+          ...(isGoogle2
+            ? (() => {
+                const prompt = combineTextFromUIMessages(messages as UIMessage[]);
+                const googleMessages = [
+                  { role: "user" as const, content: prompt && prompt.length > 0 ? prompt : "" },
+                ];
+                return { system, messages: googleMessages };
+              })()
+            : { system, messages: convertedMessages }),
+          ...(isOAIReasoning2 ? {} : { temperature }),
           ...(isOAIReasoning2 ? {} : { maxOutputTokens: config?.maxOutputTokens }),
-          topP: config?.topP,
-          topK: config?.topK,
-          frequencyPenalty: config?.frequencyPenalty,
-          presencePenalty: config?.presencePenalty,
-           providerOptions: (():
-             | Record<string, Record<string, JSONValue>>
-             | undefined => {
-            const { providerId } = parseProviderAndModel(modelToUse);
-            const rootProvider = providerId || modelToUse.split("/")[0];
-            const options: Record<string, Record<string, JSONValue>> = {};
-            if (/openai/i.test(rootProvider ?? "") && config?.openai) {
-               const {
-                 reasoningEffort,
-                 reasoningSummary,
-                 textVerbosity,
-                 serviceTier,
-                 parallelToolCalls,
-                 store,
-                 strictJsonSchema,
-                 maxCompletionTokens,
-                 user,
-                 metadata,
-               } = config.openai;
-              const openaiOpts2: Record<string, JSONValue> = {};
-              const mc2 = isOAIReasoning2
-                ? (maxCompletionTokens ?? config?.maxOutputTokens)
-                : maxCompletionTokens;
-              if (typeof mc2 === "number") openaiOpts2.maxCompletionTokens = mc2;
-              if (typeof reasoningEffort === "string") openaiOpts2.reasoningEffort = reasoningEffort as JSONValue;
-              if (typeof reasoningSummary === "string") openaiOpts2.reasoningSummary = reasoningSummary as JSONValue;
-              if (typeof textVerbosity === "string") openaiOpts2.textVerbosity = textVerbosity as JSONValue;
-              if (typeof serviceTier === "string") openaiOpts2.serviceTier = serviceTier as JSONValue;
-              if (typeof parallelToolCalls === "boolean") openaiOpts2.parallelToolCalls = parallelToolCalls;
-              if (typeof store === "boolean") openaiOpts2.store = store;
-              if (typeof strictJsonSchema === "boolean") openaiOpts2.strictJsonSchema = strictJsonSchema;
-              if (typeof user === "string" && user.length > 0) openaiOpts2.user = user;
-              if (metadata && Object.keys(metadata).length > 0) openaiOpts2.metadata = metadata as unknown as JSONValue;
-              if (Object.keys(openaiOpts2).length > 0) options.openai = openaiOpts2;
-            }
-            if (/^(google|gemini)$/i.test(rootProvider ?? "") && config?.google) {
-               const {
-                 cachedContent,
-                 structuredOutputs,
-                 safetySettings,
-                 responseModalities,
-                 thinkingConfig,
-               } = config.google;
-              const googleOpts2: Record<string, JSONValue> = {};
-              if (typeof cachedContent === "string" && cachedContent.length > 0)
-                googleOpts2.cachedContent = cachedContent;
-              if (typeof structuredOutputs === "boolean")
-                googleOpts2.structuredOutputs = structuredOutputs;
-              if (Array.isArray(safetySettings) && safetySettings.length > 0)
-                googleOpts2.safetySettings = safetySettings as unknown as JSONValue;
-              if (Array.isArray(responseModalities) && responseModalities.length > 0)
-                googleOpts2.responseModalities = responseModalities as unknown as JSONValue;
-              if (thinkingConfig && (typeof thinkingConfig.thinkingBudget === "number" || typeof thinkingConfig.includeThoughts === "boolean"))
-                googleOpts2.thinkingConfig = thinkingConfig as unknown as JSONValue;
-              if (Object.keys(googleOpts2).length > 0) options.google = googleOpts2;
-             }
-             return Object.keys(options).length ? options : undefined;
-          })(),
+          ...(isOAIReasoning2 ? {} : { topP: config?.topP }),
+          ...(isOAIReasoning2
+            ? {}
+            : {
+                topK:
+                  typeof config?.topK === "number" && config.topK > 0
+                    ? config.topK
+                    : undefined,
+              }),
+          ...(isOAIReasoning2 ? {} : { frequencyPenalty: config?.frequencyPenalty }),
+          ...(isOAIReasoning2 ? {} : { presencePenalty: config?.presencePenalty }),
+           providerOptions: buildProviderOptions({
+             modelId: modelToUse,
+             isOAIReasoning: isOAIReasoning2,
+             openai: config?.openai,
+             google: config?.google,
+             maxOutputTokens: config?.maxOutputTokens,
+             system,
+           }),
         });
 
         const stream = createUIMessageStream({
@@ -442,7 +355,12 @@ export async function POST(req: Request) {
           },
         });
 
-        return new Response(stream.pipeThrough(new JsonToSseTransformStream()));
+        // Return simulated streaming response with gateway header
+        const headers = new Headers({ "X-Used-Gateway": usedGateway, "Cache-Control": "no-store" });
+        return new Response(
+          stream.pipeThrough(new JsonToSseTransformStream()),
+          { headers }
+        );
       }
 
       throw streamErr;
@@ -456,22 +374,32 @@ export async function POST(req: Request) {
       errorMessage.includes("not supported") ||
       errorMessage.includes("Bad Request")
     ) {
+      const headers = new Headers({
+        "Content-Type": "application/json",
+        "X-Used-Gateway": "unknown",
+      });
       return new Response(
         JSON.stringify({
           error: `Model "${modelToUse}" is not supported by the LLM Gateway. Please select a different model.`,
           code: "MODEL_NOT_SUPPORTED",
+          usedGateway: "unknown",
         }),
-        { status: 400, headers: { "Content-Type": "application/json" } }
+        { status: 400, headers }
       );
     }
 
     if (errorMessage.includes("429") || errorMessage.includes("rate limit")) {
+      const headers = new Headers({
+        "Content-Type": "application/json",
+        "X-Used-Gateway": "unknown",
+      });
       return new Response(
         JSON.stringify({
           error: "Rate limit exceeded. Please wait a moment and try again.",
           code: "RATE_LIMITED",
+          usedGateway: "unknown",
         }),
-        { status: 429, headers: { "Content-Type": "application/json" } }
+        { status: 429, headers }
       );
     }
 
@@ -479,23 +407,34 @@ export async function POST(req: Request) {
       errorMessage.includes("quota") ||
       errorMessage.includes("insufficient")
     ) {
+      const headers = new Headers({
+        "Content-Type": "application/json",
+        "X-Used-Gateway": "unknown",
+      });
       return new Response(
         JSON.stringify({
           error: "API quota exceeded. Please check your API key limits.",
           code: "QUOTA_EXCEEDED",
+          usedGateway: "unknown",
         }),
-        { status: 402, headers: { "Content-Type": "application/json" } }
+        { status: 402, headers }
       );
     }
 
+    const headers = new Headers({
+      "Content-Type": "application/json",
+      "X-Used-Gateway": "unknown",
+      "Cache-Control": "no-store",
+    });
     return new Response(
       JSON.stringify({
         error: "Internal server error",
         details: errorMessage,
+        usedGateway: "unknown",
       }),
       {
         status: 500,
-        headers: { "Content-Type": "application/json" },
+        headers,
       }
     );
   }

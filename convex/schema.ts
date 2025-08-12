@@ -13,9 +13,8 @@ export default defineSchema({
   }),
   users: defineTable({
     userId: v.string(),            // Clerk userId
-
-    // LLM Gateway API key
     llmGatewayApiKey: v.optional(v.string()),
+    aiGatewayApiKey: v.optional(v.string()),
 
     // User preferences
     theme: v.optional(v.string()),
@@ -51,7 +50,13 @@ export default defineSchema({
     userId: v.string(),
     name: v.string(),
     createdAt: v.number(),
-    columns: v.array(v.object({ id: v.string(), modelId: v.string() })),
+    columns: v.array(
+      v.object({
+        id: v.string(),
+        modelId: v.string(),
+        gatewaySource: v.optional(v.union(v.literal("aigateway"), v.literal("llmgateway"))),
+      }),
+    ),
   }).index("by_user", ["userId"]),
   playgroundMessages: defineTable({
     playgroundId: v.id("playgrounds"),

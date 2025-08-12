@@ -3,7 +3,7 @@
 import { useUser } from "@clerk/nextjs";
 import type { User } from "@clerk/nextjs/server";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ChatInput } from "~/components/chat-input/chat-input";
 import type { UploadedFile } from "~/components/chat-input/file-items";
 import { useChatHandlers } from "~/components/chat-input/use-chat-handlers";
@@ -21,6 +21,11 @@ export default function Chat({ initialName }: ChatProps = {}) {
 	const [isCreatingChat, setIsCreatingChat] = useState(false);
 	const [hasNavigated, setHasNavigated] = useState(false);
 	const [attachments, setAttachments] = useState<UploadedFile[]>([]);
+
+    const conversationScrollApiRef = useRef<{
+        scrollToBottom: () => void;
+        getIsAtBottom: () => boolean;
+    } | null>(null);
 
 	const {
 		messages,
@@ -88,6 +93,16 @@ export default function Chat({ initialName }: ChatProps = {}) {
 		setInput("");
 		setAttachments([]);
 
+		// If conversation is not at bottom, scroll down
+		try {
+			if (
+				conversationScrollApiRef.current &&
+				!conversationScrollApiRef.current.getIsAtBottom()
+			) {
+				conversationScrollApiRef.current.scrollToBottom();
+			}
+		} catch {}
+
 		// If no chatId, create a new chat first (async)
 		if (!chatIdString) {
 			setIsCreatingChat(true);
@@ -119,15 +134,15 @@ export default function Chat({ initialName }: ChatProps = {}) {
 		}
 	};
 
-	const handleBranch = async (idx: number) => {
+    const handleBranch = async (_idx: number) => {
 		// TODO: Implement branch functionality if needed
 		console.log("Branch not implemented yet");
 	};
 
 	const isLoading = isSubmitting || isCreatingChat || status === "streaming";
 
-	const { state } = useSidebar();
-	const collapsed = state === "collapsed";
+    const { state } = useSidebar();
+    const _collapsed = state === "collapsed";
 
 	return (
 		<>
@@ -156,7 +171,7 @@ export default function Chat({ initialName }: ChatProps = {}) {
 					</div>
 				</div>
 			</div>
-			<div className="absolute inset-0 overflow-y-scroll sm:pt-3.5">
+            <div className="absolute inset-0 sm:pt-3.5">
 				{showOnboarding ? (
 					<div className="mx-auto flex w-full max-w-3xl flex-col space-y-12 px-4 pt-safe-offset-10 pb-10">
 						<div className="flex h-[calc(100vh-20rem)] items-start justify-center">
@@ -168,6 +183,7 @@ export default function Chat({ initialName }: ChatProps = {}) {
 						</div>
 					</div>
 				) : (
+                    <div className="h-full min-h-0 w-full">
 					<Conversation
 						messages={messages}
 						status={status}
@@ -175,7 +191,12 @@ export default function Chat({ initialName }: ChatProps = {}) {
 						onEdit={handleEdit}
 						onReload={handleReload}
 						onBranch={handleBranch}
+						scrollButtonBottomClass="bottom-35 z-50 md:bottom-32"
+						registerScrollApi={(api) => {
+							conversationScrollApiRef.current = api;
+						}}
 					/>
+					</div>
 				)}
 			</div>
 		</>

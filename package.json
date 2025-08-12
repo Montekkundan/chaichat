@@ -20,6 +20,7 @@
 		"registry:build": "shadcn build"
 	},
 	"dependencies": {
+		"@ai-sdk/gateway": "^1.0.4",
 		"@ai-sdk/react": "^2.0.4",
 		"@clerk/nextjs": "^6.21.0",
 		"@llmgateway/ai-sdk-provider": "^2.0.1",

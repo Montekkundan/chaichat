@@ -7,7 +7,7 @@ import { v } from "convex/values";
 
 export const storeKey = mutation({
   args: {
-    provider: v.literal("llmgateway"),
+    provider: v.union(v.literal("llmgateway"), v.literal("aigateway")),
     apiKey: v.string(),
   },
   handler: async (ctx, { provider, apiKey }) => {
@@ -26,15 +26,18 @@ export const storeKey = mutation({
 
     if (existingUser) {
       // Update existing user
-      await ctx.db.patch(existingUser._id, {
-        llmGatewayApiKey: apiKey,
-      });
+      if (provider === "llmgateway") {
+        await ctx.db.patch(existingUser._id, { llmGatewayApiKey: apiKey });
+      } else {
+        await ctx.db.patch(existingUser._id, { aiGatewayApiKey: apiKey });
+      }
     } else {
       // Create new user record
-      await ctx.db.insert("users", {
-        userId,
-        llmGatewayApiKey: apiKey,
-      });
+      if (provider === "llmgateway") {
+        await ctx.db.insert("users", { userId, llmGatewayApiKey: apiKey });
+      } else {
+        await ctx.db.insert("users", { userId, aiGatewayApiKey: apiKey });
+      }
     }
   },
 });
@@ -64,16 +67,17 @@ export const getKeys = action({
       return {};
     }
 
-    // Return LLM Gateway key only
+    // Return BYOK keys
     return {
       llmGatewayApiKey: user.llmGatewayApiKey,
+      aiGatewayApiKey: user.aiGatewayApiKey,
     };
   },
 });
 
 export const removeKey = mutation({
   args: {
-    provider: v.literal("llmgateway"),
+    provider: v.union(v.literal("llmgateway"), v.literal("aigateway")),
   },
   handler: async (ctx, { provider }) => {
     const identity = await ctx.auth.getUserIdentity();
@@ -88,9 +92,11 @@ export const removeKey = mutation({
       .first();
 
     if (user) {
-      await ctx.db.patch(user._id, {
-        llmGatewayApiKey: undefined,
-      });
+      if (provider === "llmgateway") {
+        await ctx.db.patch(user._id, { llmGatewayApiKey: undefined });
+      } else {
+        await ctx.db.patch(user._id, { aiGatewayApiKey: undefined });
+      }
     }
   },
 });
@@ -107,6 +113,7 @@ export const getUserKeysForAPI = action({
 
     return {
       llmGatewayApiKey: user.llmGatewayApiKey,
+      aiGatewayApiKey: user.aiGatewayApiKey,
     };
   },
 }); 

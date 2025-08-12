@@ -46,7 +46,7 @@ export interface Playground {
 	userId: string;
 	name: string;
 	createdAt: number;
-	columns: { id: string; modelId: string }[];
+  columns: { id: string; modelId: string; gatewaySource?: "aigateway" | "llmgateway" }[];
 }
 
 export interface PlaygroundMessage {
@@ -59,6 +59,7 @@ export interface PlaygroundMessage {
 	model: string;
 	createdAt: number;
 	_creationTime: number;
+  gateway?: "llm-gateway" | "vercel-ai-gateway";
 }
 
 export class ChaiChatDB extends Dexie {
@@ -70,7 +71,7 @@ export class ChaiChatDB extends Dexie {
 
 	constructor() {
 		super("ChaiChatDB");
-    this.version(7)
+    this.version(8)
 			.stores({
 				chats:
 					"_id, userId, name, createdAt, currentModel, parentChatId, isPublic",
@@ -78,8 +79,8 @@ export class ChaiChatDB extends Dexie {
           "_id, chatId, userId, createdAt, parentMessageId, version, isActive, model, attachments, partsJson",
 				users: "id, fullName",
 				playgrounds: "_id, userId, createdAt",
-				playgroundMessages:
-					"_id, playgroundId, columnId, userId, createdAt, model",
+        playgroundMessages:
+          "_id, playgroundId, columnId, userId, createdAt, model, gateway",
 			})
 			.upgrade((tx) => {
 				// Ensure message fields exist
@@ -99,6 +100,12 @@ export class ChaiChatDB extends Dexie {
 						if (chat.parentChatId === undefined) chat.parentChatId = undefined;
 						if (chat.isPublic === undefined) chat.isPublic = false;
 					});
+        // Ensure gateway on playgroundMessages
+        tx.table("playgroundMessages")
+          .toCollection()
+          .modify((msg) => {
+            if (msg.gateway === undefined) msg.gateway = undefined;
+          });
 			});
 	}
 }

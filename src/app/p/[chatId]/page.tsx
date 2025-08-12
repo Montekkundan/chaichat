@@ -102,8 +102,7 @@ export async function generateMetadata({
 }
 
 export default async function PublicChatPage({
-	params,
-	searchParams,
+	params
 }: {
 	params: Promise<{ chatId: string }>;
 	searchParams?: Promise<Record<string, string | string[] | undefined>>;

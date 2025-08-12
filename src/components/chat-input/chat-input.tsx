@@ -22,6 +22,11 @@ import {
 import { filterValidFiles } from "~/lib/file-upload/validation";
 import { FileList } from "./file-list";
 import { ModelSelector } from "./model-selector";
+import { useMessages } from "~/lib/providers/messages-provider";
+import { ModelConfigPanel } from "~/components/playground/model-config";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "~/components/ui/dropdown-menu";
+import { Button as UIButton } from "~/components/ui/button";
+import { Settings as SettingsIcon } from "lucide-react";
 
 // TODO cleanup: use all user keys
 
@@ -72,11 +77,11 @@ export function ChatInput({
 	position = "centered",
 	disabled = false,
 }: ChatInputProps) {
-	const hasToolSupport = true; // Assume all models support tools via LLM Gateway
+  // const hasToolSupport = true; // Assume all models support tools via LLM Gateway
 
 	// User keys state for search capabilities
 	const getKeys = useAction(api.userKeys.getKeys);
-	const [userKeys, setUserKeys] = useState<UserKeys | undefined>(undefined);
+  const [_userKeys, setUserKeys] = useState<UserKeys | undefined>(undefined);
 
 	// Load user keys on mount
 	useEffect(() => {
@@ -89,7 +94,7 @@ export function ChatInput({
 					const { getAllKeys } = await import("~/lib/local-keys");
 					const localKeys = await getAllKeys();
 					setUserKeys(localKeys);
-				} catch (error) {
+    } catch (_error) {
 					setUserKeys({});
 				}
 			}
@@ -99,7 +104,7 @@ export function ChatInput({
 	}, [isUserAuthenticated, getKeys]);
 
 	// For now, enable search for all models - LLM Gateway will handle capabilities
-	const allowWebSearch = true;
+  // const allowWebSearch = true;
 
 	// Helper to check if a string is only whitespace characters
 	const isOnlyWhitespace = (text: string) => !/[^\s]/.test(text);
@@ -115,7 +120,7 @@ export function ChatInput({
 	const pendingFilesRef = useRef<File[]>([]);
 
 	// Handle paste events (defined after startUpload to avoid TS errors)
-	const handlePaste = useCallback(
+  const _handlePaste = useCallback(
 		async (e: ClipboardEvent) => {
 			const items = e.clipboardData?.items;
 			if (!items) return;
@@ -177,10 +182,10 @@ export function ChatInput({
 	);
 
 	// Web search toggle state
-	const [isSearchEnabled, setIsSearchEnabled] = useState(false);
-	const toggleSearch = () => {
-		setIsSearchEnabled((prev) => !prev);
-	};
+	const [isSearchEnabled, _setIsSearchEnabled] = useState(false);
+  // const toggleSearch = () => {
+  //   setIsSearchEnabled((prev) => !prev);
+  // };
 
 	// Track if user has any API keys available - check for LLM Gateway key
 	const [hasApiKeys, setHasApiKeys] = useState(false); // Default to false
@@ -299,13 +304,13 @@ export function ChatInput({
 	);
 
 	// ---------------- Upload handling -----------------
-	const fileInputRef = useRef<HTMLInputElement>(null);
+  const _fileInputRef = useRef<HTMLInputElement>(null);
 	const [showCookieModal, setShowCookieModal] = useState(false);
 
 	// Uploads are disabled when the selected model doesn't support attachments
 	const uploadDisabled = !supportsAttachments;
 
-	const handleLocalFileChange = async (
+  const _handleLocalFileChange = async (
 		e: React.ChangeEvent<HTMLInputElement>,
 	) => {
 		if (uploadDisabled) return;
@@ -348,6 +353,10 @@ export function ChatInput({
 			);
 		}
 	};
+
+  // Model configuration state from messages provider
+  const { modelConfig, setModelConfig } = useMessages();
+  const [isConfigMenuOpen, setIsConfigMenuOpen] = useState(false);
 
 	const mainContent = (
 		<div className="w-full max-w-3xl">
@@ -443,11 +452,48 @@ export function ChatInput({
 								</label>
 							</PromptInputAction>
 						)} */}
-						<ModelSelector
+                    <ModelSelector
 							selectedModelId={selectedModel}
 							setSelectedModelId={onSelectModel}
 							className="rounded-full"
 						/>
+                        {/* Model Configuration popover */}
+                        <DropdownMenu
+                          open={isConfigMenuOpen}
+                          onOpenChange={(open) => {
+                            setIsConfigMenuOpen(open);
+                            if (open) {
+                              setTimeout(() => {
+                                const el = document.getElementById("temperature") as HTMLInputElement | null;
+                                el?.focus();
+                                el?.select?.();
+                              }, 0);
+                            }
+                          }}
+                        >
+                          <DropdownMenuTrigger asChild>
+                            <UIButton aria-label="Model Settings" variant={"ghost"} size={"icon"}>
+                              <span className="button_content__eYZtX button_flex___f_3o">
+                                <span className="pointer-events-none flex rounded-md p-2">
+                                  <SettingsIcon className="h-4 w-4" />
+                                </span>
+                              </span>
+                            </UIButton>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="start" className="w-[420px]">
+                            <div className="space-y-2 p-2">
+                              <div className="font-semibold text-sm px-1">Model Configuration</div>
+                              <ModelConfigPanel
+                                modelId={selectedModel}
+                                // Narrow typing to the shared shape
+                                // biome-ignore lint/suspicious/noExplicitAny: Component typing expects ChatColumn["config"]; runtime shape is compatible
+                                value={modelConfig as unknown as any}
+                                // biome-ignore lint/suspicious/noExplicitAny: See above note; we convert partials into provider setter
+                                onChange={(u: any) => setModelConfig(u)}
+                              />
+                            </div>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
 						{/* TODO: Implement web search functionality */}
 						{/* {allowWebSearch && (
 							<PromptInputAction

@@ -27,6 +27,7 @@ import {
 	SidebarMenuSub,
 	SidebarMenuSubButton,
 	SidebarMenuSubItem,
+    useSidebar,
 } from "~/components/ui/sidebar";
 import { toast } from "~/components/ui/toast";
 import { ChatTitlesCookieManager } from "~/lib/chat-titles-cookie";
@@ -44,6 +45,7 @@ export function HistorySection() {
 	const { user } = useUser();
 	const cache = useCache();
 	const router = useRouter();
+  const { state } = useSidebar();
 	const [recentChats, setRecentChats] = useState<LocalChat[]>([]);
 	const [chatCount, setChatCount] = useState(0);
 	const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -181,11 +183,20 @@ export function HistorySection() {
 					>
 						<SidebarMenuItem>
 							<CollapsibleTrigger asChild>
-								<SidebarMenuButton tooltip="History">
+                                <SidebarMenuButton
+                                    tooltip="History"
+                                    onClick={(e) => {
+                                        if (state === "collapsed") {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            setIsDialogOpen(true);
+                                        }
+                                    }}
+                                >
 									<History className="h-4 w-4" />
 									<span>History</span>
 									<ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
-								</SidebarMenuButton>
+                                </SidebarMenuButton>
 							</CollapsibleTrigger>
 							<CollapsibleContent>
 								<SidebarMenuSub>

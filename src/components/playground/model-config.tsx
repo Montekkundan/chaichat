@@ -7,6 +7,7 @@ import { Separator } from "~/components/ui/separator";
 import { Switch } from "~/components/ui/switch";
 import type { ChatColumn } from "~/lib/providers/playground-provider";
 
+// TODO: move in components folder
 type ModelConfigValue = ChatColumn["config"];
 
 export function ModelConfigPanel({

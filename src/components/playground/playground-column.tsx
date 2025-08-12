@@ -11,7 +11,7 @@ import {
 	Settings,
 	Trash2,
 } from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useState, useEffect, useRef } from "react";
 import { ModelSelector } from "~/components/chat-input/model-selector";
 import { Conversation } from "~/components/chat/conversation";
 import {
@@ -47,12 +47,24 @@ export function PlaygroundColumn({
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const [isConfigMenuOpen, setIsConfigMenuOpen] = useState(false);
 
-	// Shared cached models
-	const {
-		models,
-		isLoading: isModelsLoading,
-		error: modelsError,
-	} = useLLMModels();
+  // Per-column scroll API so Enter can scroll to bottom if needed
+  const conversationScrollApiRef = useRef<{
+    scrollToBottom: () => void;
+    getIsAtBottom: () => boolean;
+  } | null>(null);
+
+  // Per-column gateway source and models (controlled by ModelSelector)
+  const [columnSource, setColumnSource] = useState<"aigateway" | "llmgateway">(column.gatewaySource || "llmgateway");
+  // Keep local state in sync with provider/state updates
+  useEffect(() => {
+    const next = (column.gatewaySource || "llmgateway") as "aigateway" | "llmgateway";
+    setColumnSource(next);
+  }, [column.gatewaySource]);
+  const {
+    models,
+    isLoading: isModelsLoading,
+    error: modelsError,
+  } = useLLMModels({ source: columnSource, controlled: true });
 
 	const formatPrice = useCallback((price: string | undefined) => {
 		if (!price || price === "undefined" || price === "null") return "Free";
@@ -130,11 +142,18 @@ export function PlaygroundColumn({
 		sendToSyncedColumns,
 		addColumn,
 		maxColumns,
+    registerColumnScrollApi,
 	} = usePlayground();
 
 	const handleModelChange = (modelId: string) => {
 		updateColumn(column.id, { modelId });
 	};
+
+  // Persist per-column gateway selection back to provider state
+  const handleSourceChange = useCallback((src: "aigateway" | "llmgateway") => {
+    setColumnSource(src);
+    updateColumn(column.id, { gatewaySource: src });
+  }, [column.id, updateColumn]);
 
 	const handleInputChange = (value: string) => {
 		if (column.synced) {
@@ -153,7 +172,24 @@ export function PlaygroundColumn({
 		const inputValue = column.synced ? sharedInput : column.input;
 		if (!inputValue.trim()) return;
 
-		setIsSubmitting(true);
+    // Optimistically clear the input for snappy UX
+    if (column.synced) {
+      updateSharedInput("");
+    } else {
+      updateColumnInput(column.id, "");
+    }
+
+    setIsSubmitting(true);
+
+    // Scroll to bottom if not at bottom already
+    try {
+      if (
+        conversationScrollApiRef.current &&
+        !conversationScrollApiRef.current.getIsAtBottom()
+      ) {
+        conversationScrollApiRef.current.scrollToBottom();
+      }
+    } catch {}
 
 		try {
 			if (column.synced) {
@@ -205,11 +241,13 @@ export function PlaygroundColumn({
 							<div className="min-w-0 flex-1">
 								<div className="flex flex-1 flex-col">
 									<div className="relative grid gap-2">
-										<ModelSelector
+                    <ModelSelector
 											selectedModelId={column.modelId}
 											setSelectedModelId={handleModelChange}
 											className="ease inline-flex h-[32px] w-full max-w-[288px] items-center justify-between truncate rounded-md border bg-background px-3 py-0.5 font-mono text-foreground leading-6 transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
 											isUserAuthenticated={!!user?.id}
+                      source={columnSource}
+                      onSourceChange={handleSourceChange}
 										/>
 									</div>
 								</div>
@@ -265,9 +303,9 @@ export function PlaygroundColumn({
 											</div>
 										</DropdownMenuContent>
 									</DropdownMenu>
-								</div>
+                                </div>
 
-								{/* Add Column button */}
+                                {/* Add Column button */}
 								<Tooltip>
 									<TooltipTrigger asChild>
 										<span>
@@ -355,13 +393,18 @@ export function PlaygroundColumn({
 							className="scrolling-touch scrolling-gpu relative h-full w-full overscroll-y-contain"
 						>
 							{column.messages.length > 0 ? (
-								<Conversation
-									messages={column.messages.map((msg) => ({
-										...msg,
-										model: column.modelId,
-									}))}
-								status={derivedStatus}
+                                <Conversation
+                                    messages={column.messages}
+                                status={derivedStatus}
+                                    gateway={columnSource === "aigateway" ? "vercel-ai-gateway" : "llm-gateway"}
 									scrollButtonBottomClass="bottom-2"
+                  registerScrollApi={(api) => {
+                    conversationScrollApiRef.current = api;
+                    // Register with provider so synced sends can scroll all columns
+                    try {
+                      registerColumnScrollApi(column.id, api ?? null);
+                    } catch {}
+                  }}
 									onDelete={(id) => {
 										updateColumn(column.id, {
 											messages: column.messages.filter((msg) => msg.id !== id),

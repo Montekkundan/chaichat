@@ -1,7 +1,8 @@
-export type ProviderId = "llmgateway";
+export type ProviderId = "llmgateway" | "aigateway";
 
 export interface UserKeys {
 	llmGatewayApiKey?: string;
+  aiGatewayApiKey?: string;
 }
 
 const LOCAL_KEYS_PREFIX = "chaichat_keys_";
@@ -89,6 +90,7 @@ export function removeSessionKey(provider: ProviderId): void {
 export function getAllLocalKeys(): UserKeys {
 	return {
 		llmGatewayApiKey: getLocalKey("llmgateway"),
+    aiGatewayApiKey: getLocalKey("aigateway"),
 	};
 }
 
@@ -96,6 +98,7 @@ export function getAllLocalKeys(): UserKeys {
 export function getAllSessionKeys(): UserKeys {
 	return {
 		llmGatewayApiKey: getSessionKey("llmgateway"),
+    aiGatewayApiKey: getSessionKey("aigateway"),
 	};
 }
 
@@ -107,12 +110,14 @@ export function getAllKeys(): UserKeys {
 	return {
 		llmGatewayApiKey:
 			sessionKeys.llmGatewayApiKey || localKeys.llmGatewayApiKey,
+    aiGatewayApiKey:
+      sessionKeys.aiGatewayApiKey || localKeys.aiGatewayApiKey,
 	};
 }
 
 // Clear all keys from both storages
 export function clearAllKeys(): void {
-	const providers: ProviderId[] = ["llmgateway"];
+  const providers: ProviderId[] = ["llmgateway", "aigateway"];
 
 	for (const provider of providers) {
 		removeLocalKey(provider);

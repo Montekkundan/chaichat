@@ -37,6 +37,62 @@ type ExtendedMessage = UIMessage & {
 	_creationTime?: number;
 };
 
+type ModelConfig = {
+  temperature: number;
+  maxOutputTokens: number;
+  topP: number;
+  topK: number;
+  frequencyPenalty: number;
+  presencePenalty: number;
+  openai?: {
+    reasoningEffort?: "minimal" | "low" | "medium" | "high";
+    reasoningSummary?: "auto" | "detailed";
+    textVerbosity?: "low" | "medium" | "high";
+    serviceTier?: "auto" | "flex" | "priority";
+    parallelToolCalls?: boolean;
+    store?: boolean;
+    strictJsonSchema?: boolean;
+    maxCompletionTokens?: number;
+    user?: string;
+    metadata?: Record<string, string>;
+  };
+  google?: {
+    cachedContent?: string;
+    structuredOutputs?: boolean;
+    safetySettings?: Array<{ category: string; threshold: string }>;
+    responseModalities?: string[];
+    thinkingConfig?: { thinkingBudget?: number; includeThoughts?: boolean };
+  };
+};
+
+const createDefaultConfig = (): ModelConfig => ({
+  temperature: 0.7,
+  maxOutputTokens: 1024,
+  topP: 1,
+  topK: 0,
+  frequencyPenalty: 0,
+  presencePenalty: 0,
+  openai: {
+    reasoningEffort: undefined,
+    reasoningSummary: undefined,
+    textVerbosity: undefined,
+    serviceTier: undefined,
+    parallelToolCalls: undefined,
+    store: undefined,
+    strictJsonSchema: undefined,
+    maxCompletionTokens: undefined,
+    user: undefined,
+    metadata: undefined,
+  },
+  google: {
+    cachedContent: undefined,
+    structuredOutputs: undefined,
+    safetySettings: undefined,
+    responseModalities: undefined,
+    thinkingConfig: undefined,
+  },
+});
+
 interface MessagesContextType {
 	messages: ExtendedMessage[];
 	input: string;
@@ -49,6 +105,8 @@ interface MessagesContextType {
 	isSubmitting: boolean;
 	selectedModel: string;
 	setSelectedModel: (model: string) => void;
+  modelConfig: ModelConfig;
+  setModelConfig: (update: Partial<ModelConfig>) => void;
 	status: "ready" | "streaming" | "submitted" | "error";
 	quotaExceeded: boolean;
 	rateLimited: boolean;
@@ -120,6 +178,7 @@ export function MessagesProvider({ children, chatId }: MessagesProviderProps) {
 	const [quotaExceeded, setQuotaExceeded] = useState(false);
 	const [rateLimited, setRateLimited] = useState(false);
 	const currentUserId = user?.id ?? userSessionManager.getStorageUserId();
+  const [modelConfigState, setModelConfigState] = useState<ModelConfig>(createDefaultConfig());
 
 	const selectedModelRef = useRef(selectedModel);
 	useEffect(() => {
@@ -145,7 +204,7 @@ export function MessagesProvider({ children, chatId }: MessagesProviderProps) {
 		}
 		// For anonymous users, get from local secure storage
 		try {
-			return await getAllKeys();
+      return await getAllKeys();
 		} catch (error) {
 			console.error("Failed to get API keys:", error);
 			return {};
@@ -170,10 +229,37 @@ export function MessagesProvider({ children, chatId }: MessagesProviderProps) {
 				}
 
 				const userApiKeys = await getUserApiKeys();
+        const gateway = (() => {
+          try {
+            const src = window.localStorage.getItem("chaichat_models_source");
+            return src === "aigateway" ? "vercel-ai-gateway" : "llm-gateway";
+          } catch {
+            return "llm-gateway";
+          }
+        })();
+        // Include provider-specific sub-configs based on ANY segment in the model path.
+        // This supports nested providers like "groq/openai/..." where OpenAI-specific
+        // options (e.g., reasoningEffort) should still be forwarded.
+        const providersInPath = currentModel.toLowerCase().split("/");
+        const hasOpenAI = providersInPath.includes("openai");
+        const hasGoogleOrGemini = providersInPath.includes("google") || providersInPath.includes("gemini");
+        const config: ModelConfig = {
+          temperature: modelConfigState.temperature,
+          maxOutputTokens: modelConfigState.maxOutputTokens,
+          topP: modelConfigState.topP,
+          topK: modelConfigState.topK,
+          frequencyPenalty: modelConfigState.frequencyPenalty,
+          presencePenalty: modelConfigState.presencePenalty,
+          ...(hasOpenAI ? { openai: modelConfigState.openai } : {}),
+          ...(hasGoogleOrGemini ? { google: modelConfigState.google } : {}),
+        };
 				return {
 					model: currentModel,
 					system: SYSTEM_PROMPT_DEFAULT,
-					userApiKeys,
+          userApiKeys,
+          gateway,
+          temperature: modelConfigState.temperature,
+          config,
 				};
 			},
     // biome-ignore lint/suspicious/noExplicitAny: Bridging type mismatch between `ai` and `@ai-sdk/react` transport types at compile time; runtime behavior is correct
@@ -523,6 +609,9 @@ export function MessagesProvider({ children, chatId }: MessagesProviderProps) {
 				isSubmitting,
 				selectedModel,
 				setSelectedModel,
+        modelConfig: modelConfigState,
+        setModelConfig: (update: Partial<ModelConfig>) =>
+          setModelConfigState((prev) => ({ ...prev, ...update })),
 				status,
 				quotaExceeded,
 				rateLimited,
