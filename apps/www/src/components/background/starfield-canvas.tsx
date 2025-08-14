@@ -3,6 +3,8 @@
 import { Canvas, useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useSidebar } from "../ui/sidebar";
+import { cn } from "~/lib/utils";
 
 function StarfieldMaterial() {
 	const materialRef = useRef<THREE.ShaderMaterial>(null);
@@ -131,10 +133,13 @@ export function BackgroundSpace() {
 		return () => observer.disconnect();
 	}, []);
 
+	const { state } = useSidebar();
+	const collapsed = state === "collapsed";
+
 	return (
-		<div className="fixed inset-0 -z-10 will-change-transform pointer-events-none bg-background">
+		<div className={cn("fixed -z-10 will-change-transform pointer-events-none bg-background", collapsed ? "inset-0" : "mt-2 w-full h-full rounded-t-xl")}>
 			<Canvas
-				className="[transform:translateZ(0)]"
+				className="[transform:translateZ(0)] rounded-t-3xl"
 				camera={{ position: [0, 0, 0], fov: 75 }}
 				dpr={[1, 1.75]}
 				frameloop="always"
