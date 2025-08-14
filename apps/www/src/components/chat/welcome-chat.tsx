@@ -68,9 +68,9 @@ export default function WelcomeChat({ initialName: _initialName }: WelcomeChatPr
 	// Background handled globally in layout; no local fog/Canvas state
 
 	const suggestionItems = [
-		"What can I build with ChaiChat?",
-		"Show a quick tour of features",
-		"How do I connect my own API keys?",
+		"What is the meaning of life?",
+		"Explain the theory of relativity",
+		"What are the different AI architectures?",
 	];
 
 	const handleSuggestionClick = (suggestion: string) => {
