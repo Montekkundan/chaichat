@@ -1,6 +1,6 @@
 import { currentUser } from "@clerk/nextjs/server";
 import type { Metadata } from "next";
-import Chat from "~/components/chat/chat";
+import WelcomeChat from "~/components/chat/welcome-chat";
 import { LayoutMain } from "~/components/chat/layout-chat";
 import { APP_NAME, generateOGImageURL } from "~/lib/config";
 import { MessagesProvider } from "~/lib/providers/messages-provider";
@@ -51,7 +51,7 @@ export default async function Page({
 	return (
 		<LayoutMain>
 			<MessagesProvider>
-				<Chat initialName={firstName} />
+				<WelcomeChat initialName={firstName} />
 			</MessagesProvider>
 		</LayoutMain>
 	);
