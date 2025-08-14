@@ -17,7 +17,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ModelSelector } from "~/components/chat-input/model-selector";
 import { Conversation } from "~/components/chat/conversation";
-import { ModelConfigPanel } from "~/components/playground/model-config";
+import { ModelConfigPanel } from "~/components/model-config/model-config";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -34,6 +34,7 @@ import type { LLMGatewayModel } from "~/types/llmgateway";
 import { Button } from "../ui/button";
 import { Separator } from "../ui/separator";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
+import { Square } from "lucide-react";
 
 interface PlaygroundColumnProps {
 	column: ChatColumn;
@@ -180,6 +181,8 @@ export function PlaygroundColumn({
 		addColumn,
 		maxColumns,
 		registerColumnScrollApi,
+		stopColumn,
+		stopSyncedColumns,
 	} = usePlayground();
 
 	const handleModelChange = (modelId: string) => {
@@ -221,6 +224,11 @@ export function PlaygroundColumn({
 
 		setIsSubmitting(true);
 
+		// Optimistically mark this column as streaming for immediate UI feedback
+		try {
+			updateColumn(column.id, { isStreaming: true, status: "submitted" });
+		} catch {}
+
 		// Scroll to bottom if not at bottom already
 		try {
 			if (
@@ -255,6 +263,7 @@ export function PlaygroundColumn({
 
   const currentInput = column.synced ? sharedInput : column.input;
   const hasRequiredKey = columnSource === "aigateway" ? hasAiKey : hasLlmKey;
+
 	const canMoveLeft = columnIndex > 0;
 	const canMoveRight = columnIndex < columns.length - 1;
 	const canRemove = columns.length > 1;
@@ -568,7 +577,7 @@ export function PlaygroundColumn({
 									handleSend();
 								}}
 							>
-                        <textarea
+                            <textarea
                           placeholder={
                             hasRequiredKey
                               ? (column.synced ? "Type a synced message..." : "Type your message…")
@@ -581,7 +590,7 @@ export function PlaygroundColumn({
                             target.style.height = "auto";
                             target.style.height = `${Math.min(target.scrollHeight, 120)}px`;
                           }}
-                          className="min-h-[38px] max-h-[120px] flex-1 resize-none overflow-y-auto rounded-md border bg-background-100 py-2 pl-4 pr-9 text-sm focus:border-zinc-400 focus:outline-none focus:ring-0 dark:focus:border-zinc-600 disabled:cursor-not-allowed disabled:opacity-60"
+                          className="flex-1 max-h-[120px] min-h-[38px] resize-none overflow-y-auto rounded-md border bg-background-100 py-2 pl-4 pr-9 text-sm focus:border-zinc-400 focus:outline-none focus:ring-0 dark:focus:border-zinc-600 disabled:cursor-not-allowed disabled:opacity-60"
                           spellCheck="false"
                           rows={1}
                           style={{
@@ -598,28 +607,46 @@ export function PlaygroundColumn({
                             }
                           }}
                         />
-								<div className="absolute right-1 bottom-[3px] inline-flex items-center justify-end">
-                                    <button
-										type="button"
-										aria-label="Send Message"
-                                      onClick={handleSend}
-                                      disabled={!hasRequiredKey || isSubmitting || !currentInput.trim()}
-										className="button_base__IZQUR reset_reset__sz7UJ button_button__dyHAB reset_reset__sz7UJ geist-new-themed geist-new-tertiary geist-new-tertiary-fill button_tertiary__t8MGO button_shape__4NO5k button_small__BoUqH button_invert__WPMQW"
-										data-geist-button=""
-										data-prefix="false"
-										data-suffix="false"
-										data-version="v1"
-										style={
-											{ "--geist-icon-size": "16px" } as React.CSSProperties
-										}
-									>
-										<span className="button_content__eYZtX button_flex___f_3o">
-											<span className="pointer-events-none flex rounded-md p-2">
-												<SendIcon className="h-4 w-4" />
-											</span>
-										</span>
-									</button>
-								</div>
+                                <div className="absolute right-1 bottom-[3px] inline-flex items-center justify-end">
+                                    {column.isStreaming || derivedStatus === "streaming" ? (
+                                        <button
+                                            type="button"
+                                            aria-label="Stop"
+                                            onClick={() => (column.synced ? stopSyncedColumns() : stopColumn(column.id))}
+                                            className="button_base__IZQUR reset_reset__sz7UJ button_button__dyHAB reset_reset__sz7UJ geist-new-themed geist-new-tertiary geist-new-tertiary-fill button_tertiary__t8MGO button_shape__4NO5k button_small__BoUqH button_invert__WPMQW"
+                                            data-geist-button=""
+                                            data-prefix="false"
+                                            data-suffix="false"
+                                            data-version="v1"
+                                            style={{ "--geist-icon-size": "16px" } as React.CSSProperties}
+                                        >
+                                            <span className="button_content__eYZtX button_flex___f_3o">
+                                                <span className="pointer-events-none flex rounded-md p-2">
+                                                    <Square className="h-4 w-4" />
+                                                </span>
+                                            </span>
+                                        </button>
+                                    ) : (
+                                        <button
+                                            type="button"
+                                            aria-label="Send Message"
+                                            onClick={handleSend}
+                                            disabled={!hasRequiredKey || isSubmitting || !currentInput.trim()}
+                                            className="button_base__IZQUR reset_reset__sz7UJ button_button__dyHAB reset_reset__sz7UJ geist-new-themed geist-new-tertiary geist-new-tertiary-fill button_tertiary__t8MGO button_shape__4NO5k button_small__BoUqH button_invert__WPMQW"
+                                            data-geist-button=""
+                                            data-prefix="false"
+                                            data-suffix="false"
+                                            data-version="v1"
+                                            style={{ "--geist-icon-size": "16px" } as React.CSSProperties}
+                                        >
+                                            <span className="button_content__eYZtX button_flex___f_3o">
+                                                <span className="pointer-events-none flex rounded-md p-2">
+                                                    <SendIcon className="h-4 w-4" />
+                                                </span>
+                                            </span>
+                                        </button>
+                                    )}
+                                </div>
 							</form>
 						</div>
 					</div>

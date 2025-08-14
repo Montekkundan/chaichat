@@ -183,6 +183,30 @@ export function MessagesProvider({ children, chatId }: MessagesProviderProps) {
 		createDefaultConfig(),
 	);
 
+	// Persist per-chat model config in localStorage
+	useEffect(() => {
+		if (!chatId) return;
+		if (typeof window === "undefined") return;
+		try {
+			const key = `chaichat_chat_config_${chatId}`;
+			const raw = window.localStorage.getItem(key);
+			if (raw) {
+				const parsed = JSON.parse(raw) as Partial<ModelConfig>;
+				setModelConfigState((prev) => ({ ...prev, ...parsed }));
+			}
+		} catch {}
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [chatId]);
+
+	useEffect(() => {
+		if (!chatId) return;
+		if (typeof window === "undefined") return;
+		try {
+			const key = `chaichat_chat_config_${chatId}`;
+			window.localStorage.setItem(key, JSON.stringify(modelConfigState));
+		} catch {}
+	}, [chatId, modelConfigState]);
+
 	const selectedModelRef = useRef(selectedModel);
 	useEffect(() => {
 		selectedModelRef.current = selectedModel;

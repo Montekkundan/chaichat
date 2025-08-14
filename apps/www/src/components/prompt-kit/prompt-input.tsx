@@ -115,6 +115,39 @@ function PromptInputTextarea({
 				: `min(${textareaRef.current.scrollHeight}px, ${maxHeight})`;
 	}, [value, maxHeight, disableAutosize]);
 
+	// Type-to-focus: focus the textarea before the browser dispatches text to any element.
+	// We focus on keydown (capture) and do NOT mutate value; this keeps IME/composition smooth.
+	useEffect(() => {
+		const handler = (e: KeyboardEvent) => {
+			if (disabled) return;
+			if (e.defaultPrevented) return;
+			const active = document.activeElement as HTMLElement | null;
+			const target = e.target as HTMLElement | null;
+			const isEditable = (el: HTMLElement | null) => {
+				if (!el) return false;
+				const tag = el.tagName;
+				return tag === "INPUT" || tag === "TEXTAREA" || el.isContentEditable;
+			};
+			if (isEditable(active) || isEditable(target)) return;
+			if (e.metaKey || e.ctrlKey || e.altKey) return;
+			const key = e.key;
+			// Only printable characters (length 1); let IME use composition events naturally
+			if (!key || key.length !== 1) return;
+			if (!textareaRef.current) return;
+			try {
+				textareaRef.current.focus({ preventScroll: true } as unknown as FocusOptions);
+			} catch {
+				try {
+					textareaRef.current.focus();
+				} catch {}
+			}
+			// Do not preventDefault; allow the key to be inserted by the browser
+		};
+
+		window.addEventListener("keydown", handler, true);
+		return () => window.removeEventListener("keydown", handler, true);
+	}, [disabled]);
+
 	const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
 		if (e.key === "Enter" && !e.shiftKey) {
 			e.preventDefault();

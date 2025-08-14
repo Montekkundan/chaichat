@@ -11,14 +11,11 @@ export function UserSessionHandler() {
 		if (!isLoaded) return;
 
 		if (user?.id) {
-			// User is logged in - handle login sync
 			userSessionManager.handleUserLogin(user.id);
 		} else {
-			// User is logged out - handle logout
 			userSessionManager.handleUserLogout();
 		}
 	}, [user?.id, isLoaded]);
 
-	// This component doesn't render anything
 	return null;
 }

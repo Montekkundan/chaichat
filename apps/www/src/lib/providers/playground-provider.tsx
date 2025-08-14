@@ -100,6 +100,8 @@ interface PlaygroundContextType {
 		columnId: string,
 		api: { scrollToBottom: () => void; getIsAtBottom: () => boolean } | null,
 	) => void;
+	stopColumn: (columnId: string) => void;
+	stopSyncedColumns: () => void;
 	createNewPlayground: () => void;
 	savePlayground: () => Promise<void>;
 	loadPlayground: (playgroundId: string) => Promise<void>;
@@ -222,7 +224,7 @@ function savePlaygroundToStorage(playgroundId: string, state: PlaygroundState) {
 		let listChanged = false;
 		try {
 			list = JSON.parse(localStorage.getItem(PLAYGROUND_LIST_KEY) || "[]");
-		} catch {}
+		} catch { }
 		if (!list.includes(playgroundId)) {
 			list.unshift(playgroundId);
 			if (list.length > 10) list = list.slice(0, 10);
@@ -247,9 +249,9 @@ function savePlaygroundToStorage(playgroundId: string, state: PlaygroundState) {
 				});
 				const value = encodeURIComponent(JSON.stringify(minimal.slice(0, 20)));
 				document.cookie = `cc_playgrounds=${value}; path=/; max-age=604800; SameSite=Lax`;
-			} catch {}
+			} catch { }
 		}
-	} catch {}
+	} catch { }
 }
 
 function loadPlaygroundFromStorage(
@@ -354,7 +356,7 @@ export function PlaygroundProvider({
 					String(clamped),
 				);
 			}
-		} catch {}
+		} catch { }
 	}, []);
 
 	const pickConfigForModel = useCallback(function pickConfigForModel(
@@ -407,7 +409,7 @@ export function PlaygroundProvider({
 				if (loaded) {
 					setState(loaded);
 				}
-			} catch {}
+			} catch { }
 		}
 		setHasLoadedFromStorage(true);
 	}, [playgroundId]);
@@ -442,7 +444,7 @@ export function PlaygroundProvider({
 				for (const c of controllers) {
 					try {
 						c.abort();
-					} catch {}
+					} catch { }
 				}
 			}
 			inFlightControllersRef.current.clear();
@@ -463,7 +465,7 @@ export function PlaygroundProvider({
 				if (typeof detail === "number") {
 					setMaxColumns(detail);
 				}
-			} catch {}
+			} catch { }
 		};
 		if (typeof window !== "undefined") {
 			window.addEventListener("storage", onStorage);
@@ -566,7 +568,7 @@ export function PlaygroundProvider({
 			for (const c of controllers) {
 				try {
 					c.abort();
-				} catch {}
+				} catch { }
 			}
 			inFlightControllersRef.current.delete(columnId);
 		}
@@ -661,6 +663,52 @@ export function PlaygroundProvider({
 		[],
 	);
 
+	// Abort streaming for a specific column
+	const stopColumn = useCallback((columnId: string) => {
+		try {
+			const controllers = inFlightControllersRef.current.get(columnId);
+			if (controllers) {
+				for (const c of controllers) {
+					try {
+						c.abort();
+					} catch { }
+				}
+				inFlightControllersRef.current.delete(columnId);
+			}
+			// Reflect UI state immediately
+			setState((prev) => ({
+				...prev,
+				columns: prev.columns.map((col) =>
+					col.id === columnId ? { ...col, isStreaming: false, status: "ready" } : col,
+				),
+			}));
+		} catch { }
+	}, []);
+
+	// Abort all synced columns at once
+	const stopSyncedColumns = useCallback(() => {
+		try {
+			const synced = state.columns.filter((c) => c.synced);
+			for (const col of synced) {
+				const controllers = inFlightControllersRef.current.get(col.id);
+				if (controllers) {
+					for (const c of controllers) {
+						try {
+							c.abort();
+						} catch { }
+					}
+					inFlightControllersRef.current.delete(col.id);
+				}
+			}
+			setState((prev) => ({
+				...prev,
+				columns: prev.columns.map((col) =>
+					col.synced ? { ...col, isStreaming: false, status: "ready" } : col,
+				),
+			}));
+		} catch { }
+	}, [state.columns]);
+
 	// Message sending
 	const sendToColumn = useCallback(
 		async (columnId: string, messageText: string) => {
@@ -693,7 +741,7 @@ export function PlaygroundProvider({
 						})),
 					};
 					await db.playgrounds.put(pgRecord);
-				} catch {}
+				} catch { }
 
 				// Create user message
 				const userMessage: PlaygroundMessage = {
@@ -732,7 +780,7 @@ export function PlaygroundProvider({
 								: "llm-gateway",
 					} as DBPlaygroundMessage;
 					await db.playgroundMessages.put(dbMessage);
-				} catch {}
+				} catch { }
 
 				// Authenticated users: also persist playground + messages to Convex tables
 				if (user?.id) {
@@ -783,7 +831,7 @@ export function PlaygroundProvider({
 										: "llm-gateway",
 							});
 						}
-					} catch {}
+					} catch { }
 				}
 
 				// Prepare messages for API
@@ -876,14 +924,14 @@ export function PlaygroundProvider({
 						columns: prev.columns.map((col) =>
 							col.id === columnId
 								? {
-										...col,
-										messages: [
-											...col.messages.filter(
-												(m) => m.id !== assistantMessage.id,
-											),
-											assistantMessage,
-										],
-									}
+									...col,
+									messages: [
+										...col.messages.filter(
+											(m) => m.id !== assistantMessage.id,
+										),
+										assistantMessage,
+									],
+								}
 								: col,
 						),
 					};
@@ -917,16 +965,16 @@ export function PlaygroundProvider({
 												columns: prev.columns.map((col) =>
 													col.id === columnId
 														? {
-																...col,
-																messages: col.messages.map((msg) =>
-																	msg.id === assistantMessage.id
-																		? {
-																				...msg,
-																				parts: buildAssistantParts(),
-																			}
-																		: msg,
-																),
-															}
+															...col,
+															messages: col.messages.map((msg) =>
+																msg.id === assistantMessage.id
+																	? {
+																		...msg,
+																		parts: buildAssistantParts(),
+																	}
+																	: msg,
+															),
+														}
 														: col,
 												),
 											}));
@@ -946,16 +994,16 @@ export function PlaygroundProvider({
 												columns: prev.columns.map((col) =>
 													col.id === columnId
 														? {
-																...col,
-																messages: col.messages.map((msg) =>
-																	msg.id === assistantMessage.id
-																		? {
-																				...msg,
-																				parts: buildAssistantParts(),
-																			}
-																		: msg,
-																),
-															}
+															...col,
+															messages: col.messages.map((msg) =>
+																msg.id === assistantMessage.id
+																	? {
+																		...msg,
+																		parts: buildAssistantParts(),
+																	}
+																	: msg,
+															),
+														}
 														: col,
 												),
 											}));
@@ -978,16 +1026,16 @@ export function PlaygroundProvider({
 												columns: prev.columns.map((col) =>
 													col.id === columnId
 														? {
-																...col,
-																messages: col.messages.map((msg) =>
-																	msg.id === assistantMessage.id
-																		? {
-																				...msg,
-																				parts: buildAssistantParts(),
-																			}
-																		: msg,
-																),
-															}
+															...col,
+															messages: col.messages.map((msg) =>
+																msg.id === assistantMessage.id
+																	? {
+																		...msg,
+																		parts: buildAssistantParts(),
+																	}
+																	: msg,
+															),
+														}
 														: col,
 												),
 											}));
@@ -1007,17 +1055,17 @@ export function PlaygroundProvider({
 												columns: prev.columns.map((col) =>
 													col.id === columnId
 														? {
-																...col,
-																messages: col.messages.map((msg) =>
-																	msg.id === assistantMessage.id
-																		? {
-																				...msg,
-																				content: assistantContent,
-																				parts: buildAssistantParts(),
-																			}
-																		: msg,
-																),
-															}
+															...col,
+															messages: col.messages.map((msg) =>
+																msg.id === assistantMessage.id
+																	? {
+																		...msg,
+																		content: assistantContent,
+																		parts: buildAssistantParts(),
+																	}
+																	: msg,
+															),
+														}
 														: col,
 												),
 											}));
@@ -1040,17 +1088,17 @@ export function PlaygroundProvider({
 												columns: prev.columns.map((col) =>
 													col.id === columnId
 														? {
-																...col,
-																messages: col.messages.map((msg) =>
-																	msg.id === assistantMessage.id
-																		? {
-																				...msg,
-																				content: assistantContent,
-																				parts: buildAssistantParts(),
-																			}
-																		: msg,
-																),
-															}
+															...col,
+															messages: col.messages.map((msg) =>
+																msg.id === assistantMessage.id
+																	? {
+																		...msg,
+																		content: assistantContent,
+																		parts: buildAssistantParts(),
+																	}
+																	: msg,
+															),
+														}
 														: col,
 												),
 											}));
@@ -1065,7 +1113,7 @@ export function PlaygroundProvider({
 										toolParts.push(
 											data as unknown as UIMessage["parts"][number],
 										);
-									} catch {}
+									} catch { }
 									if (!scheduled) {
 										scheduled = true;
 										requestAnimationFrame(() => {
@@ -1075,16 +1123,16 @@ export function PlaygroundProvider({
 												columns: prev.columns.map((col) =>
 													col.id === columnId
 														? {
-																...col,
-																messages: col.messages.map((msg) =>
-																	msg.id === assistantMessage.id
-																		? {
-																				...msg,
-																				parts: buildAssistantParts(),
-																			}
-																		: msg,
-																),
-															}
+															...col,
+															messages: col.messages.map((msg) =>
+																msg.id === assistantMessage.id
+																	? {
+																		...msg,
+																		parts: buildAssistantParts(),
+																	}
+																	: msg,
+															),
+														}
 														: col,
 												),
 											}));
@@ -1106,24 +1154,24 @@ export function PlaygroundProvider({
 							columns: prev.columns.map((col) =>
 								col.id === columnId
 									? {
-											...col,
-											messages: col.messages.map((msg) =>
-												msg.id === assistantMessage.id
-													? {
-															...msg,
-															content: assistantContent,
-															parts: buildAssistantParts(),
-														}
-													: msg,
-											),
-										}
+										...col,
+										messages: col.messages.map((msg) =>
+											msg.id === assistantMessage.id
+												? {
+													...msg,
+													content: assistantContent,
+													parts: buildAssistantParts(),
+												}
+												: msg,
+										),
+									}
 									: col,
 							),
 						};
 						// Persist immediately to avoid losing assistant message on route remount
 						try {
 							savePlaygroundToStorage(ensured.id, newState);
-						} catch {}
+						} catch { }
 						return newState;
 					});
 				}
@@ -1139,7 +1187,7 @@ export function PlaygroundProvider({
 						if (setForCol.size === 0)
 							inFlightControllersRef.current.delete(columnId);
 					}
-				} catch {}
+				} catch { }
 
 				// Persist assistant message after stream completes
 				if (assistantContent) {
@@ -1161,7 +1209,7 @@ export function PlaygroundProvider({
 									: "llm-gateway",
 						} as DBPlaygroundMessage;
 						await db.playgroundMessages.put(dbMessage);
-					} catch {}
+					} catch { }
 				}
 
 				if (user?.id && state.parentChatId && assistantContent) {
@@ -1179,16 +1227,27 @@ export function PlaygroundProvider({
 									? "vercel-ai-gateway"
 									: "llm-gateway",
 						});
-					} catch {}
+					} catch { }
 				}
 
 				// Navigate to the saved playground ID after streaming completes (avoid remount during stream)
 				if (ensured.created) {
 					try {
 						router.replace(`/playground/${ensured.id}`);
-					} catch {}
+					} catch { }
 				}
 			} catch (error) {
+				// Treat user-triggered aborts as a normal stop (no error message)
+				const isAbort =
+					(error instanceof DOMException && error.name === "AbortError") ||
+					(error instanceof Error && /aborted|abort/i.test(error.message));
+
+				if (isAbort) {
+					setColumnStreaming(columnId, false);
+					setColumnStatus(columnId, "ready");
+					return;
+				}
+
 				console.error(`Failed to send message to column ${columnId}:`, error);
 
 				// Set streaming status to false on error
@@ -1217,9 +1276,9 @@ export function PlaygroundProvider({
 						columns: prev.columns.map((col) =>
 							col.id === columnId
 								? {
-										...col,
-										messages: [...col.messages, errorMessage],
-									}
+									...col,
+									messages: [...col.messages, errorMessage],
+								}
 								: col,
 						),
 					};
@@ -1266,7 +1325,7 @@ export function PlaygroundProvider({
 						api.scrollToBottom();
 					}
 				}
-			} catch {}
+			} catch { }
 
 			try {
 				const userApiKeys = await getUserApiKeys();
@@ -1306,7 +1365,7 @@ export function PlaygroundProvider({
 				}));
 
 				// 2. Make parallel API calls for all models
-				const apiPromises = userMessages.map(
+				const _apiPromises = userMessages.map(
 					async ({ column, userMessage }) => {
 						const messagesForAPI = [...column.messages, userMessage];
 
@@ -1330,14 +1389,14 @@ export function PlaygroundProvider({
 								columns: prev.columns.map((col) =>
 									col.id === column.id
 										? {
-												...col,
-												messages: [
-													...col.messages.filter(
-														(m) => m.id !== assistantMessage.id,
-													),
-													assistantMessage,
-												],
-											}
+											...col,
+											messages: [
+												...col.messages.filter(
+													(m) => m.id !== assistantMessage.id,
+												),
+												assistantMessage,
+											],
+										}
 										: col,
 								),
 							}));
@@ -1410,19 +1469,19 @@ export function PlaygroundProvider({
 															columns: prev.columns.map((col) =>
 																col.id === column.id
 																	? {
-																			...col,
-																			messages: col.messages.map((msg) =>
-																				msg.id === assistantMessage.id
-																					? {
-																							...msg,
-																							parts: createAssistantParts(
-																								assistantContent,
-																								reasoningContent,
-																							),
-																						}
-																					: msg,
-																			),
-																		}
+																		...col,
+																		messages: col.messages.map((msg) =>
+																			msg.id === assistantMessage.id
+																				? {
+																					...msg,
+																					parts: createAssistantParts(
+																						assistantContent,
+																						reasoningContent,
+																					),
+																				}
+																				: msg,
+																		),
+																	}
 																	: col,
 															),
 														}));
@@ -1445,19 +1504,19 @@ export function PlaygroundProvider({
 															columns: prev.columns.map((col) =>
 																col.id === column.id
 																	? {
-																			...col,
-																			messages: col.messages.map((msg) =>
-																				msg.id === assistantMessage.id
-																					? {
-																							...msg,
-																							parts: createAssistantParts(
-																								text,
-																								reasoning,
-																							),
-																						}
-																					: msg,
-																			),
-																		}
+																		...col,
+																		messages: col.messages.map((msg) =>
+																			msg.id === assistantMessage.id
+																				? {
+																					...msg,
+																					parts: createAssistantParts(
+																						text,
+																						reasoning,
+																					),
+																				}
+																				: msg,
+																		),
+																	}
 																	: col,
 															),
 														}));
@@ -1478,20 +1537,20 @@ export function PlaygroundProvider({
 															columns: prev.columns.map((col) =>
 																col.id === column.id
 																	? {
-																			...col,
-																			messages: col.messages.map((msg) =>
-																				msg.id === assistantMessage.id
-																					? {
-																							...msg,
-																							content: text,
-																							parts: createAssistantParts(
-																								text,
-																								reasoning,
-																							),
-																						}
-																					: msg,
-																			),
-																		}
+																		...col,
+																		messages: col.messages.map((msg) =>
+																			msg.id === assistantMessage.id
+																				? {
+																					...msg,
+																					content: text,
+																					parts: createAssistantParts(
+																						text,
+																						reasoning,
+																					),
+																				}
+																				: msg,
+																		),
+																	}
 																	: col,
 															),
 														}));
@@ -1512,20 +1571,20 @@ export function PlaygroundProvider({
 									columns: prev.columns.map((col) =>
 										col.id === column.id
 											? {
-													...col,
-													messages: col.messages.map((msg) =>
-														msg.id === assistantMessage.id
-															? {
-																	...msg,
-																	content: assistantContent,
-																	parts: createAssistantParts(
-																		assistantContent,
-																		reasoningContent || undefined,
-																	),
-																}
-															: msg,
-													),
-												}
+												...col,
+												messages: col.messages.map((msg) =>
+													msg.id === assistantMessage.id
+														? {
+															...msg,
+															content: assistantContent,
+															parts: createAssistantParts(
+																assistantContent,
+																reasoningContent || undefined,
+															),
+														}
+														: msg,
+												),
+											}
 											: col,
 									),
 								}));
@@ -1539,11 +1598,22 @@ export function PlaygroundProvider({
 									if (setForC.size === 0)
 										inFlightControllersRef.current.delete(column.id);
 								}
-							} catch {}
+							} catch { }
 
 							setColumnStatus(column.id, "ready");
 							return { columnId: column.id, success: true };
 						} catch (error) {
+							// Swallow aborts as normal stops
+							const isAbort =
+								(error instanceof DOMException && error.name === "AbortError") ||
+								(error instanceof Error && /aborted|abort/i.test(error.message));
+
+							if (isAbort) {
+								setColumnStreaming(column.id, false);
+								setColumnStatus(column.id, "ready");
+								return { columnId: column.id, success: true };
+							}
+
 							console.error(
 								`Failed to send message to column ${column.id}:`,
 								error,
@@ -1567,14 +1637,14 @@ export function PlaygroundProvider({
 								columns: prev.columns.map((col) =>
 									col.id === column.id
 										? {
-												...col,
-												messages: [
-													...col.messages.filter(
-														(m) => m.id !== assistantMessage.id,
-													),
-													errorMessage,
-												],
-											}
+											...col,
+											messages: [
+												...col.messages.filter(
+													(m) => m.id !== assistantMessage.id,
+												),
+												errorMessage,
+											],
+										}
 										: col,
 								),
 							}));
@@ -1585,6 +1655,11 @@ export function PlaygroundProvider({
 						}
 					},
 				);
+
+				// Ensure promise rejections are handled (particularly when aborted)
+				try {
+					await Promise.allSettled(_apiPromises);
+				} catch { }
 
 
 				// Set all synced columns streaming status to false and mark ready where appropriate
@@ -1609,10 +1684,10 @@ export function PlaygroundProvider({
 					setState((prev) => {
 						try {
 							savePlaygroundToStorage(ensured.id, prev);
-						} catch {}
+						} catch { }
 						return prev;
 					});
-				} catch {}
+				} catch { }
 			} catch (error) {
 				console.error("Failed to send to synced columns:", error);
 
@@ -1629,7 +1704,7 @@ export function PlaygroundProvider({
 			if (ensured.created) {
 				try {
 					router.replace(`/playground/${ensured.id}`);
-				} catch {}
+				} catch { }
 			}
 		},
 		[
@@ -1697,6 +1772,8 @@ export function PlaygroundProvider({
 				sendToColumn,
 				sendToSyncedColumns,
 				registerColumnScrollApi,
+				stopColumn,
+				stopSyncedColumns,
 
 				// Playground management
 				createNewPlayground,

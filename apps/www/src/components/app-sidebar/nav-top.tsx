@@ -39,6 +39,7 @@ export function NavTop({
 								tooltip={item.title}
 								onClick={item.onClick}
 								isActive={isActive}
+								className="cursor-pointer"
 							>
 								{item.icon &&
 									(isActive && item.activeIcon ? (

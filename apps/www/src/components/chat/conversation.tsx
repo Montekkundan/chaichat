@@ -58,6 +58,18 @@ export function Conversation({
 	const latestMessageId =
 		messages.length > 0 ? (messages[messages.length - 1]?.id ?? null) : null;
 
+	const messageHasRenderableContent = (msg: MessageType) => {
+		const parts = Array.isArray(msg.parts) ? msg.parts : [];
+		return parts.some((part) => {
+			if (part.type === "text") return (part.text || "").trim().length > 0;
+			if (part.type === "reasoning") return (part.text || "").trim().length > 0;
+			return true;
+		});
+	};
+
+	// Whether any assistant message exists yet (placeholder or with content)
+	const hasAssistantMessage = messages.some((m) => m.role === "assistant");
+
 	const handleCopy = async (text: string, key: string) => {
 		try {
 			await navigator.clipboard.writeText(text);
@@ -97,15 +109,9 @@ export function Conversation({
 				<ConversationContent className="mx-auto flex w-full max-w-3xl flex-col items-center pt-20 pb-40">
 					{messages.map((message) => {
 						const isAssistant = message.role === "assistant";
-						const hasRenderableContent = Array.isArray(message.parts)
-							? message.parts.some((part) => {
-									if (part.type === "text")
-										return (part.text || "").trim().length > 0;
-									if (part.type === "reasoning")
-										return (part.text || "").trim().length > 0;
-									return true;
-								})
-							: false;
+						const hasRenderableContent = messageHasRenderableContent(
+							message as MessageType,
+						);
 						const shouldShowInlineLoader =
 							isAssistant &&
 							(status === "submitted" || status === "streaming") &&
@@ -167,8 +173,8 @@ export function Conversation({
 																		{message.role === "assistant" &&
 																			typeof (
 																				message as
-																					| { model?: string }
-																					| undefined
+																				| { model?: string }
+																				| undefined
 																			)?.model === "string" && (
 																				<div className="mr-2">
 																					<ModelBadge
@@ -180,8 +186,8 @@ export function Conversation({
 																							(
 																								message as {
 																									gateway?:
-																										| "llm-gateway"
-																										| "vercel-ai-gateway";
+																									| "llm-gateway"
+																									| "vercel-ai-gateway";
 																								}
 																							).gateway || gateway
 																						}
@@ -250,8 +256,8 @@ export function Conversation({
 																			(
 																				message as {
 																					gateway?:
-																						| "llm-gateway"
-																						| "vercel-ai-gateway";
+																					| "llm-gateway"
+																					| "vercel-ai-gateway";
 																				}
 																			).gateway || gateway
 																		}
@@ -321,6 +327,12 @@ export function Conversation({
 							</Message>
 						);
 					})}
+					{/* Fallback loader: show only before any assistant message exists */}
+					{(status === "submitted" || status === "streaming") && !hasAssistantMessage ? (
+						<div className="w-full">
+							<Loader />
+						</div>
+					) : null}
 				</ConversationContent>
 				<ConversationScrollButton
 					className={`z-20 shadow-sm ${scrollButtonBottomClass}`}

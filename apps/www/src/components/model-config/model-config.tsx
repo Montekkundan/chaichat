@@ -259,6 +259,7 @@ export function ModelConfigPanel({
 							<Switch
 								checked={Boolean(value.openai?.strictJsonSchema)}
 								onCheckedChange={(checked) =>
+
 									onChange({
 										openai: { ...value.openai, strictJsonSchema: checked },
 									})
@@ -408,11 +409,11 @@ export function ModelConfigPanel({
 								type="number"
 								value={value.google?.thinkingConfig?.thinkingBudget ?? ""}
 								onChange={(e) =>
-									onChange({
+							onChange({
 										google: {
 											...value.google,
 											thinkingConfig: {
-												...(value.google?.thinkingConfig ?? {}),
+												...value.google?.thinkingConfig,
 												thinkingBudget:
 													Number.parseInt(e.target.value) || undefined,
 											},
@@ -427,11 +428,11 @@ export function ModelConfigPanel({
 							<Switch
 								checked={Boolean(value.google?.thinkingConfig?.includeThoughts)}
 								onCheckedChange={(checked) =>
-									onChange({
+							onChange({
 										google: {
 											...value.google,
 											thinkingConfig: {
-												...(value.google?.thinkingConfig ?? {}),
+												...value.google?.thinkingConfig,
 												includeThoughts: checked,
 											},
 										},
@@ -445,3 +446,5 @@ export function ModelConfigPanel({
 		</div>
 	);
 }
+
+
