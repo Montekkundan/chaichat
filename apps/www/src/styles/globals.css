@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "tw-animate-css";
+@plugin "@tailwindcss/typography";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -214,6 +215,7 @@
 	border-radius: inherit;
 	background: var(--c, var(--chat-input-gradient));
 	/* Mask trick so only the border area is visible */
+	mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
 	-webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
 	-webkit-mask-composite: xor;
 	mask-composite: exclude;
@@ -308,3 +310,4 @@
 		@apply bg-background text-foreground;
 	}
 }
+

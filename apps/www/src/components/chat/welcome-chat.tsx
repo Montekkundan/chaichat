@@ -92,7 +92,7 @@ export default function WelcomeChat({ initialName: _initialName }: WelcomeChatPr
 					<h2 className="text-center font-black text-8xl text-muted-foreground opacity-50 translate-y-12">
 						Experiment
 					</h2>
-					<div className="relative mx-auto flex w-full max-w-3xl justify-center">
+					<div className="relative z-10 mx-auto flex w-full max-w-3xl justify-center">
 						{/* Foreground chat input with glassy border */}
 						<ChatInput
 							value={input}
@@ -109,7 +109,6 @@ export default function WelcomeChat({ initialName: _initialName }: WelcomeChatPr
 							onFileUpload={handleFileUpload}
 							onFileRemove={handleFileRemove}
 							position="centered"
-							containerClassName="relative z-10 w-full"
 							promptClassName="rounded-3xl border-glass bg-background/10 shadow-lg"
 						/>
 					</div>

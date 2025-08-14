@@ -7,7 +7,7 @@ import { Settings as SettingsIcon } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { UploadRouter } from "~/app/api/uploadthing/core";
 import { CookiePreferencesModal } from "~/components/modals/cookie-preferences-modal";
-import { ModelConfigPanel } from "~/components/playground/model-config";
+import { ModelConfigPanel } from "~/components/model-config/model-config";
 import { Button } from "~/components/ui/button";
 import { Button as UIButton } from "~/components/ui/button";
 import {
@@ -20,7 +20,7 @@ import {
 	PromptInputAction,
 	PromptInputActions,
 	PromptInputTextarea,
-} from "~/components/ui/prompt-input";
+} from "~/components/prompt-kit/prompt-input";
 import { toast } from "~/components/ui/toast";
 import {
 	Tooltip,
@@ -31,6 +31,7 @@ import { filterValidFiles } from "~/lib/file-upload/validation";
 import { useMessages } from "~/lib/providers/messages-provider";
 import { FileList } from "./file-list";
 import { ModelSelector } from "./model-selector";
+import { cn } from "~/lib/utils";
 
 // TODO cleanup: use all user keys
 
@@ -61,6 +62,9 @@ type ChatInputProps = {
 	disabled?: boolean;
 	// onSearchToggle?: (enabled: boolean, agentId: string | null) => void
 	position?: "centered" | "bottom";
+	// Optional style overrides
+	promptClassName?: string;
+	textareaClassName?: string;
 };
 
 export function ChatInput({
@@ -81,6 +85,8 @@ export function ChatInput({
 	// onSearchToggle,
 	position = "centered",
 	disabled = false,
+	promptClassName,
+	textareaClassName,
 }: ChatInputProps) {
 	// const hasToolSupport = true; // Assume all models support tools via LLM Gateway
 
@@ -155,6 +161,7 @@ export function ChatInput({
 	const { useUploadThing } = uploadHelpers;
 	const { startUpload, isUploading } = useUploadThing("chatFiles");
 
+
 	// Track files selected/pasted but not yet uploaded
 	const pendingFilesRef = useRef<File[]>([]);
 
@@ -228,15 +235,18 @@ export function ChatInput({
 
   // Derived: does the current source have the required key?
   const hasRequiredKey = modelsSource === "aigateway" ? hasAiKey : hasLlmKey;
-	const handleSend = useCallback(async () => {
-		if (isSubmitting || disabled) {
-			return;
-		}
+    const handleSend = useCallback(async () => {
+        // Streaming: call stop immediately (do not block on isSubmitting)
+        if (status === "streaming") {
+            // Always stop client-side consumption of the stream
+            // even if the provider may not support server-side cancellation.
+            stop();
+            return;
+        }
 
-		if (status === "streaming") {
-			stop();
-			return;
-		}
+        if (isSubmitting || disabled) {
+            return;
+        }
 
 		// Prepare attachment list (defaults to current files prop)
 		let attachmentsToSend: import("./file-items").UploadedFile[] = files;
@@ -368,9 +378,12 @@ export function ChatInput({
 	const [isConfigMenuOpen, setIsConfigMenuOpen] = useState(false);
 
 	const mainContent = (
-		<div className="w-full max-w-3xl">
+		<div className={cn("w-full max-w-3xl", "")}>
 			<PromptInput
-				className="relative z-10 bg-chat-background p-0 pt-1 shadow-xs backdrop-blur-xl"
+				className={cn(
+					"relative z-10 bg-chat-background p-0 pt-1 shadow-xs backdrop-blur-xl",
+					promptClassName,
+				)}
 				maxHeight={200}
 				value={value}
 				//   onValueChange={agentCommand.handleValueChange}
@@ -405,7 +418,10 @@ export function ChatInput({
                           placeholder={`Please add your ${modelsSource === "aigateway" ? "Vercel AI Gateway" : "LLM Gateway"} API key to start chatting`}
 									onKeyDown={handleKeyDown}
 									onChange={(e) => onValueChange(e.target.value)}
-									className="min-h-[44px] cursor-not-allowed pt-3 pl-4 text-base leading-[1.3] sm:text-base md:text-base"
+								className={cn(
+									"min-h-[44px] cursor-not-allowed pt-3 pl-4 text-base leading-[1.3] sm:text-base md:text-base",
+									textareaClassName,
+								)}
 									disabled={true}
 									// ref={agentCommand.textareaRef}
 								/>
@@ -420,12 +436,15 @@ export function ChatInput({
 						placeholder="Ask ChaiChat"
 						onKeyDown={handleKeyDown}
 						onChange={(e) => onValueChange(e.target.value)}
-						className="min-h-[44px] pt-3 pl-4 text-base leading-[1.3] sm:text-base md:text-base"
+						className={cn(
+							"min-h-[44px] pt-3 pl-4 text-base leading-[1.3] sm:text-base md:text-base",
+							textareaClassName,
+						)}
 						disabled={disabled || isSubmitting}
 						// ref={agentCommand.textareaRef}
 					/>
 				)}
-				<PromptInputActions className="mt-5 w-full justify-between px-3 pb-3">
+                <PromptInputActions className="mt-5 w-full justify-between px-3 pb-3">
 					<div className="flex items-center gap-2">
 						{/* TODO: Implement file upload functionality */}
 						{/* {supportsAttachments && (
@@ -539,35 +558,38 @@ export function ChatInput({
 							</PromptInputAction>
 						)} */}
 					</div>
-                  <PromptInputAction
-                    tooltip={
-                      !hasRequiredKey
-                        ? `Please add your ${modelsSource === "aigateway" ? "Vercel AI Gateway" : "LLM Gateway"} API key`
-                        : status === "streaming"
-                          ? "Stop"
-                          : "Send"
-                    }
-                  >
+                    <PromptInputAction
+                        tooltip={
+                            !hasRequiredKey
+                                ? `Please add your ${modelsSource === "aigateway" ? "Vercel AI Gateway" : "LLM Gateway"} API key`
+                                : status === "streaming"
+                                    ? "Stop"
+                                    : "Send"
+                        }
+                    >
+                        {(() => {
+                            const isStopPhase = status === "streaming";
+                            const isButtonDisabled = isStopPhase
+                                ? disabled || !hasRequiredKey
+                                : disabled || !hasRequiredKey || isUploading || ((isOnlyWhitespace(value) && files.length === 0)) || isSubmitting;
+                            const ariaLabel = isStopPhase ? "Stop" : "Send message";
+                            return (
 						<Button
 							size="sm"
 							className="size-9 rounded-full transition-all duration-300 ease-out"
-                          disabled={
-                            disabled ||
-                            !hasRequiredKey ||
-                            isUploading ||
-                            (isOnlyWhitespace(value) && files.length === 0) ||
-                            isSubmitting
-                          }
+                            disabled={isButtonDisabled}
 							type="button"
 							onClick={handleSend}
-							aria-label={status === "streaming" ? "Stop" : "Send message"}
+                            aria-label={ariaLabel}
 						>
-							{status === "streaming" ? (
+                            {isStopPhase ? (
 								<Stop className="size-4" />
 							) : (
 								<ArrowUp className="size-4" />
 							)}
 						</Button>
+                            );
+                        })()}
 					</PromptInputAction>
 				</PromptInputActions>
 			</PromptInput>
