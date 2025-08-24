@@ -17,6 +17,7 @@ import {
 	setSessionKey,
 } from "~/lib/local-keys";
 import { cn } from "~/lib/utils";
+import { GatewayUptime } from "./app-sidebar/gateway-uptime";
 
 export function ApiKeyManager() {
 	const { user } = useUser();
@@ -269,8 +270,24 @@ export function ApiKeyManager() {
 									<Eye className="h-3 w-3" />
 								)}
 							</Button>
+							{llmGatewayKey && (
+								<Button
+									type="button"
+									variant="ghost"
+									size="sm"
+									className="h-6 px-2"
+									onClick={handleRemoveKey}
+								>
+									Remove
+								</Button>
+							)}
 						</div>
 					</div>
+				</div>
+
+				{/* Gateway Uptime Status */}
+				<div className="mt-3">
+					<GatewayUptime endpoint="/api/llm-gateway-health" />
 				</div>
 
 				<p className="mt-2 text-muted-foreground text-xs">
