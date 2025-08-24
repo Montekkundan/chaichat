@@ -19,6 +19,44 @@ import { ChatTitlesCookieManager } from "~/lib/chat-titles-cookie";
 import { getSelectedModel, setSelectedModel } from "~/lib/local-model-storage";
 import { userSessionManager } from "~/lib/user-session-manager";
 
+// Lightweight localStorage snapshot for instant client hydration
+const LOCAL_MSG_PREFIX = "cc_msgs_";
+const LOCAL_MSG_LIMIT = 200; // keep last 200 messages per chat for speed/size
+
+function saveMessagesSnapshotLocal(chatId: string, messages: Message[]): void {
+	if (typeof window === "undefined") return;
+	try {
+		const snapshot = messages.slice(-LOCAL_MSG_LIMIT);
+		const minimal = snapshot.map((m) => ({
+			_id: m._id,
+			chatId: m.chatId,
+			userId: m.userId,
+			role: m.role,
+			content: m.content,
+			partsJson: m.partsJson,
+			model: m.model,
+			createdAt: m.createdAt,
+			_creationTime: m._creationTime,
+			parentMessageId: m.parentMessageId,
+			version: m.version,
+			isActive: m.isActive,
+			attachments: m.attachments,
+			gateway: m.gateway,
+		}));
+		window.localStorage.setItem(
+			LOCAL_MSG_PREFIX + chatId,
+			JSON.stringify(minimal),
+		);
+	} catch {}
+}
+
+function deleteMessagesSnapshotLocal(chatId: string): void {
+	if (typeof window === "undefined") return;
+	try {
+		window.localStorage.removeItem(LOCAL_MSG_PREFIX + chatId);
+	} catch {}
+}
+
 interface CacheContextType {
 	chats: Chat[];
 	getChat: (chatId: string) => Chat | undefined;
@@ -60,6 +98,13 @@ interface CacheContextType {
 	getDefaultModel: () => string | null;
 	setDefaultModel: (modelId: string, providerId?: string) => void;
 
+	// Per-chat model configuration
+	getChatModelConfig: (chatId: string) => Record<string, unknown> | null;
+	setChatModelConfig: (
+		chatId: string,
+		config: Record<string, unknown> | null | undefined,
+	) => Promise<void>;
+
 	// Cache state
 	isLoading: boolean;
 	isSyncing: boolean;
@@ -68,6 +113,9 @@ interface CacheContextType {
 	// Force messages reload callback
 	onMessagesChanged?: (chatId: string) => void;
 	setOnMessagesChanged: (callback: (chatId: string) => void) => void;
+
+	// Health
+	getHealthData: (endpoint?: string) => Promise<HealthData | null>;
 }
 
 export const OPTIMISTIC_PREFIX = "chai-";
@@ -78,6 +126,16 @@ export function useCache() {
 	const context = useContext(CacheContext);
 	if (!context) throw new Error("useCache must be used within CacheProvider");
 	return context;
+}
+
+export interface HealthData {
+	message: string;
+	version?: string;
+	health: {
+		status: string;
+		redis?: { connected: boolean };
+		database?: { connected: boolean };
+	};
 }
 
 export function CacheProvider({
@@ -106,6 +164,15 @@ export function CacheProvider({
 
 	// Version cache - keyed by parentMessageId
 	const versionsCache = useRef<Map<string, Message[]>>(new Map());
+
+	// Health cache and de-duplication
+	const healthCache = useRef<
+		Map<string, { ts: number; data: HealthData | null }>
+	>(new Map());
+	const healthInflight = useRef<
+		Map<string, Promise<HealthData | null>>
+	>(new Map());
+	const HEALTH_TTL = 60_000;
 
 	// Map to translate optimistic chat IDs to their real Convex IDs once available (stable ref)
 	const optimisticToRealChatId = useRef<Map<string, string>>(new Map());
@@ -168,6 +235,10 @@ export function CacheProvider({
 							(a, b) => a._creationTime - b._creationTime,
 						);
 						messagesCache.current.set(chat._id, sortedMessages);
+						// Save local snapshot for instant hydration
+						try {
+							saveMessagesSnapshotLocal(chat._id, sortedMessages);
+						} catch {}
 					}
 				} else {
 					// Anonymous users: hydrate from Dexie using storage user id
@@ -192,6 +263,9 @@ export function CacheProvider({
 								(a, b) => a._creationTime - b._creationTime,
 							);
 							messagesCache.current.set(chat._id, sortedMessages);
+							try {
+								saveMessagesSnapshotLocal(chat._id, sortedMessages);
+							} catch {}
 						}
 					} catch (error) {
 						console.error(
@@ -220,13 +294,26 @@ export function CacheProvider({
 
 			setIsSyncing(true);
 			try {
+				// Preserve local-only fields like modelConfigJson when syncing from Convex
+				let mergedChats = effectiveChats as Chat[];
+				try {
+					const allLocalChats = await db.chats.toArray();
+					const idToConfig = new Map<string, string | undefined>(
+						allLocalChats.map((c) => [c._id, c.modelConfigJson]),
+					);
+					mergedChats = (effectiveChats as Chat[]).map((c) => ({
+						...c,
+						modelConfigJson: idToConfig.get(c._id) ?? c.modelConfigJson,
+					}));
+				} catch {}
+
 				if (user?.id) {
-					// For authenticated users: Update Dexie with fresh Convex data
-					await db.chats.bulkPut(effectiveChats as Chat[]);
+					// For authenticated users: Update Dexie with fresh Convex data while preserving local-only fields
+					await db.chats.bulkPut(mergedChats as Chat[]);
 				}
 
 				// Update local state for both authenticated and non-authenticated users
-				setChats(effectiveChats as Chat[]);
+				setChats(mergedChats as Chat[]);
 			} catch (error) {
 				console.error("Failed to sync with Convex:", error);
 			} finally {
@@ -366,7 +453,7 @@ export function CacheProvider({
 									role: localMsg.role,
 									content: localMsg.content,
 									model: localMsg.model,
-									gateway: (localMsg as Message).gateway,
+									// gateway intentionally omitted for broader backend compatibility
 									attachments: localMsg.attachments,
 									...(localMsg.parentMessageId && {
 										parentMessageId: localMsg.parentMessageId as Id<"messages">,
@@ -470,6 +557,10 @@ export function CacheProvider({
 				) {
 					routerRef.current.replace("/");
 				}
+					// Clear local snapshot so UI doesn't rehydrate deleted messages
+					try {
+						deleteMessagesSnapshotLocal(chatId);
+					} catch {}
 			} catch (error) {
 				console.error("Failed to delete chat:", error);
 
@@ -510,6 +601,52 @@ export function CacheProvider({
 			await db.chats.update(chatId, { currentModel: model });
 		},
 		[updateChatModelMutation],
+	);
+
+	// Per-chat model configuration helpers
+	const getChatModelConfig = useCallback(
+		(chatId: string): Record<string, unknown> | null => {
+			const chat = chats.find((c) => c._id === chatId);
+			if (!chat?.modelConfigJson) return null;
+			try {
+				return JSON.parse(chat.modelConfigJson) as Record<string, unknown>;
+			} catch {
+				return null;
+			}
+		},
+		[chats],
+	);
+
+	const setChatModelConfig = useCallback(
+		async (
+			chatId: string,
+			config: Record<string, unknown> | null | undefined,
+		): Promise<void> => {
+			let json: string | undefined = undefined;
+			try {
+				json = JSON.stringify(config ?? {});
+			} catch {}
+
+			// Avoid unnecessary state churn if nothing changed
+			const current = chats.find((c) => c._id === chatId)?.modelConfigJson;
+			if (current === json) return;
+
+			setChats((prev) => {
+				let changed = false;
+				const next = prev.map((c) => {
+					if (c._id !== chatId) return c;
+					if (c.modelConfigJson === json) return c;
+					changed = true;
+					return { ...c, modelConfigJson: json } as Chat;
+				});
+				return changed ? next : prev;
+			});
+
+			try {
+				await db.chats.update(chatId, { modelConfigJson: json });
+			} catch {}
+		},
+		[chats],
 	);
 
 	// Message operations
@@ -591,6 +728,9 @@ export function CacheProvider({
 						(msg) => msg.isActive === true || msg.isActive === undefined,
 					);
 					memLRU.current.set(chatId, { ts: Date.now(), msgs: activeMessages });
+					try {
+						saveMessagesSnapshotLocal(chatId, activeMessages as unknown as Message[]);
+					} catch {}
 					return activeMessages.sort(
 						(a, b) => a._creationTime - b._creationTime,
 					);
@@ -614,6 +754,9 @@ export function CacheProvider({
 							ts: Date.now(),
 							msgs: sortedMessages,
 						});
+						try {
+							saveMessagesSnapshotLocal(chatId, sortedMessages);
+						} catch {}
 						return sortedMessages;
 					}
 				} catch (error) {
@@ -653,6 +796,9 @@ export function CacheProvider({
 							ts: Date.now(),
 							msgs: sortedMessages as Message[],
 						});
+						try {
+							saveMessagesSnapshotLocal(chatId, sortedMessages as unknown as Message[]);
+						} catch {}
 						return sortedMessages as Message[];
 					}
 				} catch (error) {
@@ -1007,6 +1153,36 @@ export function CacheProvider({
 		[],
 	);
 
+	const getHealthData = useCallback(
+		async (endpoint = "/api/health"): Promise<HealthData | null> => {
+			const now = Date.now();
+			const cached = healthCache.current.get(endpoint);
+			if (cached && now - cached.ts < HEALTH_TTL) {
+				return cached.data;
+			}
+
+			const existing = healthInflight.current.get(endpoint);
+			if (existing) return existing;
+
+			const p = (async (): Promise<HealthData | null> => {
+				try {
+					const res = await fetch(endpoint);
+					if (!res.ok) return null;
+					const data = (await res.json()) as HealthData;
+					healthCache.current.set(endpoint, { ts: Date.now(), data });
+					return data;
+				} catch {
+					return null;
+				} finally {
+					healthInflight.current.delete(endpoint);
+				}
+			})();
+			healthInflight.current.set(endpoint, p);
+			return p;
+		},
+		[],
+	);
+
 	return (
 		<CacheContext.Provider
 			value={{
@@ -1022,11 +1198,14 @@ export function CacheProvider({
 				markAsOriginalVersion,
 				getDefaultModel,
 				setDefaultModel,
+				getChatModelConfig,
+				setChatModelConfig,
 				isLoading,
 				isSyncing,
 				refreshCache,
 				onMessagesChanged: onMessagesChangedCallback.current,
 				setOnMessagesChanged,
+				getHealthData,
 			}}
 		>
 			{children}

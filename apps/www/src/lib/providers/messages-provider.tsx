@@ -164,6 +164,7 @@ const _createFileParts = (attachments: UploadedFile[]) =>
 export function MessagesProvider({ children, chatId }: MessagesProviderProps) {
 	const { user } = useUser();
 	const cache = useCache();
+	const { getChatModelConfig: getChatConfig, setChatModelConfig: setChatConfig } = cache;
 	const router = useRouter();
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const [selectedModel, setSelectedModel] = useState(() => {
@@ -182,30 +183,51 @@ export function MessagesProvider({ children, chatId }: MessagesProviderProps) {
 	const [modelConfigState, setModelConfigState] = useState<ModelConfig>(
 		createDefaultConfig(),
 	);
+	const hasHydratedConfigRef = useRef<string | null>(null);
 
-	// Persist per-chat model config in localStorage
+	// Load per-chat model config (cache first, then localStorage fallback) with guard
 	useEffect(() => {
 		if (!chatId) return;
-		if (typeof window === "undefined") return;
+		if (hasHydratedConfigRef.current === chatId) return;
+
+		let _didHydrate = false;
 		try {
-			const key = `chaichat_chat_config_${chatId}`;
-			const raw = window.localStorage.getItem(key);
-			if (raw) {
-				const parsed = JSON.parse(raw) as Partial<ModelConfig>;
-				setModelConfigState((prev) => ({ ...prev, ...parsed }));
+			const cached = getChatConfig(chatId) as
+				| Partial<ModelConfig>
+				| null;
+			if (cached && Object.keys(cached).length > 0) {
+				_didHydrate = true;
+				setModelConfigState((prev) => ({ ...prev, ...cached }));
 			}
 		} catch {}
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [chatId]);
+		if (typeof window !== "undefined") {
+			try {
+				const key = `chaichat_chat_config_${chatId}`;
+				const raw = window.localStorage.getItem(key);
+				if (raw) {
+					const parsed = JSON.parse(raw) as Partial<ModelConfig>;
+					if (parsed && Object.keys(parsed).length > 0) {
+						_didHydrate = true;
+						setModelConfigState((prev) => ({ ...prev, ...parsed }));
+					}
+				}
+			} catch {}
+		}
+		hasHydratedConfigRef.current = chatId;
+	}, [chatId, getChatConfig]);
 
 	useEffect(() => {
 		if (!chatId) return;
-		if (typeof window === "undefined") return;
 		try {
-			const key = `chaichat_chat_config_${chatId}`;
-			window.localStorage.setItem(key, JSON.stringify(modelConfigState));
+			void setChatConfig(chatId, modelConfigState as unknown as Record<string, unknown>);
 		} catch {}
-	}, [chatId, modelConfigState]);
+		if (typeof window !== "undefined") {
+			try {
+				const key = `chaichat_chat_config_${chatId}`;
+				window.localStorage.setItem(key, JSON.stringify(modelConfigState));
+			} catch {}
+		}
+	}, [chatId, modelConfigState, setChatConfig]);
 
 	const selectedModelRef = useRef(selectedModel);
 	useEffect(() => {
@@ -456,18 +478,61 @@ export function MessagesProvider({ children, chatId }: MessagesProviderProps) {
 
 	// Load existing messages when chatId changes
 	useEffect(() => {
-		const loadMessages = async () => {
+		const loadInstantAndHydrate = async () => {
 			if (chatId === null) {
 				setMessages([]);
 				return;
 			}
 
 			if (chatId && chatId !== "new") {
+				// 1) Instant synchronous hydration from localStorage snapshot
 				try {
-					// Load messages from cache
-					const cachedMessages = await cache.getMessages(chatId);
+					const key = `cc_msgs_${chatId}`;
+					const raw = typeof window !== "undefined" ? window.localStorage.getItem(key) : null;
+					if (raw) {
+						try {
+							const parsed = JSON.parse(raw) as Array<{
+								_id: string;
+								role: string;
+								content: string;
+								partsJson?: string;
+								model?: string;
+								_creationTime?: number;
+								parentMessageId?: string;
+								gateway?: "llm-gateway" | "vercel-ai-gateway";
+							}>;
+							if (Array.isArray(parsed) && parsed.length > 0) {
+								const v5: ExtendedMessage[] = parsed.map((m) => {
+									let parts: UIMessage["parts"];
+									if (m.partsJson) {
+										try {
+											parts = JSON.parse(m.partsJson);
+										} catch {
+											parts = createTextParts(m.content);
+										}
+									} else {
+										parts = createTextParts(m.content);
+									}
+									return {
+										id: m._id,
+										role: m.role as "user" | "assistant" | "system",
+										parts,
+										convexId: m._id,
+										parentMessageId: m.parentMessageId,
+										model: m.model,
+										gateway: m.gateway,
+										_creationTime: m._creationTime,
+									} as ExtendedMessage;
+								});
+								setMessages(v5);
+							}
+						} catch {}
+					}
+				} catch {}
 
-					// Convert cached messages to v5 UIMessage format, preferring partsJson when present
+				// 2) Hydrate from cache (Dexie/Convex) and replace if different/newer
+				try {
+					const cachedMessages = await cache.getMessages(chatId);
 					const v5Messages: ExtendedMessage[] = cachedMessages.map((msg) => {
 						let parts: UIMessage["parts"];
 						if (msg.partsJson) {
@@ -493,8 +558,6 @@ export function MessagesProvider({ children, chatId }: MessagesProviderProps) {
 							_creationTime: msg._creationTime,
 						} as ExtendedMessage;
 					});
-
-					// Set messages in useChat hook
 					setMessages(v5Messages);
 				} catch (error) {
 					console.error("Failed to load messages:", error);
@@ -503,7 +566,7 @@ export function MessagesProvider({ children, chatId }: MessagesProviderProps) {
 			}
 		};
 
-		loadMessages();
+		loadInstantAndHydrate();
 	}, [chatId, setMessages, cache]);
 
 	const createNewChat = useCallback(
@@ -519,9 +582,20 @@ export function MessagesProvider({ children, chatId }: MessagesProviderProps) {
 				currentUserId,
 			);
 
+			// Save current model config for this new chat id immediately
+			try {
+				await cache.setChatModelConfig(newChatId, modelConfigState);
+			} catch {}
+			if (typeof window !== "undefined") {
+				try {
+					const key = `chaichat_chat_config_${newChatId}`;
+					window.localStorage.setItem(key, JSON.stringify(modelConfigState));
+				} catch {}
+			}
+
 			return newChatId;
 		},
-		[currentUserId, cache],
+		[currentUserId, cache, modelConfigState],
 	);
 
 	const sendMessage = useCallback(
