@@ -101,6 +101,10 @@ export default async function ChangelogPage() {
 						const date = new Date(changelog.date || changelog._sys.createdAt);
 						const formattedDate = formatDate(date);
 						const tags = changelog.tags?.items.map((tag) => tag._title) || [];
+						const json = changelog.content?.json;
+						const hasRichTextContent = (
+							j: typeof json,
+						): j is NonNullable<typeof json> => !!(j && Array.isArray(j.content) && j.content.length > 0);
 
 						return (
 							<div key={changelog._sys.createdAt} className="relative">
@@ -155,12 +159,12 @@ export default async function ChangelogPage() {
 											</div>
 
 											{/* Rich Text Content */}
-											{changelog.content && (
+										{changelog.content && (
 												<div className="prose dark:prose-invert max-w-none prose-headings:scroll-mt-8 prose-headings:text-balance prose-p:text-balance prose-headings:font-semibold prose-headings:tracking-tight prose-p:tracking-tight prose-a:no-underline">
-													{changelog.content.json ? (
+												{hasRichTextContent(json) ? (
 														<RichText
-															content={changelog.content.json.content}
-															blocks={changelog.content.json.blocks}
+														content={json.content}
+														blocks={json.blocks}
 															components={{
 																// Custom components matching your MDX setup
 																TweetComponent: (props: {
@@ -253,7 +257,7 @@ export default async function ChangelogPage() {
 																},
 															}}
 														/>
-													) : changelog.content.markdown ? (
+												) : changelog.content.markdown ? (
 														// Fallback markdown content
 														<ReactMarkdown remarkPlugins={[remarkGfm]}>
 															{changelog.content.markdown}
