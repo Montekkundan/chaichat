@@ -280,6 +280,27 @@ export function ModelSelector({
 		}
 	}, [selectedModelId]);
 
+	// Set default model on component mount if no selected model
+	useEffect(() => {
+		if (!selectedModelId && !hasLoadedFromStorage.current) {
+			const savedModel = getSelectedModel();
+
+			if (savedModel?.modelId) {
+				pendingSavedModel.current = savedModel;
+				setSelectedModelId(savedModel.modelId);
+				hasLoadedFromStorage.current = true;
+			} else {
+				const defaultModel = "openai/gpt-4o";
+				setSelectedModelId(defaultModel);
+				setSelectedModel(defaultModel);
+				if (!isControlled) {
+					setModelsSource(false);
+				}
+				hasLoadedFromStorage.current = true;
+			}
+		}
+	}, [selectedModelId, setSelectedModelId, isControlled, setModelsSource]);
+
 	useEffect(() => {
 		if (
 			!selectedModelId &&
