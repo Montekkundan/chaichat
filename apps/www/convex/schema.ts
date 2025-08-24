@@ -73,4 +73,26 @@ export default defineSchema({
     ),
     createdAt: v.number(),
   }).index("by_playground", ["playgroundId"]).index("by_user", ["userId"]),
+  // Flow graphs
+  flows: defineTable({
+    userId: v.string(),
+    name: v.string(),
+    createdAt: v.number(),
+  }).index("by_user", ["userId"]),
+  flowNodes: defineTable({
+    flowId: v.id("flows"),
+    type: v.string(),
+    position: v.object({ x: v.number(), y: v.number() }),
+    dataJson: v.string(),
+    createdAt: v.number(),
+  }).index("by_flow", ["flowId"]),
+  flowEdges: defineTable({
+    flowId: v.id("flows"),
+    source: v.string(),
+    target: v.string(),
+    sourceHandle: v.optional(v.string()),
+    targetHandle: v.optional(v.string()),
+    dataJson: v.optional(v.string()),
+    createdAt: v.number(),
+  }).index("by_flow", ["flowId"]),
 });

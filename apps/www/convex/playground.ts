@@ -78,5 +78,3 @@ export const getPlaygroundMessages = query({
       .collect();
   },
 });
-
-

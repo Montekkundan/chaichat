@@ -128,16 +128,40 @@ export async function POST(req: Request) {
 
 		const usedGateway = normalizedGateway;
 
-		if (!messages?.length || !model) {
+		if (!messages || !Array.isArray(messages) || messages.length === 0 || !model) {
 			return new Response(
-				JSON.stringify({ error: "Messages and model are required" }),
+				JSON.stringify({
+					error: "Messages (array) and model are required",
+					receivedMessages: messages,
+					messagesType: typeof messages
+				}),
 				{ status: 400, headers: { "Content-Type": "application/json" } },
 			);
 		}
 
     // Sanitize UI messages: strip tool content and placeholders
     const sanitizedUiMessages = cleanMessagesForTools(messages, false);
+    if (!sanitizedUiMessages || !Array.isArray(sanitizedUiMessages)) {
+      return new Response(
+        JSON.stringify({
+          error: "Failed to sanitize messages",
+          sanitizedMessages: sanitizedUiMessages,
+          originalMessages: messages
+        }),
+        { status: 500, headers: { "Content-Type": "application/json" } },
+      );
+    }
     const convertedMessages = convertToModelMessages(sanitizedUiMessages);
+    if (!convertedMessages || !Array.isArray(convertedMessages)) {
+      return new Response(
+        JSON.stringify({
+          error: "Failed to convert messages to model format",
+          convertedMessages: convertedMessages,
+          sanitizedMessages: sanitizedUiMessages
+        }),
+        { status: 500, headers: { "Content-Type": "application/json" } },
+      );
+    }
 
 		modelToUse = model || "openai/gpt-4o";
 

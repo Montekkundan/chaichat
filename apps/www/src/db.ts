@@ -10,6 +10,7 @@ export interface Chat {
 	parentChatId?: string;
 	_creationTime: number;
 	isPublic: boolean;
+	modelConfigJson?: string;
 }
 
 export interface Message {
@@ -67,16 +68,47 @@ export interface PlaygroundMessage {
 	gateway?: "llm-gateway" | "vercel-ai-gateway";
 }
 
+// Flow graph persistence (local IndexedDB)
+export interface Flow {
+  _id: string;
+  userId: string;
+  name: string;
+  createdAt: number;
+}
+
+export interface FlowNodeRecord {
+  _id: string;
+  flowId: string;
+  type: string;
+  position: { x: number; y: number };
+  dataJson: string; // arbitrary node data serialized
+  createdAt: number;
+}
+
+export interface FlowEdgeRecord {
+  _id: string;
+  flowId: string;
+  source: string;
+  target: string;
+  sourceHandle?: string;
+  targetHandle?: string;
+  dataJson?: string;
+  createdAt: number;
+}
+
 export class ChaiChatDB extends Dexie {
 	chats!: Table<Chat, string>;
 	messages!: Table<Message, string>;
 	users!: Table<UserProfile, string>;
 	playgrounds!: Table<Playground, string>;
 	playgroundMessages!: Table<PlaygroundMessage, string>;
+  flows!: Table<Flow, string>;
+  flowNodes!: Table<FlowNodeRecord, string>;
+  flowEdges!: Table<FlowEdgeRecord, string>;
 
 	constructor() {
 		super("ChaiChatDB");
-		this.version(9)
+    this.version(10)
 			.stores({
 				chats:
 					"_id, userId, name, createdAt, currentModel, parentChatId, isPublic",
@@ -86,6 +118,9 @@ export class ChaiChatDB extends Dexie {
 				playgrounds: "_id, userId, createdAt",
 				playgroundMessages:
 					"_id, playgroundId, columnId, userId, createdAt, model, gateway",
+        flows: "_id, userId, createdAt",
+        flowNodes: "_id, flowId, type, createdAt",
+        flowEdges: "_id, flowId, createdAt",
 			})
 			.upgrade((tx) => {
 				// Ensure message fields exist
@@ -112,6 +147,13 @@ export class ChaiChatDB extends Dexie {
 					.modify((msg) => {
 						if (msg.gateway === undefined) msg.gateway = undefined;
 					});
+
+        // Initialize flows containers if not present (no-op placeholder)
+        try {
+          void tx.table("flows");
+          void tx.table("flowNodes");
+          void tx.table("flowEdges");
+        } catch {}
 			});
 	}
 }
