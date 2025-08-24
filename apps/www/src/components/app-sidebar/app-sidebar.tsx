@@ -22,12 +22,12 @@ import {
 	Sidebar,
 	SidebarContent,
 	SidebarFooter,
-	// SidebarFooter,
 	SidebarHeader,
 	SidebarMenu,
 	SidebarMenuButton,
 	SidebarMenuItem,
 	SidebarRail,
+ 	useSidebar,
 } from "~/components/ui/sidebar";
 import { toast } from "~/components/ui/toast";
 import { useCache } from "~/lib/providers/cache-provider";
@@ -35,6 +35,7 @@ import { Separator } from "../ui/separator";
 import { HistorySection } from "./history-section";
 // import { NavMain } from "./nav-main";
 import { NavTop } from "./nav-top";
+
 
 export function AppSidebar({
 	initialUser,
@@ -52,21 +53,23 @@ export function AppSidebar({
 	const { user } = useUser();
 	const router = useRouter();
 	const cache = useCache();
-	const [search, setSearch] = useState("");
-	const [debouncedSearch, setDebouncedSearch] = useState("");
+	const [_search, _setSearch] = useState("");
+	const [_debouncedSearch, _setDebouncedSearch] = useState("");
 	const [deleteModalOpen, setDeleteModalOpen] = useState(false);
 	const [chatToDelete, setChatToDelete] = useState<string | null>(null);
 	const toggleVisibility = useMutation(api.chat.toggleChatVisibility);
 	const [shareChatId, setShareChatId] = useState<string | null>(null);
+	const { state } = useSidebar();
+	const _isCollapsed = state === "collapsed";
 
 	const effectiveUser = user ?? initialUser;
 
 	useEffect(() => {
 		const handler = setTimeout(() => {
-			setDebouncedSearch(search);
+			_setDebouncedSearch(_search);
 		}, 200);
 		return () => clearTimeout(handler);
-	}, [search]);
+	}, [_search]);
 
 	const handleNewChat = async () => {
 		// For non-logged users, just navigate to home without redirecting to login
@@ -116,7 +119,6 @@ export function AppSidebar({
 		setChatToDelete(null);
 	};
 
-	// Define data object after all functions are defined
 	const data = {
 		navTop: [
 			{
@@ -124,10 +126,6 @@ export function AppSidebar({
 				icon: <Plus size={16} />,
 				onClick: handleNewChat,
 			},
-			// {
-			// 	title: "Notifications",
-			// 	icon: Bell,
-			// },
 			{
 				title: "Home",
 				icon: <HouseLineIcon size={16} />,
@@ -139,6 +137,12 @@ export function AppSidebar({
 				icon: <SquareTerminal size={16} />,
 				onClick: () => router.push("/playground"),
 			},
+			// {
+			// 	title: "Flow",
+			// 	icon: <FlowArrowIcon size={16} />,
+			// 	activeIcon: <FlowArrowIcon size={16} weight="duotone" />,
+			// 	onClick: () => router.push("/flow"),
+			// },
 			// {
 			// 	title: "Registry",
 			// 	icon: <CashRegisterIcon size={16} />,
