@@ -1,0 +1,40 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "playground-column",
+  "type": "registry:block",
+  "title": "Playground Column",
+  "description": "A chat testing column with per-column model selection and controls.",
+  "dependencies": [
+    "@clerk/nextjs",
+    "convex/react",
+    "@phosphor-icons/react",
+    "lucide-react"
+  ],
+  "registryDependencies": [
+    "button",
+    "separator",
+    "tooltip",
+    "dropdown-menu",
+    "model-selector",
+    "ai-elements:actions",
+    "ai-elements:branch",
+    "ai-elements:code-block",
+    "ai-elements:conversation",
+    "ai-elements:inline-citation",
+    "ai-elements:loader",
+    "ai-elements:message",
+    "ai-elements:reasoning",
+    "ai-elements:response",
+    "ai-elements:suggestion",
+    "ai-elements:task",
+    "ai-elements:tool"
+  ],
+  "files": [
+    {
+      "path": "src/registry/blocks/playground-column/playground-column.tsx",
+      "content": "\"use client\";\n\nimport { PlaygroundProvider, usePlayground } from \"~/lib/providers/playground-provider\";\nimport { PlaygroundColumn as RealPlaygroundColumn } from \"~/components/playground/playground-column\";\n\nfunction Inner() {\n    const { columns, addColumn, maxColumns } = usePlayground();\n    if (!columns || columns.length === 0) return null;\n    return (\n        <div className=\"w-full space-y-2\">\n            <div className=\"flex justify-end\">\n                <button\n                    type=\"button\"\n                    onClick={addColumn}\n                    disabled={columns.length >= maxColumns}\n                    className=\"rounded-md border px-2 py-1 text-xs hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50\"\n                >\n                    Add Column\n                </button>\n            </div>\n            <div className=\"w-full overflow-x-auto\">\n                <div className=\"flex min-w-full gap-3\">\n                    {columns.map((col, idx) => (\n                        <div key={col.id} className=\"min-w-[420px] max-w-[560px] flex-1\">\n                            <RealPlaygroundColumn column={col} columnIndex={idx} />\n                        </div>\n                    ))}\n                </div>\n            </div>\n        </div>\n    );\n}\n\nexport default function PlaygroundColumnBlock() {\n    return (\n        <PlaygroundProvider playgroundId={\"registry-preview\"}>\n            <Inner />\n        </PlaygroundProvider>\n    );\n}\n\nexport { RealPlaygroundColumn as PlaygroundColumn };\n\n\n",
+      "type": "registry:component"
+    }
+  ],
+  "docs": "# Playground Column\n\nA self-contained chat testing column with per-column model selection and controls.\n\n## Usage\n\n```tsx\nimport PlaygroundColumn from \"~/registry/blocks/playground-column/playground-column\";\n\nexport default function Example() {\n  return <PlaygroundColumn />;\n}\n```\n\nThis block mounts a minimal provider for the preview and is safe to import in any project.\n"
+}

@@ -4,19 +4,58 @@
 	"homepage": "https://acme.com",
 	"items": [
 		{
-			"name": "settings-appearance",
+			"name": "model-selector",
 			"type": "registry:block",
-			"title": "Settings Appearance",
-			"description": "A settings panel for theme selection with light/dark toggle and Tweakcn theme URL input. Requires existing tweakcn-theme utilities.",
-			"dependencies": ["next-themes", "lucide-react"],
-			"registryDependencies": ["button", "card", "input", "label", "badge"],
+			"title": "Model Selector",
+			"description": "Dropdown to browse and select models (LLM Gateway or AI Gateway).",
+			"dependencies": ["@phosphor-icons/react", "@clerk/nextjs", "convex/react"],
+			"registryDependencies": [
+				"badge",
+				"button",
+				"drawer",
+				"dropdown-menu",
+				"input",
+				"label",
+				"popover",
+				"separator",
+				"switch",
+				"tooltip"
+			],
 			"files": [
 				{
-					"path": "src/registry/blocks/settings-appearance/settings-appearance.tsx",
+					"path": "src/registry/blocks/model-selector/model-selector.tsx",
 					"type": "registry:component"
 				}
+			]
+		},
+		{
+			"name": "playground-column",
+			"type": "registry:block",
+			"title": "Playground Column",
+			"description": "A chat testing column with per-column model selection and controls.",
+			"dependencies": ["@clerk/nextjs", "convex/react", "@phosphor-icons/react", "lucide-react"],
+			"registryDependencies": [
+				"button",
+				"separator",
+				"tooltip",
+				"dropdown-menu",
+				"model-selector",
+				"ai-elements:actions",
+				"ai-elements:branch",
+				"ai-elements:code-block",
+				"ai-elements:conversation",
+				"ai-elements:inline-citation",
+				"ai-elements:loader",
+				"ai-elements:message",
+				"ai-elements:reasoning",
+				"ai-elements:response",
+				"ai-elements:suggestion",
+				"ai-elements:task",
+				"ai-elements:tool"
 			],
-			"docs": "This component integrates with your existing ~/lib/tweakcn-theme utilities and theme provider. Make sure you have the tweakcn-theme system set up in your project."
+			"files": [
+				{ "path": "src/registry/blocks/playground-column/playground-column.tsx", "type": "registry:component" }
+			]
 		}
 	]
 }
