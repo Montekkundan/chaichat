@@ -4,8 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "registry:build && basehub & next build",
-    "build:turbo": "registry:build & basehub & next build --turbopack",
+    "build": "bun run registry:build && basehub & next build",
+    "build:turbo": "bun run registry:build & basehub & next build --turbopack",
     "check": "biome check .",
     "check:unsafe": "biome check --write --unsafe .",
     "check:write": "biome check --write .",
