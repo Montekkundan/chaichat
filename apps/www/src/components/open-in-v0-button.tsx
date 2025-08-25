@@ -9,7 +9,7 @@ export function OpenInV0Button({
 }: { name: string } & React.ComponentProps<typeof Button>) {
 	const origin =
 		(typeof window !== "undefined" && window.location?.origin) ||
-		process.env.NEXT_PUBLIC_BASE_URL ||
+		process.env.NEXT_PUBLIC_APP_URL ||
 		"";
 	const jsonUrl = `${origin}/r/${name}.json`;
 	const v0Url = `https://v0.dev/chat/api/open?url=${encodeURIComponent(jsonUrl)}`;
