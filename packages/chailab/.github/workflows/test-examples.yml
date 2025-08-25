@@ -1,0 +1,115 @@
+name: Test ChaiLab Examples
+
+on:
+  push:
+    branches: [ main, dev ]
+    paths:
+      - 'examples/**'
+      - '.github/workflows/test-examples.yml'
+  pull_request:
+    branches: [ main, dev ]
+    paths:
+      - 'examples/**'
+      - '.github/workflows/test-examples.yml'
+
+jobs:
+  test-examples:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.10', '3.11', '3.12']
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install uv
+      run: |
+        curl -LsSf https://astral.sh/uv/install.sh | sh
+        echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+    - name: Install dependencies
+      run: |
+        cd examples
+        uv pip install -r requirements.txt
+
+    - name: Install ChaiLab
+      run: |
+        uv pip install -e .
+
+    - name: Install test dependencies
+      run: |
+        uv pip install -r tests/requirements-test.txt
+
+    - name: Run unit tests
+      run: |
+        pytest tests/ -v --cov=chailab --cov-report=term-missing
+
+    - name: Test installation integration
+      run: |
+        python tests/test_installation.py
+
+    - name: Test basic examples syntax
+      run: |
+        cd examples
+        python -m py_compile basic_greeting.py
+        python -m py_compile text_processor.py
+        python -m py_compile math_calculator.py
+        python -m py_compile advanced_features.py
+        python -m py_compile run_example.py
+
+    - name: Test imports in examples
+      run: |
+        cd examples
+        python -c "import basic_greeting; print('✅ basic_greeting imports successfully')"
+        python -c "import text_processor; print('✅ text_processor imports successfully')"
+        python -c "import math_calculator; print('✅ math_calculator imports successfully')"
+        python -c "import advanced_features; print('✅ advanced_features imports successfully')"
+
+    - name: Check Jupyter notebook syntax
+      run: |
+        if command -v jupyter &> /dev/null; then
+          jupyter nbconvert --to python examples/chailab_quickstart.ipynb --stdout > /dev/null
+          echo "✅ Jupyter notebook syntax is valid"
+        else
+          echo "⚠️  Jupyter not available, skipping notebook syntax check"
+        fi
+
+    - name: Test example runner
+      run: |
+        cd examples
+        python run_example.py << EOF
+        q
+        EOF
+        echo "✅ Example runner works"
+
+  test-with-pip:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+
+    - name: Install with pip
+      run: |
+        pip install -e .
+
+    - name: Install test dependencies
+      run: |
+        pip install -r tests/requirements-test.txt
+
+    - name: Run unit tests with pip
+      run: |
+        pytest tests/ -v
+
+    - name: Test basic functionality with pip installation
+      run: |
+        python tests/test_installation.py

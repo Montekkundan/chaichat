@@ -1,0 +1,48 @@
+# ChaiLab Advanced Jupyter Examples Requirements
+# Comprehensive dependencies for all advanced examples
+
+# Core ChaiLab package
+chailab>=0.1.0
+
+# Jupyter and Interactive Development
+jupyter>=1.0.0
+jupyterlab>=4.0.0
+ipython>=7.0.0
+ipywidgets>=8.0.0
+notebook>=7.0.0
+
+# Data Science Core Libraries
+pandas>=2.0.0
+numpy>=1.21.0
+matplotlib>=3.5.0
+seaborn>=0.11.0
+scipy>=1.10.0
+
+# Machine Learning and Statistics
+scikit-learn>=1.3.0
+statsmodels>=0.14.0
+
+# Advanced Visualization
+plotly>=5.0.0
+
+# Progress and Utilities
+tqdm>=4.65.0
+
+# Optional Integrations (uncomment as needed)
+# wandb>=0.15.0          # For W&B integration
+# yfinance>=0.2.0        # For financial data examples
+# requests>=2.31.0       # For API calls
+# beautifulsoup4>=4.12.0 # For web scraping
+# fastapi>=0.100.0       # For advanced API examples
+# uvicorn>=0.23.0        # For server deployment
+
+# Development and Testing
+pytest>=7.4.0
+black>=23.0.0
+flake8>=6.0.0
+
+# Installation Notes:
+# 1. For basic examples: pip install -r requirements.txt
+# 2. For full data science: pip install pandas numpy matplotlib seaborn scikit-learn plotly
+# 3. For Jupyter widgets: pip install ipywidgets jupyterlab
+# 4. Enable widgets: jupyter labextension install @jupyter-widgets/jupyterlab-manager
