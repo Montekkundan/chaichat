@@ -11,7 +11,8 @@
 			"convex",
 			"basehub-types.d.ts",
 			"apps/www/convex",
-			"apps/www/basehub-types.d.ts"
+			"apps/www/basehub-types.d.ts",
+			"packages/chaichat_cli"
 		]
 	},
 	"formatter": { "enabled": true },

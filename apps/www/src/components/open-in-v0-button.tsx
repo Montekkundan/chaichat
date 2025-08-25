@@ -1,3 +1,5 @@
+"use client";
+
 import { cn } from "~/lib/utils";
 import { Button } from "./ui/button";
 
@@ -5,6 +7,12 @@ export function OpenInV0Button({
 	name,
 	className,
 }: { name: string } & React.ComponentProps<typeof Button>) {
+	const origin =
+		(typeof window !== "undefined" && window.location?.origin) ||
+		process.env.NEXT_PUBLIC_BASE_URL ||
+		"";
+	const jsonUrl = `${origin}/r/${name}.json`;
+	const v0Url = `https://v0.dev/chat/api/open?url=${encodeURIComponent(jsonUrl)}`;
 	return (
 		<Button
 			aria-label="Open in v0"
@@ -16,7 +24,7 @@ export function OpenInV0Button({
 			asChild
 		>
 			<a
-				href={`https://v0.dev/chat/api/open?url=${process.env.NEXT_PUBLIC_BASE_URL}/r/${name}.json`}
+				href={v0Url}
 				target="_blank"
 				rel="noreferrer"
 			>

@@ -7,7 +7,7 @@
   "dependencies": [
     "@phosphor-icons/react",
     "@clerk/nextjs",
-    "convex/react"
+    "convex"
   ],
   "registryDependencies": [
     "badge",
@@ -27,6 +27,5 @@
       "content": "\"use client\";\n\nimport { useState } from \"react\";\nimport { ModelSelector as RealModelSelector } from \"~/components/chat-input/model-selector\";\n\nexport default function ModelSelectorBlock() {\n\tconst [selectedModelId, setSelectedModelId] = useState(\"\");\n\tconst [source, setSource] = useState<\"aigateway\" | \"llmgateway\">(\n\t\t\"llmgateway\",\n\t);\n\n\treturn (\n\t\t<div className=\"w-full max-w-[360px]\">\n\t\t\t<RealModelSelector\n\t\t\t\tselectedModelId={selectedModelId}\n\t\t\t\tsetSelectedModelId={setSelectedModelId}\n\t\t\t\tclassName=\"w-full\"\n\t\t\t\tsource={source}\n\t\t\t\tonSourceChange={setSource}\n\t\t\t/>\n\t\t</div>\n\t);\n}\n\nexport { RealModelSelector as ModelSelector };\n\n\n",
       "type": "registry:component"
     }
-  ],
-  "docs": "# Model Selector\n\nA searchable dropdown to browse and select models from LLM Gateway or AI Gateway.\n\n## Usage\n\n```tsx\nimport ModelSelector from \"~/registry/blocks/model-selector/model-selector\";\n\nexport default function Example() {\n  const [model, setModel] = useState(\"\");\n  return (\n    <ModelSelector selectedModelId={model} setSelectedModelId={setModel} />\n  );\n}\n```\n\n## Props\n\n- selectedModelId: string\n- setSelectedModelId: (id: string) => void\n- className?: string\n- source?: 'aigateway' | 'llmgateway'\n- onSourceChange?: (s: 'aigateway' | 'llmgateway') => void\n"
+  ]
 }

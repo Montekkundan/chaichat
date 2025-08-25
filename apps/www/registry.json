@@ -8,7 +8,7 @@
 			"type": "registry:block",
 			"title": "Model Selector",
 			"description": "Dropdown to browse and select models (LLM Gateway or AI Gateway).",
-			"dependencies": ["@phosphor-icons/react", "@clerk/nextjs", "convex/react"],
+			"dependencies": ["@phosphor-icons/react", "@clerk/nextjs", "convex"],
 			"registryDependencies": [
 				"badge",
 				"button",
@@ -33,25 +33,12 @@
 			"type": "registry:block",
 			"title": "Playground Column",
 			"description": "A chat testing column with per-column model selection and controls.",
-			"dependencies": ["@clerk/nextjs", "convex/react", "@phosphor-icons/react", "lucide-react"],
+			"dependencies": ["@clerk/nextjs", "convex", "@phosphor-icons/react", "lucide-react"],
 			"registryDependencies": [
 				"button",
 				"separator",
 				"tooltip",
-				"dropdown-menu",
-				"model-selector",
-				"ai-elements:actions",
-				"ai-elements:branch",
-				"ai-elements:code-block",
-				"ai-elements:conversation",
-				"ai-elements:inline-citation",
-				"ai-elements:loader",
-				"ai-elements:message",
-				"ai-elements:reasoning",
-				"ai-elements:response",
-				"ai-elements:suggestion",
-				"ai-elements:task",
-				"ai-elements:tool"
+				"dropdown-menu"
 			],
 			"files": [
 				{ "path": "src/registry/blocks/playground-column/playground-column.tsx", "type": "registry:component" }

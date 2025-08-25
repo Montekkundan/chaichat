@@ -2,7 +2,7 @@
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { useUser } from "@clerk/nextjs";
-import { FilesIcon, HouseLineIcon } from "@phosphor-icons/react";
+import { CashRegisterIcon, FilesIcon, HouseLineIcon } from "@phosphor-icons/react";
 import { useMutation } from "convex/react";
 import {
 	BookOpen,
@@ -143,12 +143,12 @@ export function AppSidebar({
 			// 	activeIcon: <FlowArrowIcon size={16} weight="duotone" />,
 			// 	onClick: () => router.push("/flow"),
 			// },
-			// {
-			// 	title: "Registry",
-			// 	icon: <CashRegisterIcon size={16} />,
-			// 	activeIcon: <CashRegisterIcon size={16} weight="duotone" />,
-			// 	onClick: () => router.push("/registry"),
-			// },
+			{
+				title: "Registry",
+				icon: <CashRegisterIcon size={16} />,
+				activeIcon: <CashRegisterIcon size={16} weight="duotone" />,
+				onClick: () => router.push("/registry"),
+			},
 		],
 		navMain: [
 			{

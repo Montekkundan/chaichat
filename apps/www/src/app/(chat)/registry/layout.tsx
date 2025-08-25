@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { APP_NAME, generateOGImageURL } from "~/lib/config";
+import { readAllRegistryItems } from "~/lib/registry";
 import { LayoutMain } from "~/components/chat/layout-chat";
 import { cn } from "~/lib/utils";
 
@@ -38,26 +39,38 @@ export const metadata: Metadata = {
 	},
 };
 
-export default function RegistryLayout({
+export default async function RegistryLayout({
 	children,
 }: {
 	children: React.ReactNode;
 }) {
+	const all = await readAllRegistryItems();
+	const hasBlocks = all.some((i) => i.type?.includes("block"));
+	const hasComponents = all.some((i) => i.type?.includes("component") || i.type?.includes("ui"));
+	const hasPages = all.some((i) => i.type?.includes("page"));
 	return (
 		<LayoutMain>
-			<div className="mx-auto max-w-7xl px-4 py-6">
+			<div className="relative h-full overflow-y-auto">
+				<div className="mx-auto max-w-7xl px-4 py-6">
 				<header className="mb-6 flex flex-col gap-2">
 					<h1 className="font-bold text-3xl tracking-tight">Registry</h1>
 					<p className="text-muted-foreground">
 						Distribute reusable code with a docs-like experience.
 					</p>
 					<nav className="mt-2 flex flex-wrap items-center gap-2">
-						<RegistryNavLink href="/registry/blocks">Blocks</RegistryNavLink>
-						<RegistryNavLink href="/registry/components">Components</RegistryNavLink>
-						<RegistryNavLink href="/registry/pages">Pages</RegistryNavLink>
+						{hasBlocks ? (
+							<RegistryNavLink href="/registry/blocks">Blocks</RegistryNavLink>
+						) : null}
+						{hasComponents ? (
+							<RegistryNavLink href="/registry/components">Components</RegistryNavLink>
+						) : null}
+						{hasPages ? (
+							<RegistryNavLink href="/registry/pages">Pages</RegistryNavLink>
+						) : null}
 					</nav>
 				</header>
 				{children}
+				</div>
 			</div>
 		</LayoutMain>
 	);

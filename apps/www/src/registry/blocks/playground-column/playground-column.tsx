@@ -1,7 +1,6 @@
 "use client";
 
 import { PlaygroundProvider, usePlayground } from "~/lib/providers/playground-provider";
-import { PlaygroundColumn as RealPlaygroundColumn } from "~/components/playground/playground-column";
 
 function Inner() {
     const { columns, addColumn, maxColumns } = usePlayground();
@@ -21,8 +20,15 @@ function Inner() {
             <div className="w-full overflow-x-auto">
                 <div className="flex min-w-full gap-3">
                     {columns.map((col, idx) => (
-                        <div key={col.id} className="min-w-[420px] max-w-[560px] flex-1">
-                            <RealPlaygroundColumn column={col} columnIndex={idx} />
+                        <div key={col.id} className="min-w-[360px] max-w-[480px] flex-1">
+                            <div className="flex h-[420px] flex-col rounded-lg border bg-background">
+                                <div className="flex items-center justify-between border-b p-2">
+                                    <div className="font-medium text-sm">Column {idx + 1}</div>
+                                </div>
+                                <div className="flex flex-1 items-center justify-center p-4 text-muted-foreground text-sm">
+                                    Preview-only column (no chat UI)
+                                </div>
+                            </div>
                         </div>
                     ))}
                 </div>
@@ -38,7 +44,4 @@ export default function PlaygroundColumnBlock() {
         </PlaygroundProvider>
     );
 }
-
-export { RealPlaygroundColumn as PlaygroundColumn };
-
 
