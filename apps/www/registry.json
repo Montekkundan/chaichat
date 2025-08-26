@@ -8,7 +8,7 @@
 			"type": "registry:block",
 			"title": "Model Selector",
 			"description": "Dropdown to browse and select models (LLM Gateway or AI Gateway).",
-			"dependencies": ["@phosphor-icons/react", "@clerk/nextjs", "convex"],
+			"dependencies": ["@phosphor-icons/react", "@ai-sdk/gateway"],
 			"registryDependencies": [
 				"badge",
 				"button",
@@ -22,23 +22,24 @@
 				"tooltip"
 			],
 			"files": [
-				{
-					"path": "src/registry/blocks/model-selector/model-selector.tsx",
-					"type": "registry:component"
-				}
-			]
+				{ "path": "src/registry/blocks/model-selector/model-selector.tsx", "type": "registry:component", "target": "components/model-selector/model-selector.tsx" },
+				{ "path": "src/registry/blocks/model-selector/use-models.ts", "type": "registry:hook", "target": "components/model-selector/use-models.ts" },
+				{ "path": "src/registry/blocks/model-selector/api/models/route.ts", "type": "registry:lib", "target": "src/app/api/models/route.ts" },
+				{ "path": "src/registry/blocks/model-selector/api/models/ai-gateway/route.ts", "type": "registry:lib", "target": "src/app/api/models/ai-gateway/route.ts" }
+			],
+			"envVars": {
+				"LLM_GATEWAY_API_KEY": "",
+				"AI_GATEWAY_API_KEY": ""
+			}
 		},
 		{
 			"name": "playground-column",
 			"type": "registry:block",
 			"title": "Playground Column",
-			"description": "A chat testing column with per-column model selection and controls.",
-			"dependencies": ["@clerk/nextjs", "convex", "@phosphor-icons/react", "lucide-react"],
+			"description": "Minimal UI-only column with left/right/delete controls.",
+			"dependencies": [],
 			"registryDependencies": [
-				"button",
-				"separator",
-				"tooltip",
-				"dropdown-menu"
+				"button"
 			],
 			"files": [
 				{ "path": "src/registry/blocks/playground-column/playground-column.tsx", "type": "registry:component" }

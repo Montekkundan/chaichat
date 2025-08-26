@@ -104,4 +104,57 @@ export function extractMarkdownHeadings(markdown?: string): { id: string; text: 
 	return headings;
 }
 
+interface RichTextContent {
+	content?: RichTextNode[];
+}
+
+interface RichTextNode {
+	type: string;
+	attrs?: {
+		level?: number;
+		[key: string]: unknown;
+	};
+	content?: RichTextNode[];
+	text?: string;
+}
+
+export function extractRichTextHeadings(content?: RichTextContent): { id: string; text: string; level: number }[] {
+	if (!content?.content || !Array.isArray(content.content)) return [];
+
+	const headings: { id: string; text: string; level: number }[] = [];
+
+	function processContentItem(item: RichTextNode) {
+		if (item.type === 'heading' && item.attrs?.level && item.content) {
+			const level = item.attrs.level;
+			if (level === 1 || level === 2) {
+				let text = '';
+				if (item.content && Array.isArray(item.content)) {
+					text = item.content
+						.filter((child: RichTextNode) => child.type === 'text')
+						.map((child: RichTextNode) => child.text || '')
+						.join('')
+						.trim();
+				}
+
+				if (text) {
+					const id = text
+						.toLowerCase()
+						.replace(/[^a-z0-9\s-]/g, "")
+						.trim()
+						.replace(/\s+/g, "-");
+
+					headings.push({ id, text, level });
+				}
+			}
+		}
+
+		if (item.content && Array.isArray(item.content)) {
+			item.content.forEach(processContentItem);
+		}
+	}
+
+	content.content.forEach(processContentItem);
+	return headings;
+}
+
 

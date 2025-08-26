@@ -6,7 +6,7 @@ import { basehub } from "basehub";
 import { RichText } from "basehub/react-rich-text";
 import { DocsShell, DocsSidebar, DocsTOC } from "~/components/registry/registry-layout";
 import { InstallCommand } from "~/components/registry/install-command";
-import { extractMarkdownHeadings, readAllRegistryItems, readRegistryItem } from "~/lib/registry";
+import { extractMarkdownHeadings, extractRichTextHeadings, readAllRegistryItems, readRegistryItem } from "~/lib/registry";
 import { BlockPreview } from "~/components/registry/block-preview";
 import { OpenInV0Button } from "~/components/open-in-v0-button";
 
@@ -22,7 +22,6 @@ export default async function BlockDetailPage({ params }: { params: Promise<{ sl
 	const all = await readAllRegistryItems();
 	const sidebarItems = all.filter((i) => i.type?.includes("block"));
 
-	// Try to load docs from BaseHub by slug, falling back to local markdown
 	const bh = await basehub().query({
 		_componentInstances: {
 			pagesItem: {
@@ -74,8 +73,9 @@ export default async function BlockDetailPage({ params }: { params: Promise<{ sl
 	const hasRichTextContent = (j: typeof rich): j is NonNullable<typeof rich> =>
 		!!(j && Array.isArray(j.content) && j.content.length > 0);
 
-	// Only build TOC from markdown for now. Rich text TOC can be added later.
-	const headings = hasRichTextContent(rich) ? [] : extractMarkdownHeadings(item.docs);
+	const headings = hasRichTextContent(rich)
+		? extractRichTextHeadings(rich)
+		: extractMarkdownHeadings(item.docs);
 
 	function slugify(text: string) {
 		return text
