@@ -14,7 +14,7 @@ const componentCache = new Map<string, ComponentType<Record<string, unknown>>>()
 const registryComponentImporters: Record<string, () => Promise<{ default: ComponentType<Record<string, unknown>> }>> = {
 	"model-selector": () =>
 		import("~/registry/blocks/model-selector/model-selector").then((m: typeof import("~/registry/blocks/model-selector/model-selector")) => ({
-			default: m.ModelSelector as ComponentType<Record<string, unknown>>,
+			default: m.default as ComponentType<Record<string, unknown>>,
 		})),
 	"playground-column": () =>
 		import("~/registry/blocks/playground-column/playground-column").then((m: typeof import("~/registry/blocks/playground-column/playground-column")) => ({
