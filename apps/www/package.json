@@ -4,8 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "shadcn build && basehub & next build",
-    "build:turbo": "shadcn build & basehub & next build --turbopack",
+    "build": "shadcn build && node scripts/registry-rewrite.mjs && basehub & next build",
+    "build:turbo": "shadcn build && node scripts/registry-rewrite.mjs && basehub & next build --turbopack",
     "check": "biome check .",
     "check:unsafe": "biome check --write --unsafe .",
     "check:write": "biome check --write .",
@@ -17,7 +17,8 @@
     "test:watch": "bun test --watch",
     "test:coverage": "bun test --coverage",
     "check-types": "tsc --noEmit",
-    "registry:build": "shadcn build"
+    "registry:build": "shadcn build && node scripts/registry-rewrite.mjs",
+    "registry:rewrite": "node scripts/registry-rewrite.mjs"
   },
   "dependencies": {
     "@ai-sdk/gateway": "^1.0.4",
