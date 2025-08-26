@@ -4,11 +4,16 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { basehub } from "basehub";
 import { RichText } from "basehub/react-rich-text";
+import path from "node:path";
+import fs from "node:fs/promises";
 import { DocsShell, DocsSidebar, DocsTOC } from "~/components/registry/registry-layout";
-import { InstallCommand } from "~/components/registry/install-command";
 import { extractMarkdownHeadings, extractRichTextHeadings, readAllRegistryItems, readRegistryItem } from "~/lib/registry";
 import { BlockPreview } from "~/components/registry/block-preview";
 import { OpenInV0Button } from "~/components/open-in-v0-button";
+import { CodeBlock, CodeBlockCopyButton } from "~/components/ai-elements/code-block";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
+import { RegistryCodeBlock } from "~/components/registry/registry-code-block";
+export const revalidate = 60; // ISR: refresh registry docs every minute
 
 export async function generateStaticParams() {
 	const items = await readAllRegistryItems();
@@ -85,6 +90,31 @@ export default async function BlockDetailPage({ params }: { params: Promise<{ sl
 			.replace(/\s+/g, "-");
 	}
 
+	// Prepare files for manual copy section. Prefer built JSON file contents in public/r.
+	const filesForManualCopy = await Promise.all(
+		(item.files || []).map(async (f) => {
+			let content = f.content || "";
+			if (!content) {
+				try {
+					const abs = path.join(process.cwd(), f.path);
+					content = await fs.readFile(abs, "utf8");
+				} catch {}
+			}
+			return { path: f.path, type: f.type, content } as { path: string; type?: string; content: string };
+		}),
+	);
+
+	function languageFromPath(p: string): string {
+		const ext = p.split(".").pop() || "";
+		if (ext === "tsx") return "tsx";
+		if (ext === "ts") return "typescript";
+		if (ext === "js") return "javascript";
+		if (ext === "tsx" || ext === "jsx") return "tsx";
+		if (ext === "css") return "css";
+		if (ext === "json") return "json";
+		return "plaintext";
+	}
+
 	return (
 		<DocsShell
 			title={item.title}
@@ -99,9 +129,56 @@ export default async function BlockDetailPage({ params }: { params: Promise<{ sl
 				<p className="text-muted-foreground">{item.description}</p>
 				<div className="flex flex-wrap items-center gap-2">
 					<OpenInV0Button name={slug} />
-					<InstallCommand slug={slug} />
+					{/* <InstallCommand slug={slug} /> */}
 				</div>
 				<BlockPreview slug={slug} />
+				{filesForManualCopy.length > 0 && (
+					<div className="space-y-3">
+						<Tabs defaultValue="cli" className="w-full">
+							<TabsList className="gap-2 p-1.5">
+								<TabsTrigger value="cli" className="px-3 py-1.5 text-sm">CLI</TabsTrigger>
+								<TabsTrigger value="manual" className="px-3 py-1.5 text-sm">Manual</TabsTrigger>
+							</TabsList>
+
+							<TabsContent value="cli">
+								<div className="rounded-md border p-3">
+									<CodeBlock
+										code={`npx shadcn@latest add "http://localhost:3000/r/${slug}.json"`}
+										language="bash"
+									>
+										<CodeBlockCopyButton aria-label="Copy CLI command" />
+									</CodeBlock>
+								</div>
+							</TabsContent>
+
+							<TabsContent value="manual">
+								{filesForManualCopy.length > 0 && (
+									<Tabs defaultValue={filesForManualCopy[0]?.path || "file-0"} className="w-full">
+										<TabsList className="mb-2 gap-2 overflow-x-auto whitespace-nowrap p-1.5">
+											{filesForManualCopy.map((f) => (
+												<TabsTrigger key={f.path} value={f.path} className="px-2.5 py-1.5 font-mono text-xs sm:text-sm">
+													{path.basename(f.path)}
+												</TabsTrigger>
+											))}
+										</TabsList>
+										{filesForManualCopy.map((f) => (
+											<TabsContent key={f.path} value={f.path}>
+												<RegistryCodeBlock
+													code={f.content}
+													language={languageFromPath(f.path)}
+													title={f.path}
+													defaultCollapsed
+													collapsedMaxHeight={320}
+													className="border"
+												/>
+											</TabsContent>
+										))}
+									</Tabs>
+								)}
+							</TabsContent>
+						</Tabs>
+					</div>
+				)}
 				{hasRichTextContent(rich) ? (
 					<div className="prose dark:prose-invert max-w-none prose-headings:scroll-mt-8 prose-headings:text-balance prose-p:text-balance prose-headings:font-semibold prose-headings:tracking-tight prose-p:tracking-tight prose-a:no-underline">
 						<RichText
