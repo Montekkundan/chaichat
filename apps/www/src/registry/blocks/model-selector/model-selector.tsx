@@ -93,7 +93,7 @@ type ModelSelectorProps = {
 
 type ModelStatusFilter = "any" | "active" | "deprecated" | "deactivated";
 
-export function ModelSelector({
+function ModelSelector({
 	selectedModelId,
 	setSelectedModelId,
 	models: modelsProp,
@@ -1678,3 +1678,6 @@ export function ModelSelector({
 		</TooltipProvider>
 	);
 }
+
+export { ModelSelector };
+export default ModelSelector;
