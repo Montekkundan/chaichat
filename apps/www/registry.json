@@ -22,10 +22,10 @@
 				"tooltip"
 			],
 			"files": [
-				{ "path": "src/registry/blocks/model-selector/model-selector.tsx", "type": "registry:component", "target": "src/components/model-selector/model-selector.tsx" },
-				{ "path": "src/registry/blocks/model-selector/use-models.ts", "type": "registry:hook", "target": "src/components/model-selector/use-models.ts" },
-				{ "path": "src/registry/blocks/model-selector/api/models/route.ts", "type": "registry:lib", "target": "src/app/api/models/route.ts" },
-				{ "path": "src/registry/blocks/model-selector/api/models/ai-gateway/route.ts", "type": "registry:lib", "target": "src/app/api/models/ai-gateway/route.ts" }
+				{ "path": "src/registry/blocks/model-selector/model-selector.tsx", "type": "registry:component" },
+				{ "path": "src/registry/blocks/model-selector/use-models.ts", "type": "registry:hook" },
+				{ "path": "src/registry/blocks/model-selector/api/models/route.ts", "type": "registry:lib" },
+				{ "path": "src/registry/blocks/model-selector/api/models/ai-gateway/route.ts", "type": "registry:lib" }
 			],
 			"envVars": {
 				"LLM_GATEWAY_API_KEY": "",
