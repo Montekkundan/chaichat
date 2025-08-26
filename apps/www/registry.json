@@ -22,8 +22,8 @@
 				"tooltip"
 			],
 			"files": [
-				{ "path": "src/registry/blocks/model-selector/model-selector.tsx", "type": "registry:component", "target": "components/model-selector/model-selector.tsx" },
-				{ "path": "src/registry/blocks/model-selector/use-models.ts", "type": "registry:hook", "target": "components/model-selector/use-models.ts" },
+				{ "path": "src/registry/blocks/model-selector/model-selector.tsx", "type": "registry:component", "target": "src/app/components/model-selector/model-selector.tsx" },
+				{ "path": "src/registry/blocks/model-selector/use-models.ts", "type": "registry:hook", "target": "src/app/components/model-selector/use-models.ts" },
 				{ "path": "src/registry/blocks/model-selector/api/models/route.ts", "type": "registry:lib", "target": "src/app/api/models/route.ts" },
 				{ "path": "src/registry/blocks/model-selector/api/models/ai-gateway/route.ts", "type": "registry:lib", "target": "src/app/api/models/ai-gateway/route.ts" }
 			],
