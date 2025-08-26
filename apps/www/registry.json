@@ -24,8 +24,8 @@
 			"files": [
 				{ "path": "src/registry/blocks/model-selector/model-selector.tsx", "type": "registry:component" },
 				{ "path": "src/registry/blocks/model-selector/use-models.ts", "type": "registry:hook" },
-				{ "path": "src/registry/blocks/model-selector/api/models/route.ts", "type": "registry:lib" },
-				{ "path": "src/registry/blocks/model-selector/api/models/ai-gateway/route.ts", "type": "registry:lib" }
+				{ "path": "src/app/api/models/route.ts", "type": "registry:lib" },
+				{ "path": "src/app/api/models/ai-gateway/route.ts", "type": "registry:lib" }
 			],
 			"envVars": {
 				"LLM_GATEWAY_API_KEY": "",
