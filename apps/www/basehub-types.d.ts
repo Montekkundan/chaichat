@@ -99,7 +99,7 @@ export interface BlockColor {
     __typename: 'BlockColor'
 }
 
-export type BlockDocument = (Chailab | Changelog | Components | Documentation | DocumentationItem | ImageComponent | ImageComponent_1 | Pages | PagesItem | PagesItem_1 | Pages_1 | Registry | SupportBlocksWrapper | Tags | TagsItem | TweetComponent | TweetComponent_1 | VideoComponent | VideoComponent_1 | YoutubeComponent | YoutubeComponent_1 | _AgentStart | documentationItem_AsList | imageComponent1_AsList | imageComponent_AsList | pagesItem1_AsList | pagesItem_AsList | tagsItem_AsList | tweetComponent1_AsList | tweetComponent_AsList | videoComponent1_AsList | videoComponent_AsList | youtubeComponent1_AsList | youtubeComponent_AsList) & { __isUnion?: true }
+export type BlockDocument = (Chailab | Changelog | Components | Documentation | DocumentationItem | ImageComponent | ImageComponent_1 | Pages | PagesItem | PagesItem_1 | Pages_1 | Registry | RegistryComponents | Tags | TagsItem | TweetComponent | TweetComponent_1 | VideoComponent | VideoComponent_1 | YoutubeComponent | YoutubeComponent_1 | _AgentStart | documentationItem_AsList | imageComponent1_AsList | imageComponent_AsList | pagesItem1_AsList | pagesItem_AsList | tagsItem_AsList | tweetComponent1_AsList | tweetComponent_AsList | videoComponent1_AsList | videoComponent_AsList | youtubeComponent1_AsList | youtubeComponent_AsList) & { __isUnion?: true }
 
 export interface BlockDocumentSys {
     apiNamePath: Scalars['String']
@@ -470,7 +470,7 @@ export interface Query {
     changelog: Changelog
     components: Components
     registry: Registry
-    supportBlocksWrapper: SupportBlocksWrapper
+    registryComponents: RegistryComponents
     __typename: 'Query'
 }
 
@@ -485,6 +485,22 @@ export interface Registry {
     _title: Scalars['String']
     pages: Pages
     __typename: 'Registry'
+}
+
+export interface RegistryComponents {
+    _analyticsKey: Scalars['String']
+    _dashboardUrl: Scalars['String']
+    _id: Scalars['String']
+    _idPath: Scalars['String']
+    _slug: Scalars['String']
+    _slugPath: Scalars['String']
+    _sys: BlockDocumentSys
+    _title: Scalars['String']
+    image: ImageComponent
+    tweet: TweetComponent
+    video: VideoComponent
+    youtube: YoutubeComponent
+    __typename: 'RegistryComponents'
 }
 
 export interface RepoSys {
@@ -505,22 +521,6 @@ export interface SearchHighlight {
     /** HTML snippet with <mark> tags around the matched terms */
     snippet: Scalars['String']
     __typename: 'SearchHighlight'
-}
-
-export interface SupportBlocksWrapper {
-    _analyticsKey: Scalars['String']
-    _dashboardUrl: Scalars['String']
-    _id: Scalars['String']
-    _idPath: Scalars['String']
-    _slug: Scalars['String']
-    _slugPath: Scalars['String']
-    _sys: BlockDocumentSys
-    _title: Scalars['String']
-    image: ImageComponent
-    tweet: TweetComponent
-    video: VideoComponent
-    youtube: YoutubeComponent
-    __typename: 'SupportBlocksWrapper'
 }
 
 export interface Tags {
@@ -708,6 +708,7 @@ export interface _AgentStart {
     manageBranches: Scalars['Boolean']
     mcpUrl: Scalars['String']
     model: Scalars['String']
+    openRouterKey: (Scalars['String'] | null)
     searchTheWeb: Scalars['Boolean']
     slackInstallUrl: Scalars['String']
     systemPrompt: Scalars['String']
@@ -1094,7 +1095,7 @@ export interface BlockDocumentGenqlSelection{
     on_PagesItem_1?: PagesItem_1GenqlSelection
     on_Pages_1?: Pages_1GenqlSelection
     on_Registry?: RegistryGenqlSelection
-    on_SupportBlocksWrapper?: SupportBlocksWrapperGenqlSelection
+    on_RegistryComponents?: RegistryComponentsGenqlSelection
     on_Tags?: TagsGenqlSelection
     on_TagsItem?: TagsItemGenqlSelection
     on_TweetComponent?: TweetComponentGenqlSelection
@@ -1740,7 +1741,7 @@ export interface QueryGenqlSelection{
     changelog?: ChangelogGenqlSelection
     components?: ComponentsGenqlSelection
     registry?: RegistryGenqlSelection
-    supportBlocksWrapper?: SupportBlocksWrapperGenqlSelection
+    registryComponents?: RegistryComponentsGenqlSelection
     __typename?: boolean | number
 }
 
@@ -1770,6 +1771,28 @@ export interface RegistryGenqlSelection{
     search?: (PagesItemSearchInput | null), 
     /** Skip the first n items. */
     skip?: (Scalars['Int'] | null)} })
+    __typename?: boolean | number
+}
+
+export interface RegistryComponentsGenqlSelection{
+    _analyticsKey?: { __args: {
+    /**
+     * The scope of the analytics key. Use `send` for just ingesting data. Use `query` if you need to show an analytics data in your website.
+     * 
+     * Have in mind, if you expose your `query` analytics key in the frontend, you'll be exposing all of this block's analytics data to the public. This is generally safe, but it might not be in your case.
+     */
+    scope?: (AnalyticsKeyScope | null)} } | boolean | number
+    _dashboardUrl?: boolean | number
+    _id?: boolean | number
+    _idPath?: boolean | number
+    _slug?: boolean | number
+    _slugPath?: boolean | number
+    _sys?: BlockDocumentSysGenqlSelection
+    _title?: boolean | number
+    image?: ImageComponentGenqlSelection
+    tweet?: TweetComponentGenqlSelection
+    video?: VideoComponentGenqlSelection
+    youtube?: YoutubeComponentGenqlSelection
     __typename?: boolean | number
 }
 
@@ -1805,28 +1828,6 @@ export interface SelectFilter {excludes?: (Scalars['String'] | null),excludesAll
 export interface StringFilter {contains?: (Scalars['String'] | null),endsWith?: (Scalars['String'] | null),eq?: (Scalars['String'] | null),in?: (Scalars['String'][] | null),isNull?: (Scalars['Boolean'] | null),matches?: (StringMatchesFilter | null),notEq?: (Scalars['String'] | null),notIn?: (Scalars['String'][] | null),startsWith?: (Scalars['String'] | null)}
 
 export interface StringMatchesFilter {caseSensitive?: (Scalars['Boolean'] | null),pattern: Scalars['String']}
-
-export interface SupportBlocksWrapperGenqlSelection{
-    _analyticsKey?: { __args: {
-    /**
-     * The scope of the analytics key. Use `send` for just ingesting data. Use `query` if you need to show an analytics data in your website.
-     * 
-     * Have in mind, if you expose your `query` analytics key in the frontend, you'll be exposing all of this block's analytics data to the public. This is generally safe, but it might not be in your case.
-     */
-    scope?: (AnalyticsKeyScope | null)} } | boolean | number
-    _dashboardUrl?: boolean | number
-    _id?: boolean | number
-    _idPath?: boolean | number
-    _slug?: boolean | number
-    _slugPath?: boolean | number
-    _sys?: BlockDocumentSysGenqlSelection
-    _title?: boolean | number
-    image?: ImageComponentGenqlSelection
-    tweet?: TweetComponentGenqlSelection
-    video?: VideoComponentGenqlSelection
-    youtube?: YoutubeComponentGenqlSelection
-    __typename?: boolean | number
-}
 
 export interface TagsGenqlSelection{
     _analyticsKey?: { __args: {
@@ -2123,6 +2124,7 @@ export interface _AgentStartGenqlSelection{
     manageBranches?: boolean | number
     mcpUrl?: boolean | number
     model?: boolean | number
+    openRouterKey?: boolean | number
     searchTheWeb?: boolean | number
     slackInstallUrl?: boolean | number
     systemPrompt?: boolean | number
@@ -2764,6 +2766,10 @@ export interface FragmentsMap {
     root: Registry,
     selection: RegistryGenqlSelection,
 }
+  RegistryComponents: {
+    root: RegistryComponents,
+    selection: RegistryComponentsGenqlSelection,
+}
   RepoSys: {
     root: RepoSys,
     selection: RepoSysGenqlSelection,
@@ -2775,10 +2781,6 @@ export interface FragmentsMap {
   SearchHighlight: {
     root: SearchHighlight,
     selection: SearchHighlightGenqlSelection,
-}
-  SupportBlocksWrapper: {
-    root: SupportBlocksWrapper,
-    selection: SupportBlocksWrapperGenqlSelection,
 }
   Tags: {
     root: Tags,

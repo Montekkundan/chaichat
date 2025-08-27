@@ -13,6 +13,7 @@ import { OpenInV0Button } from "~/components/open-in-v0-button";
 import { CodeBlock, CodeBlockCopyButton } from "~/components/ai-elements/code-block";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { RegistryCodeBlock } from "~/components/registry/registry-code-block";
+import { BlogLink, UnorderedList, Heading1, Heading2, Heading3, OrderedList, ListItem, Code, Pre } from "./components";
 export const revalidate = 60; // ISR: refresh registry docs every minute
 
 export async function generateStaticParams() {
@@ -240,6 +241,43 @@ export default async function BlockDetailPage({ params }: { params: Promise<{ sl
 										</div>
 									);
 								},
+								h1: (props) => (
+									<Heading1 id={props.id}>{props.children}</Heading1>
+								  ),
+								  h2: (props) => (
+									<Heading2 id={props.id}>{props.children}</Heading2>
+								  ),
+								  h3: (props) => (
+									<Heading3 id={props.id}>{props.children}</Heading3>
+								  ),
+								  hr: () => (
+									<hr className="border-brand-w1/20 w-full" />
+								  ),
+								  a: (props) => (
+									<BlogLink
+									  href={props.href}
+									  target={props.target}
+									  rel={props.rel}
+									  internal={undefined}
+									>
+									  {props.children}
+									</BlogLink>
+								  ),
+								  ul: (props) => (
+									<UnorderedList data-is-task-list={false}>
+									  {props.children}
+									</UnorderedList>
+								  ),
+								  ol: (props) => <OrderedList start={props.start ?? 1}>{props.children}</OrderedList>,
+								  li: (props) => (
+									<ListItem data-is-task-list={false}>{props.children}</ListItem>
+								  ),
+								  code: (props) => <Code>{props.children}</Code>,
+								  pre: (props) => (
+									<Pre code={props.code} language={props.language}>
+									  {props.children}
+									</Pre>
+								  ),
 							}}
 						/>
 					</div>
