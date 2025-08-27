@@ -63,6 +63,21 @@
 	--shadow-2xl: 0px 1px 2px 0px hsl(0 0% 0% / 0.45);
 	--tracking-normal: 0em;
 	--spacing: 0.25rem;
+	/* Code block theme variables - light mode */
+	--chai-background: oklch(0.95 0 0);
+	--chai-content-background: oklch(0.98 0 0);
+	--chai-color-text: oklch(0.15 0 0);
+	--chai-token-constant: oklch(0.4 0.15 142);
+	--chai-token-string: oklch(0.2 0 0);
+	--chai-token-comment: oklch(0.5 0 0);
+	--chai-token-keyword: oklch(0.4 0.15 142);
+	--chai-token-parameter: oklch(0.2 0 0);
+	--chai-token-function: oklch(0.35 0.2 142);
+	--chai-token-string-expression: oklch(0.45 0.1 142);
+	--chai-token-punctuation: oklch(0.35 0.2 142);
+	--chai-token-link: oklch(0.4 0.15 142);
+	--chai-token-tag: oklch(0.35 0.2 142);
+	--chai-line-indicator: oklch(0.8 0 0);
 	/* Used as alpha channel when backdrop-blur not supported */
 	/* --blur-fallback: 1; */
 	/* Chat specific */
@@ -136,6 +151,21 @@
 	--shadow-xl: 0px 1px 2px 0px hsl(0 0% 0% / 0.18), 0px 8px 10px -1px
 		hsl(0 0% 0% / 0.18);
 	--shadow-2xl: 0px 1px 2px 0px hsl(0 0% 0% / 0.45);
+	/* Code block theme variables - dark mode */
+	--chai-background: oklch(0.08 0 0);
+	--chai-content-background: oklch(0.04 0 0);
+	--chai-color-text: oklch(0.85 0 0);
+	--chai-token-constant: oklch(0.75 0.15 142);
+	--chai-token-string: oklch(0.9 0 0);
+	--chai-token-comment: oklch(0.5 0 0);
+	--chai-token-keyword: oklch(0.75 0.15 142);
+	--chai-token-parameter: oklch(0.9 0 0);
+	--chai-token-function: oklch(0.7 0.2 142);
+	--chai-token-string-expression: oklch(0.8 0.1 142);
+	--chai-token-punctuation: oklch(0.7 0.2 142);
+	--chai-token-link: oklch(0.75 0.15 142);
+	--chai-token-tag: oklch(0.7 0.2 142);
+	--chai-line-indicator: oklch(0.18 0 0);
 	/* Chat specific */
 	/* --chat-background: var(--background); */
 	/* --chat-input-background: oklch(0.18 0 0 / var(--blur-fallback, 0.4)); */
