@@ -39,33 +39,7 @@ export default async function BlockDetailPage({ params }: { params: Promise<{ sl
 					_title: true,
 					content: {
 						json: {
-							content: true,
-							blocks: {
-								on_TweetComponent: {
-									_id: true,
-									__typename: true,
-									_title: true,
-									tweetId: true,
-								},
-								on_YoutubeComponent: {
-									_id: true,
-									__typename: true,
-									_title: true,
-									youtubeId: true,
-								},
-								on_VideoComponent: {
-									_id: true,
-									__typename: true,
-									_title: true,
-									url: true,
-								},
-								on_ImageComponent: {
-									_id: true,
-									__typename: true,
-									_title: true,
-									url: true,
-								},
-							},
+							content: true
 						},
 						markdown: true,
 					},
@@ -186,61 +160,6 @@ export default async function BlockDetailPage({ params }: { params: Promise<{ sl
 							content={rich.content}
 							blocks={rich.blocks}
 							components={{
-								TweetComponent: (props: { tweetId?: string | null }) => {
-									const tweetId = props.tweetId;
-									if (!tweetId) return null;
-									const { Tweet } = require("react-tweet");
-									const Image = require("next/image").default;
-									return (
-										<div className="dark mx-auto my-6 grid w-full max-w-[500px] place-items-center">
-											<Tweet
-												id={tweetId}
-												components={{
-													AvatarImg: (p: { src: string; alt: string; width: number; height: number }) => (
-														<Image src={p.src} alt={p.alt} width={p.width} height={p.height} />
-													),
-												}}
-											/>
-										</div>
-									);
-								},
-								YoutubeComponent: (props: { youtubeId?: string | null }) => {
-									const youtubeId = props.youtubeId;
-									if (!youtubeId) return null;
-									return (
-										<div className="relative my-6 aspect-video w-full overflow-hidden rounded-md border">
-											<iframe
-												src={`https://www.youtube.com/embed/${youtubeId}`}
-												title="YouTube video player"
-												allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-												allowFullScreen
-												className="absolute inset-0 h-full w-full"
-											/>
-										</div>
-									);
-								},
-								VideoComponent: (props: { url?: string | null }) => {
-									const url = props.url;
-									if (!url) return null;
-									return (
-										<div className="my-6">
-											<video className="w-full rounded-md border" controls loop src={url}>
-												<track kind="captions" />
-											</video>
-										</div>
-									);
-								},
-								ImageComponent: (props: { url?: string | null; _title?: string | null }) => {
-									const url = props.url;
-									const title = props._title;
-									if (!url) return null;
-									return (
-										<div className="my-6">
-											{/* eslint-disable-next-line @next/next/no-img-element */}
-											<img className="w-full rounded-md border" src={url} alt={title || "Image"} />
-										</div>
-									);
-								},
 								h1: (props) => (
 									<Heading1 id={props.id}>{props.children}</Heading1>
 								  ),
