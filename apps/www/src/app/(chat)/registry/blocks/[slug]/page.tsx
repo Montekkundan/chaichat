@@ -158,7 +158,6 @@ export default async function BlockDetailPage({ params }: { params: Promise<{ sl
 					<div className="prose dark:prose-invert max-w-none prose-headings:scroll-mt-8 prose-headings:text-balance prose-p:text-balance prose-headings:font-semibold prose-headings:tracking-tight prose-p:tracking-tight prose-a:no-underline">
 						<RichText
 							content={rich.content}
-							blocks={rich.blocks}
 							components={{
 								h1: (props) => (
 									<Heading1 id={props.id}>{props.children}</Heading1>
