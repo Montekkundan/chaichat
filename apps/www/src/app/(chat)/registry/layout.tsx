@@ -55,7 +55,7 @@ export default async function RegistryLayout({
 				<header className="mb-6 flex flex-col gap-2">
 					<h1 className="font-bold text-3xl tracking-tight">Registry</h1>
 					<p className="text-muted-foreground">
-						Distribute reusable code with a docs-like experience.
+						Distributing blocks, components, and pages which I created for experimenting with AI.
 					</p>
 					<nav className="mt-2 flex flex-wrap items-center gap-2">
 						{hasBlocks ? (
