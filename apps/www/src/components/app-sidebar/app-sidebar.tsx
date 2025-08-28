@@ -35,7 +35,7 @@ import { Separator } from "../ui/separator";
 import { HistorySection } from "./history-section";
 // import { NavMain } from "./nav-main";
 import { NavTop } from "./nav-top";
-import { NavProjects } from "./nav-projects";
+// import { NavProjects } from "./nav-projects";
 
 
 export function AppSidebar({

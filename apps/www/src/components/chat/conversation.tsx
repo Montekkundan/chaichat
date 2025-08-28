@@ -80,7 +80,7 @@ export function Conversation({
 				blob = await res.blob();
 			}
 			if (!blob) throw new Error("Blob conversion failed");
-			const _ClipboardItem = (window as any).ClipboardItem;
+			const _ClipboardItem = (window as Window & { ClipboardItem?: typeof ClipboardItem }).ClipboardItem;
 			if (_ClipboardItem && navigator.clipboard?.write) {
 				const item = new _ClipboardItem({ [blob.type]: blob });
 				await navigator.clipboard.write([item]);
@@ -247,69 +247,69 @@ export function Conversation({
 														const extendedMessage = message as ExtendedMessage;
 														const attachments = extendedMessage.attachments;
 														const hasFileParts = parts.some((p) => p.type === "file");
-																return !hasFileParts && attachments && attachments.length > 0 ? (
-																	<div className="mb-4 space-y-2">
-																		{attachments.map((attachment, idx: number) => {
-																			const attKeyBase = `${message.id}-attachment-${idx}`;
-																			return (
-																				<div key={attKeyBase} className="max-w-md">
-																					<div className="group rounded-xl overflow-hidden border bg-muted/40 p-2 md:p-3 shadow-sm">
-																						{attachment.contentType?.startsWith('image/') ? (
-																							<>
-																								<img
-																									src={attachment.url}
-																									alt={attachment.name}
-																									className="w-full h-auto max-h-80 object-contain rounded-md bg-background"
-																									style={{ color: "transparent" }}
-																								/>
-																								<Actions className="mt-2 opacity-0 transition-opacity group-hover:opacity-100">
-																									{(() => {
-																										const key = `${attKeyBase}-img`;
-																										const isCopied = copiedKey === key;
-																										return (
-																											<>
-																												<Action
-																												tooltip="Copy image"
-																												label="Copy image"
-																												onClick={() => handleCopyImage(attachment.url, key)}
-																												aria-label={isCopied ? "Copied" : "Copy image to clipboard"}
-																												disabled={isCopied}
-																											>
-																												<div className={cn("transition-all", isCopied ? "scale-100 opacity-100" : "scale-0 opacity-0")}> 
-																													<Check className="stroke-emerald-500" size={16} strokeWidth={2} aria-hidden="true" />
-																												</div>
-																												<div className={cn("absolute transition-all", isCopied ? "scale-0 opacity-0" : "scale-100 opacity-100")}> 
-																													<Copy size={16} strokeWidth={2} aria-hidden="true" />
-																												</div>
-																											</Action>
+														return !hasFileParts && attachments && attachments.length > 0 ? (
+															<div className="mb-4 space-y-2">
+																{attachments.map((attachment, idx: number) => {
+																	const attKeyBase = `${message.id}-attachment-${idx}`;
+																	return (
+																		<div key={attKeyBase} className="max-w-md">
+																			<div className="group rounded-xl overflow-hidden border bg-muted/40 p-2 md:p-3 shadow-sm">
+																				{attachment.contentType?.startsWith('image/') ? (
+																					<>
+																						<img
+																							src={attachment.url}
+																							alt={attachment.name}
+																							className="w-full h-auto max-h-80 object-contain rounded-md bg-background"
+																							style={{ color: "transparent" }}
+																						/>
+																						<Actions className="mt-2 opacity-0 transition-opacity group-hover:opacity-100">
+																							{(() => {
+																								const key = `${attKeyBase}-img`;
+																								const isCopied = copiedKey === key;
+																								return (
+																									<>
+																										<Action
+																											tooltip="Copy image"
+																											label="Copy image"
+																											onClick={() => handleCopyImage(attachment.url, key)}
+																											aria-label={isCopied ? "Copied" : "Copy image to clipboard"}
+																											disabled={isCopied}
+																										>
+																											<div className={cn("transition-all", isCopied ? "scale-100 opacity-100" : "scale-0 opacity-0")}>
+																												<Check className="stroke-emerald-500" size={16} strokeWidth={2} aria-hidden="true" />
+																											</div>
+																											<div className={cn("absolute transition-all", isCopied ? "scale-0 opacity-0" : "scale-100 opacity-100")}>
+																												<Copy size={16} strokeWidth={2} aria-hidden="true" />
+																											</div>
+																										</Action>
 
-																											<Action
-																												tooltip="Download"
-																												label="Download"
-																												onClick={() => handleDownloadImage(attachment.url, attachment.name)}
-																												aria-label="Download image"
-																											>
-																												<Download size={16} strokeWidth={2} aria-hidden="true" />
-																											</Action>
-																											</>
-																									);
-																								})()}
-																				</Actions>
-																				</>
+																										<Action
+																											tooltip="Download"
+																											label="Download"
+																											onClick={() => handleDownloadImage(attachment.url, attachment.name)}
+																											aria-label="Download image"
+																										>
+																											<Download size={16} strokeWidth={2} aria-hidden="true" />
+																										</Action>
+																									</>
+																								);
+																							})()}
+																						</Actions>
+																					</>
 																				) : (
-																				<div className="flex items-center gap-2 p-2 bg-muted/50 rounded">
-																					<div className="text-sm">📎</div>
-																					<div className="flex-1">
-																						<div className="text-sm font-medium">{attachment.name}</div>
-																						<div className="text-xs text-muted-foreground">
-																							{(attachment.size / 1024).toFixed(2)} KB
+																					<div className="flex items-center gap-2 p-2 bg-muted/50 rounded">
+																						<div className="text-sm">📎</div>
+																						<div className="flex-1">
+																							<div className="text-sm font-medium">{attachment.name}</div>
+																							<div className="text-xs text-muted-foreground">
+																								{(attachment.size / 1024).toFixed(2)} KB
+																							</div>
 																						</div>
 																					</div>
-																				</div>
-																			)}
+																				)}
+																			</div>
 																		</div>
-																	</div>
-																);
+																	);
 																})}
 															</div>
 														) : null;
@@ -344,14 +344,14 @@ export function Conversation({
 																								<Action
 																									tooltip="Copy image"
 																									label="Copy image"
-																									onClick={() => handleCopyImage(fileData.url!, imgKey)}
+																									onClick={() => fileData.url && handleCopyImage(fileData.url, imgKey)}
 																									aria-label={isCopied ? "Copied" : "Copy image to clipboard"}
-																									disabled={isCopied}
+																									disabled={!fileData.url || isCopied}
 																								>
 																									<div className={cn("transition-all", isCopied ? "scale-100 opacity-100" : "scale-0 opacity-0")}>
 																										<Check className="stroke-emerald-500" size={16} strokeWidth={2} aria-hidden="true" />
 																									</div>
-																									<div className={cn("absolute transition-all", isCopied ? "scale-0 opacity-0" : "scale-100 opacity-100")}> 
+																									<div className={cn("absolute transition-all", isCopied ? "scale-0 opacity-0" : "scale-100 opacity-100")}>
 																										<Copy size={16} strokeWidth={2} aria-hidden="true" />
 																									</div>
 																								</Action>
@@ -359,17 +359,18 @@ export function Conversation({
 																								<Action
 																									tooltip="Download"
 																									label="Download"
-																									onClick={() => handleDownloadImage(fileData.url!, fileData.filename)}
+																									onClick={() => fileData.url && handleDownloadImage(fileData.url, fileData.filename)}
 																									aria-label="Download image"
+																									disabled={!fileData.url}
 																								>
 																									<Download size={16} strokeWidth={2} aria-hidden="true" />
 																								</Action>
-																						</>
-																					);
-																				})()}
-																			</Actions>
+																							</>
+																						);
+																					})()}
+																				</Actions>
+																			</div>
 																		</div>
-																	</div>
 																	);
 																}
 
@@ -413,27 +414,28 @@ export function Conversation({
 																				<img src={src} alt={alt} className="w-full h-auto max-h-80 object-contain rounded-md bg-background" style={{ color: "transparent" }} />
 																				<Actions className="mt-2 opacity-0 transition-opacity group-hover:opacity-100">
 																					<Action
-																							tooltip="Copy image"
-																							label="Copy image"
-																							onClick={() => handleCopyImage(src, imgKey)}
-																							aria-label={copied ? "Copied" : "Copy image to clipboard"}
-																							disabled={copied}
-																						>
-																							<div className={cn("transition-all", copied ? "scale-100 opacity-100" : "scale-0 opacity-0")}>
-																								<Check className="stroke-emerald-500" size={16} strokeWidth={2} aria-hidden="true" />
-																							</div>
-																							<div className={cn("absolute transition-all", copied ? "scale-0 opacity-0" : "scale-100 opacity-100")}> 
-																								<Copy size={16} strokeWidth={2} aria-hidden="true" />
-																							</div>
+																						tooltip="Copy image"
+																						label="Copy image"
+																						onClick={() => src && handleCopyImage(src, imgKey)}
+																						aria-label={copied ? "Copied" : "Copy image to clipboard"}
+																						disabled={!src || copied}
+																					>
+																						<div className={cn("transition-all", copied ? "scale-100 opacity-100" : "scale-0 opacity-0")}>
+																							<Check className="stroke-emerald-500" size={16} strokeWidth={2} aria-hidden="true" />
+																						</div>
+																						<div className={cn("absolute transition-all", copied ? "scale-0 opacity-0" : "scale-100 opacity-100")}>
+																							<Copy size={16} strokeWidth={2} aria-hidden="true" />
+																						</div>
 																					</Action>
 																					<Action
-																							tooltip="Download"
-																							label="Download"
-																							onClick={() => handleDownloadImage(src, typeof (message as any).filename === 'string' ? (message as any).filename : undefined)}
-																							aria-label="Download image"
-																						>
-																							<Download size={16} strokeWidth={2} aria-hidden="true" />
-																						</Action>
+																						tooltip="Download"
+																						label="Download"
+																						onClick={() => src && handleDownloadImage(src, typeof (message as { filename?: string }).filename === 'string' ? (message as { filename?: string }).filename : undefined)}
+																						aria-label="Download image"
+																						disabled={!src}
+																					>
+																						<Download size={16} strokeWidth={2} aria-hidden="true" />
+																					</Action>
 																				</Actions>
 																			</div>
 																		</div>
