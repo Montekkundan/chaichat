@@ -1,5 +1,5 @@
 import type { UIMessage as MessageType } from "@ai-sdk/react";
-import { Check, Copy } from "lucide-react";
+import { Check, Copy, Download } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useStickToBottomContext } from "use-stick-to-bottom";
 import { Action, Actions } from "~/components/ai-elements/actions";
@@ -18,6 +18,7 @@ import {
 	ReasoningContent,
 	ReasoningTrigger,
 } from "../ai-elements/reasoning";
+import type { ExtendedMessage } from "~/lib/providers/messages-provider";
 
 type ConversationProps = {
 	messages: (MessageType & {
@@ -54,6 +55,70 @@ export function Conversation({
 
 	const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
+	const dataUrlToBlob = (dataUrl: string): Blob | null => {
+		try {
+			const [meta, b64] = dataUrl.split(",");
+			const mimeMatch = /data:([^;]+);base64/.exec(meta || "");
+			const mime = mimeMatch ? mimeMatch[1] : "application/octet-stream";
+			const binary = typeof atob === "function" ? atob(b64 || "") : "";
+			const len = binary.length;
+			const bytes = new Uint8Array(len);
+			for (let i = 0; i < len; i++) bytes[i] = binary.charCodeAt(i);
+			return new Blob([bytes], { type: mime });
+		} catch {
+			return null;
+		}
+	};
+
+	const handleCopyImage = async (url: string, key: string) => {
+		try {
+			let blob: Blob | null = null;
+			if (url.startsWith("data:")) {
+				blob = dataUrlToBlob(url);
+			} else {
+				const res = await fetch(url);
+				blob = await res.blob();
+			}
+			if (!blob) throw new Error("Blob conversion failed");
+			const _ClipboardItem = (window as any).ClipboardItem;
+			if (_ClipboardItem && navigator.clipboard?.write) {
+				const item = new _ClipboardItem({ [blob.type]: blob });
+				await navigator.clipboard.write([item]);
+				setCopiedKey(key);
+				setTimeout(() => setCopiedKey(null), 1500);
+			} else {
+				console.warn("Clipboard image copy not supported in this browser.");
+			}
+		} catch (err) {
+			console.error("Failed to copy image: ", err);
+		}
+	};
+
+	const handleDownloadImage = async (url: string, filename?: string) => {
+		try {
+			const a = document.createElement("a");
+			if (url.startsWith("data:")) {
+				a.href = url;
+				a.download = filename || "image";
+				document.body.appendChild(a);
+				a.click();
+				a.remove();
+			} else {
+				const res = await fetch(url);
+				const blob = await res.blob();
+				const objectUrl = URL.createObjectURL(blob);
+				a.href = objectUrl;
+				a.download = filename || "image";
+				document.body.appendChild(a);
+				a.click();
+				a.remove();
+				URL.revokeObjectURL(objectUrl);
+			}
+		} catch (err) {
+			console.error("Failed to download image: ", err);
+		}
+	};
+
 	// Only show the inline loader for the latest assistant message, so that we dont show it for messages that have/had error
 	const latestMessageId =
 		messages.length > 0 ? (messages[messages.length - 1]?.id ?? null) : null;
@@ -67,8 +132,11 @@ export function Conversation({
 		});
 	};
 
-	// Whether any assistant message exists yet (placeholder or with content)
-	const hasAssistantMessage = messages.some((m) => m.role === "assistant");
+	// Latest message helper and bottom loader condition for current turn
+	const latestMessage = messages.length > 0 ? messages[messages.length - 1] : null;
+	const showBottomLoader =
+		(status === "submitted" || status === "streaming") &&
+		(!latestMessage || latestMessage.role !== "assistant");
 
 	const handleCopy = async (text: string, key: string) => {
 		try {
@@ -128,124 +196,336 @@ export function Conversation({
 											const parts = Array.isArray(message.parts)
 												? message.parts
 												: [];
-											const reasoningParts = parts.filter(
-												(p) => p.type === "reasoning",
-											);
 											const textParts = parts.filter((p) => p.type === "text");
+											const hasTextParts = textParts.length > 0;
+
+											// Collect all reasoning parts to combine them
+											const reasoningParts = parts.filter((part) => {
+												if (part.type !== "reasoning") return false;
+												let text: string | undefined;
+												if (
+													typeof part === "object" &&
+													part !== null &&
+													"text" in part
+												) {
+													const maybe = (
+														part as unknown as { text?: unknown }
+													).text;
+													if (typeof maybe === "string") text = maybe;
+												}
+												return text && text.trim().length > 0;
+											});
+
+											const combinedReasoningText = reasoningParts
+												.map((part) => {
+													const maybe = (
+														part as unknown as { text?: unknown }
+													).text;
+													return typeof maybe === "string" ? maybe : "";
+												})
+												.join("\n\n");
+
 											return (
 												<>
-													{reasoningParts.map((part, i) => {
-														let text: string | undefined;
-														if (
-															typeof part === "object" &&
-															part !== null &&
-															"text" in part
-														) {
-															const maybe = (
-																part as unknown as { text?: unknown }
-															).text;
-															if (typeof maybe === "string") text = maybe;
-														}
-														if (!text || text.trim().length === 0) return null;
-														return (
-															<Reasoning
-																key={`${message.id}-reasoning-${i}`}
-																className="w-full"
-																isStreaming={status === "streaming"}
-																defaultOpen={status === "streaming"}
-															>
-																<ReasoningTrigger />
-																<ReasoningContent>{text}</ReasoningContent>
-															</Reasoning>
-														);
-													})}
-													{textParts.map((part, i) => {
-														const key = `${message.id}-text-${i}`;
-														const isCopied = copiedKey === key;
-														const isLastBlock = i === textParts.length - 1;
-														const showActions =
-															isLastBlock && message.role === "assistant";
-														return (
-															<div key={key} className="w-full">
-																<Response>{part.text}</Response>
-																{showActions && (
-																	<Actions className="mt-2 opacity-0 transition-opacity group-hover:opacity-100">
-																		{message.role === "assistant" &&
-																			typeof (
-																				message as
-																				| { model?: string }
-																				| undefined
-																			)?.model === "string" && (
-																				<div className="mr-2">
-																					<ModelBadge
-																						modelId={
-																							(message as { model?: string })
-																								.model
-																						}
-																						gateway={
-																							(
-																								message as {
-																									gateway?:
-																									| "llm-gateway"
-																									| "vercel-ai-gateway";
-																								}
-																							).gateway || gateway
-																						}
-																					/>
+
+
+													{/* Render combined reasoning if any exists */}
+													{combinedReasoningText && (
+														<Reasoning
+															key={`${message.id}-reasoning`}
+															className="w-full"
+															isStreaming={status === "streaming"}
+															defaultOpen={status === "streaming"}
+														>
+															<ReasoningTrigger />
+															<ReasoningContent>{combinedReasoningText}</ReasoningContent>
+														</Reasoning>
+													)}
+
+													{/* Render attachments (uploaded images) */}
+													{(() => {
+														const extendedMessage = message as ExtendedMessage;
+														const attachments = extendedMessage.attachments;
+														const hasFileParts = parts.some((p) => p.type === "file");
+																return !hasFileParts && attachments && attachments.length > 0 ? (
+																	<div className="mb-4 space-y-2">
+																		{attachments.map((attachment, idx: number) => {
+																			const attKeyBase = `${message.id}-attachment-${idx}`;
+																			return (
+																				<div key={attKeyBase} className="max-w-md">
+																					<div className="group rounded-xl overflow-hidden border bg-muted/40 p-2 md:p-3 shadow-sm">
+																						{attachment.contentType?.startsWith('image/') ? (
+																							<>
+																								<img
+																									src={attachment.url}
+																									alt={attachment.name}
+																									className="w-full h-auto max-h-80 object-contain rounded-md bg-background"
+																									style={{ color: "transparent" }}
+																								/>
+																								<Actions className="mt-2 opacity-0 transition-opacity group-hover:opacity-100">
+																									{(() => {
+																										const key = `${attKeyBase}-img`;
+																										const isCopied = copiedKey === key;
+																										return (
+																											<>
+																												<Action
+																												tooltip="Copy image"
+																												label="Copy image"
+																												onClick={() => handleCopyImage(attachment.url, key)}
+																												aria-label={isCopied ? "Copied" : "Copy image to clipboard"}
+																												disabled={isCopied}
+																											>
+																												<div className={cn("transition-all", isCopied ? "scale-100 opacity-100" : "scale-0 opacity-0")}> 
+																													<Check className="stroke-emerald-500" size={16} strokeWidth={2} aria-hidden="true" />
+																												</div>
+																												<div className={cn("absolute transition-all", isCopied ? "scale-0 opacity-0" : "scale-100 opacity-100")}> 
+																													<Copy size={16} strokeWidth={2} aria-hidden="true" />
+																												</div>
+																											</Action>
+
+																											<Action
+																												tooltip="Download"
+																												label="Download"
+																												onClick={() => handleDownloadImage(attachment.url, attachment.name)}
+																												aria-label="Download image"
+																											>
+																												<Download size={16} strokeWidth={2} aria-hidden="true" />
+																											</Action>
+																											</>
+																									);
+																								})()}
+																				</Actions>
+																				</>
+																				) : (
+																				<div className="flex items-center gap-2 p-2 bg-muted/50 rounded">
+																					<div className="text-sm">📎</div>
+																					<div className="flex-1">
+																						<div className="text-sm font-medium">{attachment.name}</div>
+																						<div className="text-xs text-muted-foreground">
+																							{(attachment.size / 1024).toFixed(2)} KB
+																						</div>
+																					</div>
 																				</div>
 																			)}
-																		<Action
-																			tooltip="Copy"
-																			label="Copy"
-																			onClick={() => handleCopy(part.text, key)}
-																			aria-label={
-																				isCopied
-																					? "Copied"
-																					: "Copy to clipboard"
-																			}
-																			disabled={isCopied}
-																		>
-																			<div
-																				className={cn(
-																					"transition-all",
-																					isCopied
-																						? "scale-100 opacity-100"
-																						: "scale-0 opacity-0",
-																				)}
-																			>
-																				<Check
-																					className="stroke-emerald-500"
-																					size={16}
-																					strokeWidth={2}
-																					aria-hidden="true"
-																				/>
-																			</div>
-																			<div
-																				className={cn(
-																					"absolute transition-all",
-																					isCopied
-																						? "scale-0 opacity-0"
-																						: "scale-100 opacity-100",
-																				)}
-																			>
-																				<Copy
-																					size={16}
-																					strokeWidth={2}
-																					aria-hidden="true"
-																				/>
-																			</div>
-																		</Action>
-																	</Actions>
-																)}
+																		</div>
+																	</div>
+																);
+																})}
 															</div>
-														);
+														) : null;
+													})()}
+
+													{parts.map((part, i) => {
+														switch (part.type) {
+															case "reasoning":
+																// Skip individual reasoning parts since we combined them above
+																return null;
+															case "file": {
+																const key = `${message.id}-file-${i}`;
+																const fileData = part as { url?: string; mediaType?: string; filename?: string };
+
+																// Handle image files
+																if (fileData.mediaType?.startsWith('image/') && fileData.url) {
+																	return (
+																		<div key={key} className="max-w-md">
+																			<div className="group rounded-xl overflow-hidden border bg-muted/40 p-2 md:p-3 shadow-sm">
+																				<img
+																					src={fileData.url}
+																					alt={fileData.filename || "Image"}
+																					className="w-full h-auto max-h-80 object-contain rounded-md bg-background"
+																					style={{ color: "transparent" }}
+																				/>
+																				<Actions className="mt-2 opacity-0 transition-opacity group-hover:opacity-100">
+																					{(() => {
+																						const imgKey = `${key}-img`;
+																						const isCopied = copiedKey === imgKey;
+																						return (
+																							<>
+																								<Action
+																									tooltip="Copy image"
+																									label="Copy image"
+																									onClick={() => handleCopyImage(fileData.url!, imgKey)}
+																									aria-label={isCopied ? "Copied" : "Copy image to clipboard"}
+																									disabled={isCopied}
+																								>
+																									<div className={cn("transition-all", isCopied ? "scale-100 opacity-100" : "scale-0 opacity-0")}>
+																										<Check className="stroke-emerald-500" size={16} strokeWidth={2} aria-hidden="true" />
+																									</div>
+																									<div className={cn("absolute transition-all", isCopied ? "scale-0 opacity-0" : "scale-100 opacity-100")}> 
+																										<Copy size={16} strokeWidth={2} aria-hidden="true" />
+																									</div>
+																								</Action>
+
+																								<Action
+																									tooltip="Download"
+																									label="Download"
+																									onClick={() => handleDownloadImage(fileData.url!, fileData.filename)}
+																									aria-label="Download image"
+																								>
+																									<Download size={16} strokeWidth={2} aria-hidden="true" />
+																								</Action>
+																						</>
+																					);
+																				})()}
+																			</Actions>
+																		</div>
+																	</div>
+																	);
+																}
+
+																// Handle other file types
+																return (
+																	<div key={key} className="w-full">
+																		<div className="rounded-lg overflow-hidden border bg-muted/30 p-2">
+																			<div className="flex items-center gap-2 p-2 bg-muted/50 rounded">
+																				<div className="text-sm">📎</div>
+																				<div className="flex-1">
+																					<div className="text-sm font-medium">{fileData.filename || "File"}</div>
+																					<div className="text-xs text-muted-foreground">
+																						{fileData.mediaType || "Unknown type"}
+																					</div>
+																				</div>
+																			</div>
+																		</div>
+																	</div>
+																);
+															}
+															case "text": {
+																const key = `${message.id}-text-${i}`;
+																const isCopied = copiedKey === key;
+																const isLastTextBlock = i === parts.length - 1 ||
+																	parts.slice(i + 1).every(p => p.type !== "text");
+																const showActions =
+																	isLastTextBlock && message.role === "assistant";
+
+																// If assistant returned raw <img> HTML, extract and render safely with actions
+																const raw = part.text?.trim() || "";
+																const imgMatch = /<img\s+[^>]*src=["']([^"']+)["'][^>]*>/i.exec(raw);
+																if (message.role === "assistant" && imgMatch) {
+																	const src = imgMatch[1];
+																	const altMatch = /alt=["']([^"']*)["']/i.exec(raw);
+																	const alt = altMatch ? altMatch[1] : "Image";
+																	const imgKey = `${key}-htmlimg`;
+																	const copied = copiedKey === imgKey;
+																	return (
+																		<div key={key} className="max-w-md w-full">
+																			<div className="group rounded-xl overflow-hidden border bg-muted/40 p-2 md:p-3 shadow-sm">
+																				<img src={src} alt={alt} className="w-full h-auto max-h-80 object-contain rounded-md bg-background" style={{ color: "transparent" }} />
+																				<Actions className="mt-2 opacity-0 transition-opacity group-hover:opacity-100">
+																					<Action
+																							tooltip="Copy image"
+																							label="Copy image"
+																							onClick={() => handleCopyImage(src, imgKey)}
+																							aria-label={copied ? "Copied" : "Copy image to clipboard"}
+																							disabled={copied}
+																						>
+																							<div className={cn("transition-all", copied ? "scale-100 opacity-100" : "scale-0 opacity-0")}>
+																								<Check className="stroke-emerald-500" size={16} strokeWidth={2} aria-hidden="true" />
+																							</div>
+																							<div className={cn("absolute transition-all", copied ? "scale-0 opacity-0" : "scale-100 opacity-100")}> 
+																								<Copy size={16} strokeWidth={2} aria-hidden="true" />
+																							</div>
+																					</Action>
+																					<Action
+																							tooltip="Download"
+																							label="Download"
+																							onClick={() => handleDownloadImage(src, typeof (message as any).filename === 'string' ? (message as any).filename : undefined)}
+																							aria-label="Download image"
+																						>
+																							<Download size={16} strokeWidth={2} aria-hidden="true" />
+																						</Action>
+																				</Actions>
+																			</div>
+																		</div>
+																	);
+																}
+																return (
+																	<div key={key} className="w-full">
+																		<Response
+																			parseIncompleteMarkdown={status === "streaming"}
+																			allowedImagePrefixes={["*"]}
+																			allowedLinkPrefixes={["*"]}
+																			defaultOrigin=""
+																		>
+																			{part.text}
+																		</Response>
+																		{showActions && (
+																			<Actions className="mt-2 opacity-0 transition-opacity group-hover:opacity-100">
+																				{message.role === "assistant" &&
+																					typeof (message as { model?: string }).model === "string" && (
+																						<div className="mr-2">
+																							<ModelBadge
+																								modelId={
+																									(message as { model?: string })
+																										.model
+																								}
+																								gateway={
+																									(
+																										message as {
+																											gateway?:
+																											| "llm-gateway"
+																											| "vercel-ai-gateway";
+																										}
+																									).gateway || gateway
+																								}
+																							/>
+																						</div>
+																					)}
+																				<Action
+																					tooltip="Copy"
+																					label="Copy"
+																					onClick={() => handleCopy(part.text, key)}
+																					aria-label={
+																						isCopied
+																							? "Copied"
+																							: "Copy to clipboard"
+																					}
+																					disabled={isCopied}
+																				>
+																					<div
+																						className={cn(
+																							"transition-all",
+																							isCopied
+																								? "scale-100 opacity-100"
+																								: "scale-0 opacity-0",
+																						)}
+																					>
+																						<Check
+																							className="stroke-emerald-500"
+																							size={16}
+																							strokeWidth={2}
+																							aria-hidden="true"
+																						/>
+																					</div>
+																					<div
+																						className={cn(
+																							"absolute transition-all",
+																							isCopied
+																								? "scale-0 opacity-0"
+																								: "scale-100 opacity-100",
+																						)}
+																					>
+																						<Copy
+																							size={16}
+																							strokeWidth={2}
+																							aria-hidden="true"
+																						/>
+																					</div>
+																				</Action>
+																			</Actions>
+																		)}
+																	</div>
+																);
+															}
+															default:
+																return null;
+														}
 													})}
 													{/* Fallback: while streaming and before any text arrives, still show model badge */}
 													{message.role === "assistant" &&
 														status === "streaming" &&
-														textParts.length === 0 &&
-														typeof (message as { model?: string } | undefined)
-															?.model === "string" && (
+														!hasTextParts &&
+														typeof (message as { model?: string }).model === "string" && (
 															<Actions className="mt-2 opacity-0 transition-opacity group-hover:opacity-100">
 																<div className="mr-2">
 																	<ModelBadge
@@ -327,9 +607,9 @@ export function Conversation({
 							</Message>
 						);
 					})}
-					{/* Fallback loader: show only before any assistant message exists */}
-					{(status === "submitted" || status === "streaming") && !hasAssistantMessage ? (
-						<div className="w-full">
+					{/* Fallback loader: only before the first assistant message for the current turn */}
+					{showBottomLoader ? (
+						<div className="w-full px-6">
 							<Loader />
 						</div>
 					) : null}

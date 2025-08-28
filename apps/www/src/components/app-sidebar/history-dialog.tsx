@@ -53,6 +53,7 @@ export function HistoryDialog({
 	const [messages, setMessages] = React.useState<LocalMessage[]>([]);
 	const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
 	const [chatToDelete, setChatToDelete] = React.useState<string | null>(null);
+	const [deleteAllOpen, setDeleteAllOpen] = React.useState(false);
 	const [searchQuery, setSearchQuery] = React.useState("");
 	const [filteredChats, setFilteredChats] = React.useState<LocalChat[]>([]);
 	const [chatMessages, setChatMessages] = React.useState<
@@ -257,22 +258,107 @@ export function HistoryDialog({
 		setChatToDelete(null);
 	};
 
-	const convertToMessageFormat = (localMessage: LocalMessage) => ({
-		id: localMessage._id,
-		role: localMessage.role as "user" | "assistant" | "system",
-		parts: [
-			{
-				type: "text" as const,
-				text: localMessage.content,
-			},
-		],
-		// Provide both so downstream sorters can use either
-		createdAt: localMessage.createdAt,
-		_creationTime: localMessage._creationTime,
-		model: localMessage.model,
-		convexId: localMessage._id,
-		content: localMessage.content,
-	});
+	const convertToMessageFormat = (localMessage: LocalMessage) => {
+		// Best-effort parse of partsJson to reconstruct text/file parts (including images)
+		let parts: Array<
+			| { type: "text"; text: string }
+			| { type: "file"; url: string; mediaType: string; filename: string }
+			| { type: "reasoning"; text: string }
+		> = [];
+
+		if (localMessage.partsJson) {
+			try {
+				const raw = JSON.parse(localMessage.partsJson) as unknown;
+				if (Array.isArray(raw)) {
+					for (const p of raw) {
+						if (p && typeof p === "object") {
+							const t = (p as { type?: unknown }).type;
+							if (t === "text" && typeof (p as { text?: unknown }).text === "string") {
+								parts.push({ type: "text", text: (p as { text: string }).text });
+							} else if (t === "file" && typeof (p as { url?: unknown }).url === "string") {
+								if (typeof (p as { url: string }).url === "string") {
+									parts.push({
+										type: "file" as const,
+										url: (p as { url: string }).url,
+										mediaType: ((p as { mediaType?: string }).mediaType || "application/octet-stream") as string,
+										filename: ((p as { filename?: string }).filename || "") as string,
+									});
+								}
+							} else if (t === "reasoning" && typeof (p as { text?: unknown }).text === "string") {
+								parts.push({ type: "reasoning", text: (p as { text: string }).text });
+							}
+						}
+					}
+				}
+			} catch {
+				// ignore partsJson parse errors; fall back to text content below
+			}
+		}
+
+		if (parts.length === 0) {
+			parts = [{ type: "text", text: localMessage.content }];
+		}
+
+		return {
+			id: localMessage._id,
+			role: localMessage.role as "user" | "assistant" | "system",
+			parts,
+			// Provide both so downstream sorters can use either
+			createdAt: localMessage.createdAt,
+			_creationTime: localMessage._creationTime,
+			model: localMessage.model,
+			convexId: localMessage._id,
+			content: localMessage.content,
+			attachments: Array.isArray(localMessage.attachments)
+				? localMessage.attachments.map((a) => ({
+					name: a.name,
+					url: a.url,
+					contentType: a.contentType,
+					size: a.size,
+				}))
+				: [],
+		};
+	};
+
+	const handleDeleteAll = () => {
+		setDeleteAllOpen(true);
+	};
+
+	const handleConfirmDeleteAll = async () => {
+		try {
+			if (!isLoggedIn) {
+				// Remove titles from cookies first (clearAllData does not)
+				for (const chat of chats) {
+					ChatTitlesCookieManager.removeChatTitle(chat.id);
+				}
+				await localChatStorage.clearAllData();
+				setChats([]);
+				setSelectedChat(null);
+				setMessages([]);
+			} else {
+				// Delete each chat from both cache and local
+				await Promise.all(
+					chats.map(async (chat) => {
+						try {
+							await Promise.all([
+								cache.deleteChat(chat.id),
+								localChatStorage.deleteChat(chat.id),
+							]);
+						} finally {
+							ChatTitlesCookieManager.removeChatTitle(chat.id);
+						}
+					}),
+				);
+				setChats([]);
+				setSelectedChat(null);
+				setMessages([]);
+			}
+		} catch (error) {
+			console.error("Failed to delete all chats:", error);
+		} finally {
+			setDeleteAllOpen(false);
+		}
+	};
 
 	const renderContent = () => {
 		if (!selectedChat) {
@@ -303,9 +389,9 @@ export function HistoryDialog({
 					<Conversation
 						messages={messages.map(convertToMessageFormat)}
 						status="ready"
-						onDelete={() => {}}
-						onEdit={() => {}}
-						onReload={() => {}}
+						onDelete={() => { }}
+						onEdit={() => { }}
+						onReload={() => { }}
 					/>
 				</div>
 
@@ -397,6 +483,17 @@ export function HistoryDialog({
 									>
 										Chat History ({filteredChats.length} chats)
 									</div>
+									<div className="ml-auto">
+										<Button
+											variant="destructive"
+											size="sm"
+											disabled={chats.length === 0}
+											onClick={handleDeleteAll}
+										>
+											<Trash className="mr-2 h-4 w-4" />
+											Delete All
+										</Button>
+									</div>
 								</div>
 							</header>
 							<div className="flex flex-1 flex-col overflow-hidden">
@@ -422,6 +519,26 @@ export function HistoryDialog({
 						</Button>
 						<Button variant="destructive" onClick={handleConfirmDelete}>
 							Delete
+						</Button>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
+
+			<Dialog open={deleteAllOpen} onOpenChange={setDeleteAllOpen}>
+				<DialogContent>
+					<DialogHeader>
+						<DialogTitle>Delete All Conversations</DialogTitle>
+						<DialogDescription>
+							This will permanently delete all chats and messages. This action
+							cannot be undone.
+						</DialogDescription>
+					</DialogHeader>
+					<DialogFooter>
+						<Button variant="outline" onClick={() => setDeleteAllOpen(false)}>
+							Cancel
+						</Button>
+						<Button variant="destructive" onClick={handleConfirmDeleteAll}>
+							Delete All
 						</Button>
 					</DialogFooter>
 				</DialogContent>

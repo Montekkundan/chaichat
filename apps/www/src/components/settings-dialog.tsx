@@ -42,16 +42,20 @@ import {
 	resetToDefaultTheme,
 } from "~/lib/tweakcn-theme";
 import { cn } from "~/lib/utils";
+import { useState } from "react";
+import Image from "next/image";
+import { Badge } from "./ui/badge";
 
 const data = {
 	nav: [
 		{ name: "API Keys", icon: Key, id: "api-keys" },
 		{ name: "Appearance", icon: GearIcon, id: "appearance" },
+		{ name: "Gallery", icon: GearIcon, id: "gallery" },
 		{ name: "Playground", icon: GearIcon, id: "playground" },
 	],
 };
 
-type SettingsSection = "api-keys" | "appearance" | "playground";
+type SettingsSection = "api-keys" | "appearance" | "gallery" | "playground";
 
 export function SettingsDialog({
 	open,
@@ -72,6 +76,24 @@ export function SettingsDialog({
 	const [isUserAction, setIsUserAction] = React.useState(false);
 	const [maxColumns, setMaxColumns] = React.useState<number>(3);
 	const [maxColumnsInput, setMaxColumnsInput] = React.useState<string>("3");
+
+	const [storageUsage, setStorageUsage] = useState<{
+		uploadThing?: { usedBytes: number; totalBytes?: number; fileCount: number };
+		vercelBlob?: { usedBytes: number; totalBytes?: number; fileCount: number };
+		activeProvider: "uploadthing" | "vercelblob";
+	} | null>(null);
+	const [galleryImages, setGalleryImages] = useState<Array<{
+		id: string;
+		url: string;
+		name: string;
+		size: number;
+		contentType: string;
+		uploadedAt: string;
+		generated?: boolean;
+		prompt?: string;
+	}>>([]);
+	const [galleryLoading, setGalleryLoading] = useState(false);
+	const [selectedStorageProvider, setSelectedStorageProvider] = useState<"uploadthing" | "vercelblob">("uploadthing");
 
 	// Track last applied URL to avoid redundant fetches and flicker
 	const lastAppliedUrlRef = React.useRef<string | null>(null);
@@ -152,7 +174,7 @@ export function SettingsDialog({
 			);
 			setMaxColumns(clamped);
 			setMaxColumnsInput(String(clamped));
-		} catch {}
+		} catch { }
 	}, []);
 
 	const commitMaxColumns = (value: number) => {
@@ -183,6 +205,89 @@ export function SettingsDialog({
 		const parsed = Number.parseInt(value);
 		if (!Number.isNaN(parsed)) {
 			commitMaxColumns(parsed);
+		}
+	};
+
+	const fetchStorageUsage = React.useCallback(async () => {
+		try {
+			const localKeys = {
+				llmGatewayApiKey: localStorage.getItem("chaichat_keys_llmgateway") || undefined,
+				aiGatewayApiKey: localStorage.getItem("chaichat_keys_aigateway") || undefined,
+				uploadThingApiKey: localStorage.getItem("chaichat_keys_uploadthing") || undefined,
+				vercelBlobApiKey: localStorage.getItem("chaichat_keys_vercelblob") || undefined,
+				storageProvider: localStorage.getItem("chai-storage-provider") || "uploadthing",
+			};
+
+			const response = await fetch("/api/storage-usage", {
+				method: "GET",
+				headers: {
+					"X-Local-Keys": JSON.stringify(localKeys),
+				},
+			});
+
+			if (response.ok) {
+				const data = await response.json();
+				console.log("Storage usage data:", data);
+				setStorageUsage(data);
+			} else {
+				console.warn("Storage usage API responded with error:", response.status);
+				setStorageUsage(null);
+			}
+		} catch (error) {
+			console.warn("Failed to fetch storage usage:", error);
+			setStorageUsage(null);
+		}
+	}, []);
+
+	const fetchGalleryImages = React.useCallback(async () => {
+		setGalleryLoading(true);
+		try {
+			// localStorage keys to pass to the API
+			const localKeys = {
+				llmGatewayApiKey: localStorage.getItem("chaichat_keys_llmgateway") || undefined,
+				aiGatewayApiKey: localStorage.getItem("chaichat_keys_aigateway") || undefined,
+				uploadThingApiKey: localStorage.getItem("chaichat_keys_uploadthing") || undefined,
+				vercelBlobApiKey: localStorage.getItem("chaichat_keys_vercelblob") || undefined,
+				storageProvider: localStorage.getItem("chai-storage-provider") || "uploadthing",
+			};
+
+			const response = await fetch("/api/gallery?limit=20&offset=0", {
+				method: "GET",
+				headers: {
+					"X-Local-Keys": JSON.stringify(localKeys),
+				},
+			});
+
+			if (response.ok) {
+				const data = await response.json();
+				console.log("Gallery images data:", data);
+				setGalleryImages(data.images || []);
+			} else {
+				console.warn("Gallery API responded with error:", response.status);
+				setGalleryImages([]);
+			}
+		} catch (error) {
+			console.warn("Failed to fetch gallery images:", error);
+			setGalleryImages([]);
+		} finally {
+			setGalleryLoading(false);
+		}
+	}, []);
+
+	const formatBytes = (bytes: number) => {
+		if (bytes === 0) return "0 B";
+		const k = 1024;
+		const sizes = ["B", "KB", "MB", "GB"];
+		const i = Math.floor(Math.log(bytes) / Math.log(k));
+		return `${(bytes / k ** i).toFixed(1)} ${sizes[i]}`;
+	};
+
+	const getStorageProvider = () => {
+		try {
+			const provider = window.localStorage.getItem("chai-storage-provider");
+			return provider === "vercelblob" ? "vercelblob" : "uploadthing";
+		} catch {
+			return "uploadthing";
 		}
 	};
 
@@ -261,6 +366,36 @@ export function SettingsDialog({
 		return () => clearTimeout(timeoutId);
 		// Only re-run when the URL text changes or restoration status flips
 	}, [themeUrl, isRestoringUrl, resolvedTheme, isUserAction, tweakcnTheme]);
+
+	// biome-ignore lint/correctness/useExhaustiveDependencies: <explanation>
+	React.useEffect(() => {
+		const handleStorageProviderChange = () => {
+			const provider = getStorageProvider();
+			setSelectedStorageProvider(provider);
+			if (activeSection === "gallery") {
+				fetchStorageUsage();
+				fetchGalleryImages();
+			}
+		};
+
+		handleStorageProviderChange();
+
+		window.addEventListener("storageProviderChanged", handleStorageProviderChange);
+		window.addEventListener("storage", handleStorageProviderChange);
+
+		return () => {
+			window.removeEventListener("storageProviderChanged", handleStorageProviderChange);
+			window.removeEventListener("storage", handleStorageProviderChange);
+		};
+	}, []);
+
+	// Fetch gallery data when gallery section is active
+	React.useEffect(() => {
+		if (activeSection === "gallery") {
+			fetchStorageUsage();
+			fetchGalleryImages();
+		}
+	}, [activeSection, fetchStorageUsage, fetchGalleryImages]);
 
 	const handleResetTheme = () => {
 		resetToDefaultTheme();
@@ -450,6 +585,181 @@ export function SettingsDialog({
 									}}
 									className="h-8 w-24"
 								/>
+							</div>
+						</div>
+					</div>
+				);
+			case "gallery":
+				return (
+					<div className="space-y-6">
+						<div>
+							<h3 className="font-semibold text-lg">Gallery</h3>
+							<p
+								className="text-sm"
+								style={{ color: "var(--foreground)", opacity: 0.8 }}
+							>
+								View and manage your generated and uploaded images
+							</p>
+						</div>
+						<div className="space-y-4">
+							<div className="rounded-lg border bg-card p-4">
+								<h4 className="mb-4 font-medium">Image Gallery</h4>
+								<div className="space-y-4">
+									{/* Debug Info */}
+									{process.env.NODE_ENV === "development" && (
+										<div className="rounded border p-3 bg-muted/20">
+											<div className="text-sm">
+												<div><strong>Debug Info:</strong></div>
+												<div>Storage Provider: {selectedStorageProvider}</div>
+												<div>Images Count: {galleryImages.length}</div>
+												<div>Loading: {galleryLoading ? "Yes" : "No"}</div>
+												<div>Storage Data: {storageUsage ? "Available" : "None"}</div>
+											</div>
+										</div>
+									)}
+
+									{/* Storage Usage Stats */}
+									<div className="grid grid-cols-2 gap-4 text-sm">
+										<div className="rounded border p-3">
+											<div className="font-medium text-muted-foreground">Storage Used</div>
+											<div className="text-lg font-semibold">
+												{storageUsage
+													? (() => {
+														const activeUsage = selectedStorageProvider === "uploadthing"
+															? storageUsage.uploadThing
+															: storageUsage.vercelBlob;
+														return activeUsage
+															? formatBytes(activeUsage.usedBytes)
+															: "0 B";
+													})()
+													: "Loading..."}
+											</div>
+											<div className="text-xs text-muted-foreground">
+												{storageUsage
+													? (() => {
+														const activeUsage = selectedStorageProvider === "uploadthing"
+															? storageUsage.uploadThing
+															: storageUsage.vercelBlob;
+														return activeUsage && 'totalBytes' in activeUsage && activeUsage.totalBytes !== undefined
+															? `of ${formatBytes(activeUsage.totalBytes)}`
+															: "unlimited";
+													})()
+													: "unlimited"}
+											</div>
+										</div>
+										<div className="rounded border p-3">
+											<div className="font-medium text-muted-foreground">Images Count</div>
+											<div className="text-lg font-semibold">
+												{storageUsage
+													? (() => {
+														const activeUsage = selectedStorageProvider === "uploadthing"
+															? storageUsage.uploadThing
+															: storageUsage.vercelBlob;
+														return activeUsage?.fileCount || 0;
+													})()
+													: "Loading..."}
+											</div>
+											<div className="text-xs text-muted-foreground">total images</div>
+										</div>
+									</div>
+
+									{/* Gallery Grid */}
+									<div className="space-y-3">
+										<div className="flex items-center justify-between">
+											<div>
+												<span className="font-medium">Recent Images</span>
+												<div className="text-xs text-muted-foreground">
+													from {selectedStorageProvider === "uploadthing" ? "UploadThing" : "Vercel Blob"}
+												</div>
+											</div>
+											<Button
+												variant="outline"
+												size="sm"
+												onClick={() => {
+													fetchStorageUsage();
+													fetchGalleryImages();
+												}}
+												disabled={galleryLoading}
+											>
+												{galleryLoading ? "Loading..." : "Refresh"}
+											</Button>
+										</div>
+
+										{/* Gallery Content */}
+										{galleryLoading ? (
+											<div className="flex items-center justify-center p-8">
+												<div className="text-sm text-muted-foreground">Loading images...</div>
+											</div>
+										) : galleryImages.length > 0 ? (
+											<div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+												{galleryImages.map((image) => (
+													<div key={image.id} className="relative group rounded-lg overflow-hidden border">
+														{image.url ? (
+															<Image
+																src={image.url}
+																alt={image.name}
+																width={150}
+																height={150}
+																className="w-full h-32 object-cover transition-transform group-hover:scale-105"
+															/>
+														) : (
+															<div className="w-full h-32 bg-gray-200 flex items-center justify-center">
+																<span className="text-gray-500 text-xs">No preview</span>
+															</div>
+														)}
+														<div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
+														<div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2">
+															<div className="text-white text-xs truncate">{image.name}</div>
+															<div className="text-white/70 text-xs">{formatBytes(image.size)}</div>
+														</div>
+													</div>
+												))}
+											</div>
+										) : (
+											/* Empty State */
+											<div className="flex flex-col items-center justify-center rounded-lg border border-dashed p-8 text-center">
+												<div className="text-4xl mb-4">🖼️</div>
+												<h4 className="font-medium mb-2">No images found</h4>
+												<p className="text-sm text-muted-foreground mb-4">
+													{selectedStorageProvider === "uploadthing"
+														? "No images found in UploadThing. UploadThing v7 API integration is limited - try using Vercel Blob for full gallery features."
+														: "No images found in Vercel Blob. Upload some images or generate new ones to see them here."
+													}
+												</p>
+												<div className="space-y-2">
+													<Button variant="outline" size="sm">
+														Generate Image
+													</Button>
+													<p className="text-xs text-muted-foreground">
+														Or drag & drop images in chat/playground
+													</p>
+													{selectedStorageProvider === "uploadthing" && (
+														<Button
+															variant="ghost"
+															size="sm"
+															onClick={() => setActiveSection("api-keys")}
+														>
+															Switch to Vercel Blob
+														</Button>
+													)}
+												</div>
+											</div>
+										)}
+									</div>
+
+									{/* Storage Provider Info */}
+									<div className="rounded-lg bg-muted/50 p-3">
+										<div className="flex items-center justify-between text-sm">
+											<span className="font-medium">Storage Provider</span>
+											<Badge variant="secondary">
+												{selectedStorageProvider === "uploadthing" ? "UploadThing" : "Vercel Blob"}
+											</Badge>
+										</div>
+										<p className="text-xs text-muted-foreground mt-1">
+											Images are stored securely with your chosen provider
+										</p>
+									</div>
+								</div>
 							</div>
 						</div>
 					</div>

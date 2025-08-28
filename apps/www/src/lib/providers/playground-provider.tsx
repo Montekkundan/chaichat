@@ -20,6 +20,12 @@ import {
 } from "~/db";
 import { getAllKeys } from "~/lib/local-keys";
 import { userSessionManager } from "~/lib/user-session-manager";
+type UploadedFile = {
+	name: string;
+	url: string;
+	contentType: string;
+	size: number;
+};
 type PlaygroundMessage = UIMessage & {
 	content?: string;
 	createdAt?: Date;
@@ -54,6 +60,13 @@ type ModelConfig = {
 		safetySettings?: Array<{ category: string; threshold: string }>;
 		responseModalities?: string[];
 		thinkingConfig?: { thinkingBudget?: number; includeThoughts?: boolean };
+	};
+	anthropic?: {
+		thinkingBudget?: number;
+		maxTokens?: number;
+		temperature?: number;
+		topP?: number;
+		topK?: number;
 	};
 };
 
@@ -95,13 +108,15 @@ interface PlaygroundContextType {
 	updateSharedInput: (input: string) => void;
 	updateColumnInput: (columnId: string, input: string) => void;
 	sendToColumn: (columnId: string, message: string) => Promise<void>;
-	sendToSyncedColumns: (message: string) => Promise<void>;
+	sendToSyncedColumns: (message: string, attachments?: UploadedFile[]) => Promise<void>;
 	registerColumnScrollApi: (
 		columnId: string,
 		api: { scrollToBottom: () => void; getIsAtBottom: () => boolean } | null,
 	) => void;
 	stopColumn: (columnId: string) => void;
 	stopSyncedColumns: () => void;
+	sharedAttachments: UploadedFile[];
+	setSharedAttachments: (files: UploadedFile[]) => void;
 	createNewPlayground: () => void;
 	savePlayground: () => Promise<void>;
 	loadPlayground: (playgroundId: string) => Promise<void>;
@@ -326,6 +341,9 @@ export function PlaygroundProvider({
 			return PLAYGROUND_MAX_COLUMNS_DEFAULT;
 		}
 	});
+
+	// Shared attachments across synced columns (previews before send)
+	const [sharedAttachments, setSharedAttachments] = useState<UploadedFile[]>([]);
 
 	// Registry of per-column scroll APIs so we can trigger scrolling across synced columns
 	const columnScrollApisRef = useRef<
@@ -1303,7 +1321,7 @@ export function PlaygroundProvider({
 	);
 
 	const sendToSyncedColumns = useCallback(
-		async (message: string) => {
+		async (message: string, attachments?: UploadedFile[]) => {
 			const syncedColumns = state.columns.filter((col) => col.synced);
 
 			if (syncedColumns.length === 0) return;
@@ -1332,13 +1350,22 @@ export function PlaygroundProvider({
 				const messageTimestamp = Date.now();
 
 				// Add user messages to all synced columns immediately
+				const fileParts: UIMessage["parts"] = Array.isArray(attachments)
+					? attachments.map((att) => ({
+						type: "file" as const,
+						url: att.url,
+						mediaType: att.contentType,
+						filename: att.name,
+					}))
+					: [];
+
 				const userMessages = syncedColumns.map((column) => ({
 					column,
 					userMessage: {
 						id: `user-${messageTimestamp}-${column.id}`,
 						role: "user" as const,
 						content: message,
-						parts: createTextParts(message),
+						parts: ([{ type: "text", text: message } as const] as UIMessage["parts"]).concat(fileParts),
 						createdAt: new Date(),
 						model: column.modelId,
 						gateway: (column.gatewaySource === "aigateway"
@@ -1774,6 +1801,8 @@ export function PlaygroundProvider({
 				registerColumnScrollApi,
 				stopColumn,
 				stopSyncedColumns,
+				sharedAttachments,
+				setSharedAttachments,
 
 				// Playground management
 				createNewPlayground,

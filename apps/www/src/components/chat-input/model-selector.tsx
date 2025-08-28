@@ -89,6 +89,7 @@ export function ModelSelector({
 	const [filters, setFilters] = useState({
 		streaming: false,
 		vision: false,
+		imageOutput: false,
 		tools: false,
 		jsonOutput: false,
 		moderatedMode: "any" as "any" | "moderated" | "unmoderated",
@@ -102,6 +103,7 @@ export function ModelSelector({
 	const [useAiGateway, setUseAiGateway] = useState<boolean>(false);
   const [_hasLlmGatewayKey, setHasLlmGatewayKey] = useState<boolean>(false);
   const [hasAiGatewayKey, setHasAiGatewayKey] = useState<boolean>(false);
+  const [keysLoaded, setKeysLoaded] = useState<boolean>(false);
 
 	const hasLoadedFromStorage = useRef(false);
 	const pendingSavedModel = useRef<SelectedModelData | null>(null);
@@ -205,6 +207,8 @@ export function ModelSelector({
         } catch {
           setHasLlmGatewayKey(false);
           setHasAiGatewayKey(false);
+        } finally {
+          setKeysLoaded(true);
         }
       };
 
@@ -216,10 +220,12 @@ export function ModelSelector({
 
     // If AI key is missing while AI gateway is selected, switch back to LLM
     useEffect(() => {
+      // Avoid flipping back before keys are loaded to prevent race conditions after user toggles
+      if (!keysLoaded) return;
       if (!hasAiGatewayKey && useAiGateway) {
         setModelsSource(false);
       }
-    }, [hasAiGatewayKey, useAiGateway, setModelsSource]);
+    }, [hasAiGatewayKey, useAiGateway, setModelsSource, keysLoaded]);
 
 	useEffect(() => {
 		// Focus search input when the drawer opens on mobile
@@ -450,6 +456,18 @@ export function ModelSelector({
 					if (filters.streaming && !providers.some((p) => p.streaming))
 						return false;
 					if (filters.vision && !providers.some((p) => p.vision)) return false;
+					// Image-output filter
+					const supportsImageOutput = (() => {
+						const arch = model.architecture;
+						const hasArchImage = Array.isArray(arch?.output_modalities)
+							? arch.output_modalities?.some((m) => typeof m === "string" && m.toLowerCase() === "image") === true
+							: false;
+						if (hasArchImage) return true;
+						// AI Gateway often lacks architecture; fall back to id/name pattern detection
+						const hay = `${model.id} ${model.name}`.toLowerCase();
+						return /dall-e/.test(hay) || /image-preview/.test(hay);
+					})();
+					if (filters.imageOutput && !supportsImageOutput) return false;
 					if (filters.tools && !providers.some((p) => p.tools)) return false;
 					if (filters.jsonOutput && !model.json_output) return false;
 					if (
@@ -1070,6 +1088,18 @@ export function ModelSelector({
 												/>
 											</div>
 											<div className="flex items-center justify-between gap-2">
+												<Label htmlFor="f-image" className="text-xs">
+													Image output
+												</Label>
+												<Switch
+													id="f-image"
+													checked={filters.imageOutput}
+													onCheckedChange={(v) =>
+														setFilters((p) => ({ ...p, imageOutput: v }))
+													}
+												/>
+											</div>
+											<div className="flex items-center justify-between gap-2">
 												<Label htmlFor="f-tools" className="text-xs">
 													Tools
 												</Label>
@@ -1180,6 +1210,7 @@ export function ModelSelector({
 													setFilters({
 														streaming: false,
 														vision: false,
+														imageOutput: false,
 														tools: false,
 														jsonOutput: false,
 														moderatedMode: "any",
@@ -1310,6 +1341,7 @@ export function ModelSelector({
 						setExpandedModels(new Set());
 					}
 				}}
+				modal={false}
 			>
 				<DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
 				<DropdownMenuContent
@@ -1318,6 +1350,24 @@ export function ModelSelector({
 					sideOffset={4}
 					forceMount
 					side="top"
+					onPointerDownOutside={(e) => {
+						const target = e.target as HTMLElement | null;
+						if (target?.closest('[data-model-filters-popover="true"]')) {
+							e.preventDefault();
+						}
+					}}
+					onFocusOutside={(e) => {
+						const target = e.target as HTMLElement | null;
+						if (target?.closest('[data-model-filters-popover="true"]')) {
+							e.preventDefault();
+						}
+					}}
+					onInteractOutside={(e) => {
+						const target = e.target as HTMLElement | null;
+						if (target?.closest('[data-model-filters-popover="true"]')) {
+							e.preventDefault();
+						}
+					}}
 				>
 					<div className="sticky top-0 z-10 rounded-t-md border-b bg-background px-0 pt-0 pb-0">
 						<div className="relative">
@@ -1412,7 +1462,7 @@ export function ModelSelector({
 							</div>
 						</div>
 						{!useAiGateway && (
-							<Popover>
+							<Popover modal={false}>
 								<PopoverTrigger asChild>
 									<Button
 										variant="ghost"
@@ -1424,7 +1474,7 @@ export function ModelSelector({
 										<SlidersHorizontal className="h-4 w-4" />
 									</Button>
 								</PopoverTrigger>
-								<PopoverContent align="center" className="w-80 space-y-3 p-3">
+								<PopoverContent align="start" className="w-80 space-y-3 p-3 z-50" data-model-filters-popover="true">
 									<div className="grid grid-cols-2 gap-3">
 										<div className="flex items-center justify-between gap-2">
 											<Label htmlFor="hf-streaming" className="text-xs">
@@ -1447,6 +1497,18 @@ export function ModelSelector({
 												checked={filters.vision}
 												onCheckedChange={(v) =>
 													setFilters((p) => ({ ...p, vision: v }))
+												}
+											/>
+										</div>
+										<div className="flex items-center justify-between gap-2">
+											<Label htmlFor="hf-image" className="text-xs">
+												Image output
+											</Label>
+											<Switch
+												id="hf-image"
+												checked={filters.imageOutput}
+												onCheckedChange={(v) =>
+													setFilters((p) => ({ ...p, imageOutput: v }))
 												}
 											/>
 										</div>
@@ -1571,6 +1633,7 @@ export function ModelSelector({
 												setFilters({
 													streaming: false,
 													vision: false,
+													imageOutput: false,
 													tools: false,
 													jsonOutput: false,
 													moderatedMode: "any",
@@ -1594,181 +1657,6 @@ export function ModelSelector({
 								{searchQuery && (
 									<div className="flex items-center justify-between px-3 py-2 text-xs">
 										Showing {filteredModels.length} of {models.length} models
-										<Popover>
-											<PopoverTrigger asChild>
-												<Button
-													variant="ghost"
-													size="sm"
-													type="button"
-													className="h-7 px-2"
-												>
-													<SlidersHorizontal className="h-4 w-4" />
-												</Button>
-											</PopoverTrigger>
-											<PopoverContent
-												align="end"
-												className="w-80 space-y-3 p-3"
-											>
-												<div className="grid grid-cols-2 gap-3">
-													<div className="flex items-center justify-between gap-2">
-														<Label htmlFor="df-streaming" className="text-xs">
-															Streaming
-														</Label>
-														<Switch
-															id="df-streaming"
-															checked={filters.streaming}
-															onCheckedChange={(v) =>
-																setFilters((p) => ({ ...p, streaming: v }))
-															}
-														/>
-													</div>
-													<div className="flex items-center justify-between gap-2">
-														<Label htmlFor="df-vision" className="text-xs">
-															Vision
-														</Label>
-														<Switch
-															id="df-vision"
-															checked={filters.vision}
-															onCheckedChange={(v) =>
-																setFilters((p) => ({ ...p, vision: v }))
-															}
-														/>
-													</div>
-													<div className="flex items-center justify-between gap-2">
-														<Label htmlFor="df-tools" className="text-xs">
-															Tools
-														</Label>
-														<Switch
-															id="df-tools"
-															checked={filters.tools}
-															onCheckedChange={(v) =>
-																setFilters((p) => ({ ...p, tools: v }))
-															}
-														/>
-													</div>
-													{/* Cancellation filter removed */}
-													<div className="flex items-center justify-between gap-2">
-														<Label htmlFor="df-json" className="text-xs">
-															JSON Output
-														</Label>
-														<Switch
-															id="df-json"
-															checked={filters.jsonOutput}
-															onCheckedChange={(v) =>
-																setFilters((p) => ({ ...p, jsonOutput: v }))
-															}
-														/>
-													</div>
-													{/* <div className="flex items-center justify-between gap-2">
-											<Label htmlFor="df-moderated" className="text-xs">Moderation</Label>
-											<select id="df-moderated" className="h-8 w-36 rounded-md border bg-background px-2 text-xs" value={filters.moderatedMode} onChange={(e) => setFilters((p) => ({ ...p, moderatedMode: e.target.value as any }))}>
-												<option value="any">Any</option>
-												<option value="moderated">Moderated</option>
-												<option value="unmoderated">Unmoderated</option>
-											</select>
-										</div> */}
-												</div>
-												<div className="grid grid-cols-2 gap-3">
-													<div>
-														<Label htmlFor="df-provider" className="text-xs">
-															Provider
-														</Label>
-														<Input
-															id="df-provider"
-															placeholder="e.g. openai"
-															value={String(filters.providerQuery)}
-															onChange={(e) =>
-																setFilters((p) => ({
-																	...p,
-																	providerQuery: e.target.value,
-																}))
-															}
-															className="h-8"
-														/>
-													</div>
-													<div>
-														<Label htmlFor="df-minctx" className="text-xs">
-															Min context
-														</Label>
-														<Input
-															id="df-minctx"
-															type="number"
-															min={0}
-															value={String(filters.minContext)}
-															onChange={(e) =>
-																setFilters((p) => ({
-																	...p,
-																	minContext: e.target.value,
-																}))
-															}
-															className="h-8"
-														/>
-													</div>
-													<div>
-														<Label htmlFor="df-maxprice" className="text-xs">
-															Max prompt $/1K
-														</Label>
-														<Input
-															id="df-maxprice"
-															type="number"
-															min={0}
-															step="0.0001"
-															value={String(filters.maxPromptPrice)}
-															onChange={(e) =>
-																setFilters((p) => ({
-																	...p,
-																	maxPromptPrice: e.target.value,
-																}))
-															}
-															className="h-8"
-														/>
-													</div>
-													<div>
-														<Label htmlFor="df-status" className="text-xs">
-															Status
-														</Label>
-														<select
-															id="df-status"
-															className="h-8 w-full rounded-md border bg-background px-2 text-sm"
-															value={filters.status}
-															onChange={(e) =>
-																setFilters((p) => ({
-																	...p,
-																	status: e.target.value as ModelStatusFilter,
-																}))
-															}
-														>
-															<option value="any">Any</option>
-															<option value="active">Active</option>
-															<option value="deprecated">Deprecated</option>
-															<option value="deactivated">Deactivated</option>
-														</select>
-													</div>
-												</div>
-												<div className="flex items-center justify-between">
-													<Button
-														type="button"
-														variant="ghost"
-														size="sm"
-														onClick={() =>
-															setFilters({
-																streaming: false,
-																vision: false,
-																tools: false,
-																jsonOutput: false,
-																moderatedMode: "any",
-																status: "any",
-																providerQuery: "",
-																minContext: "",
-																maxPromptPrice: "",
-															})
-														}
-													>
-														Reset
-													</Button>
-												</div>
-											</PopoverContent>
-										</Popover>
 									</div>
 								)}
 								{filteredModels.map(renderModelItem)}

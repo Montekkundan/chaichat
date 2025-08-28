@@ -24,6 +24,9 @@ export function ApiKeyManager() {
 	const isLoggedIn = !!user?.id;
 	const [llmGatewayKey, setLlmGatewayKey] = useState("");
 	const [aiGatewayKey, setAiGatewayKey] = useState("");
+	const [uploadThingKey, setUploadThingKey] = useState("");
+	const [vercelBlobKey, setVercelBlobKey] = useState("");
+	const [storageProvider, setStorageProvider] = useState<"uploadthing" | "vercelblob">("uploadthing");
 	const [showKey, setShowKey] = useState(false);
 	const [isLoading, setIsLoading] = useState(true);
 	const [useSessionStorage, setUseSessionStorage] = useState(false);
@@ -45,6 +48,15 @@ export function ApiKeyManager() {
 					if (convexKeys?.aiGatewayApiKey) {
 						setAiGatewayKey(convexKeys.aiGatewayApiKey);
 					}
+					if (convexKeys?.uploadThingApiKey) {
+						setUploadThingKey(convexKeys.uploadThingApiKey);
+					}
+					if (convexKeys?.vercelBlobApiKey) {
+						setVercelBlobKey(convexKeys.vercelBlobApiKey);
+					}
+					if (convexKeys?.storageProvider) {
+						setStorageProvider(convexKeys.storageProvider);
+					}
 				} else {
 					const localKeys = getAllKeys();
 					if (localKeys.llmGatewayApiKey) {
@@ -52,6 +64,16 @@ export function ApiKeyManager() {
 					}
 					if (localKeys.aiGatewayApiKey) {
 						setAiGatewayKey(localKeys.aiGatewayApiKey);
+					}
+					if (localKeys.uploadThingApiKey) {
+						setUploadThingKey(localKeys.uploadThingApiKey);
+					}
+					if (localKeys.vercelBlobApiKey) {
+						setVercelBlobKey(localKeys.vercelBlobApiKey);
+					}
+					const storedProvider = localStorage.getItem("chai-storage-provider");
+					if (storedProvider === "uploadthing" || storedProvider === "vercelblob") {
+						setStorageProvider(storedProvider);
 					}
 				}
 			} catch (error) {
@@ -156,6 +178,110 @@ export function ApiKeyManager() {
 			window.dispatchEvent(new CustomEvent("apiKeysChanged"));
 		} catch (error) {
 			console.error("Failed to save AI Gateway API key:", error);
+		}
+	};
+
+	const handleStorageProviderChange = async (provider: "uploadthing" | "vercelblob") => {
+		setStorageProvider(provider);
+		try {
+			if (isLoggedIn) {
+				await storeKeyMutation({ provider: "storage", apiKey: provider });
+			} else {
+				localStorage.setItem("chai-storage-provider", provider);
+			}
+			window.dispatchEvent(new CustomEvent("storageProviderChanged"));
+		} catch (error) {
+			console.error("Failed to save storage provider:", error);
+		}
+	};
+
+	const handleUploadThingKeyChange = async (value: string) => {
+		setUploadThingKey(value);
+		const trimmedKey = value.trim();
+		if (!trimmedKey) {
+			await handleRemoveUploadThingKey();
+			return;
+		}
+
+		// Extract the actual token before saving
+		let cleanToken = trimmedKey;
+		// Remove surrounding quotes if present
+		cleanToken = cleanToken.replace(/^['"]|['"]$/g, '');
+		// If it starts with UPLOADTHING_TOKEN=, extract the actual token
+		if (cleanToken.startsWith('UPLOADTHING_TOKEN=')) {
+			cleanToken = cleanToken.replace('UPLOADTHING_TOKEN=', '');
+			// Remove surrounding quotes again after extraction
+			cleanToken = cleanToken.replace(/^['"]|['"]$/g, '');
+		}
+
+		try {
+			if (isLoggedIn) {
+				await storeKeyMutation({ provider: "uploadthing", apiKey: cleanToken });
+			} else {
+				if (useSessionStorage) {
+					await setSessionKey("uploadthing", cleanToken);
+				} else {
+					await setLocalKey("uploadthing", cleanToken);
+				}
+			}
+			window.dispatchEvent(new CustomEvent("apiKeysChanged"));
+		} catch (error) {
+			console.error("Failed to save UploadThing API key:", error);
+		}
+	};
+
+	const handleVercelBlobKeyChange = async (value: string) => {
+		setVercelBlobKey(value);
+		const trimmedKey = value.trim();
+		if (!trimmedKey) {
+			await handleRemoveVercelBlobKey();
+			return;
+		}
+		try {
+			if (isLoggedIn) {
+				await storeKeyMutation({ provider: "vercelblob", apiKey: trimmedKey });
+			} else {
+				if (useSessionStorage) {
+					await setSessionKey("vercelblob", trimmedKey);
+				} else {
+					await setLocalKey("vercelblob", trimmedKey);
+				}
+			}
+			window.dispatchEvent(new CustomEvent("apiKeysChanged"));
+		} catch (error) {
+			console.error("Failed to save Vercel Blob API key:", error);
+		}
+	};
+
+	const handleRemoveUploadThingKey = async () => {
+		try {
+			if (isLoggedIn) {
+				await removeKeyMutation({ provider: "uploadthing" });
+			} else {
+				removeLocalKey("uploadthing");
+				removeSessionKey("uploadthing");
+			}
+			setUploadThingKey("");
+			window.dispatchEvent(new CustomEvent("apiKeysChanged"));
+		} catch (error) {
+			console.error("Failed to remove UploadThing API key:", error);
+			toast.error("Failed to remove UploadThing API key");
+		}
+	};
+
+	const handleRemoveVercelBlobKey = async () => {
+		try {
+			if (isLoggedIn) {
+				await removeKeyMutation({ provider: "vercelblob" });
+			} else {
+				removeLocalKey("vercelblob");
+				removeSessionKey("vercelblob");
+			}
+			setVercelBlobKey("");
+			window.dispatchEvent(new CustomEvent("apiKeysChanged"));
+		} catch (error) {
+			console.error("Failed to remove Vercel Blob API key:", error);
+			toast.error("Failed to remove Vercel Blob API key");
 		}
 	};
 
@@ -385,6 +511,163 @@ export function ApiKeyManager() {
 						Vercel AI Gateway
 					</a>
 				</p>
+			</div>
+
+			{/* Storage Provider Configuration */}
+			<div className="rounded-lg border bg-card p-4">
+				<div className="mb-3 flex items-center justify-between">
+					<div className="flex items-center gap-3">
+						<div className="flex items-center gap-2">
+							<span className="font-medium">Image Storage</span>
+							<Badge className="bg-green-600 text-white">
+								Active: {storageProvider === "uploadthing" ? "UploadThing" : "Vercel Blob"}
+							</Badge>
+						</div>
+					</div>
+				</div>
+
+				<div className="space-y-4">
+					{/* Storage Provider Selection */}
+					<div>
+						<label className="font-medium text-sm">Storage Provider</label>
+						<div className="mt-2 flex gap-2">
+							<label className="flex items-center space-x-2">
+								<input
+									type="radio"
+									name="storageProvider"
+									value="uploadthing"
+									checked={storageProvider === "uploadthing"}
+									onChange={(e) => handleStorageProviderChange(e.target.value as "uploadthing")}
+									className="rounded"
+								/>
+								<span className="text-sm">UploadThing</span>
+							</label>
+							<label className="flex items-center space-x-2">
+								<input
+									type="radio"
+									name="storageProvider"
+									value="vercelblob"
+									checked={storageProvider === "vercelblob"}
+									onChange={(e) => handleStorageProviderChange(e.target.value as "vercelblob")}
+									className="rounded"
+								/>
+								<span className="text-sm">Vercel Blob</span>
+							</label>
+						</div>
+					</div>
+
+					{/* UploadThing Key Configuration */}
+					{storageProvider === "uploadthing" && (
+						<div>
+							<label className="font-medium text-sm">UploadThing API Key</label>
+							<div className="flex items-center gap-2 mt-2">
+								<div className="relative flex-1">
+									<Input
+										type={showKey ? "text" : "password"}
+										placeholder="Enter your UploadThing API key"
+										value={uploadThingKey}
+										onChange={(e) => handleUploadThingKeyChange(e.target.value)}
+										className="pr-20 text-sm"
+									/>
+									<div className="-translate-y-1/2 absolute top-1/2 right-2 flex gap-1">
+										<Button
+											type="button"
+											variant="ghost"
+											size="sm"
+											className="h-6 w-6 p-0"
+											onClick={toggleKeyVisibility}
+											title={showKey ? "Hide key" : "Show key"}
+										>
+											{showKey ? (
+												<EyeOff className="h-3 w-3" />
+											) : (
+												<Eye className="h-3 w-3" />
+											)}
+										</Button>
+										{uploadThingKey && (
+											<Button
+												type="button"
+												variant="ghost"
+												size="sm"
+												className="h-6 px-2"
+												onClick={handleRemoveUploadThingKey}
+											>
+												Remove
+											</Button>
+										)}
+									</div>
+								</div>
+							</div>
+							<p className="mt-2 text-muted-foreground text-xs">
+								Get your API key from{" "}
+								<a
+									href="https://uploadthing.com"
+									target="_blank"
+									rel="noopener noreferrer"
+									className="underline hover:no-underline"
+								>
+									uploadthing.com
+								</a>
+							</p>
+						</div>
+					)}
+
+					{/* Vercel Blob Key Configuration */}
+					{storageProvider === "vercelblob" && (
+						<div>
+							<label className="font-medium text-sm">Vercel Blob API Key</label>
+							<div className="flex items-center gap-2 mt-2">
+								<div className="relative flex-1">
+									<Input
+										type={showKey ? "text" : "password"}
+										placeholder="Enter your Vercel Blob API key"
+										value={vercelBlobKey}
+										onChange={(e) => handleVercelBlobKeyChange(e.target.value)}
+										className="pr-20 text-sm"
+									/>
+									<div className="-translate-y-1/2 absolute top-1/2 right-2 flex gap-1">
+										<Button
+											type="button"
+											variant="ghost"
+											size="sm"
+											className="h-6 w-6 p-0"
+											onClick={toggleKeyVisibility}
+											title={showKey ? "Hide key" : "Show key"}
+										>
+											{showKey ? (
+												<EyeOff className="h-3 w-3" />
+											) : (
+												<Eye className="h-3 w-3" />
+											)}
+										</Button>
+										{vercelBlobKey && (
+											<Button
+												type="button"
+												variant="ghost"
+												size="sm"
+												className="h-6 px-2"
+												onClick={handleRemoveVercelBlobKey}
+											>
+												Remove
+											</Button>
+										)}
+									</div>
+								</div>
+							</div>
+							<p className="mt-2 text-muted-foreground text-xs">
+								Get your API key from{" "}
+								<a
+									href="https://vercel.com/docs/storage/vercel-blob"
+									target="_blank"
+									rel="noopener noreferrer"
+									className="underline hover:no-underline"
+								>
+									Vercel Blob
+								</a>
+							</p>
+						</div>
+					)}
+				</div>
 			</div>
 		</div>
 	);

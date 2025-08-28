@@ -1,9 +1,9 @@
 "use client";
 
-import { useUser } from "@clerk/nextjs";
-import { useAction } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { LinkIcon, LinkSimpleBreakIcon } from "@phosphor-icons/react";
+import { useUser } from "@clerk/nextjs";
+import { LinkIcon, LinkSimpleBreakIcon, Paperclip } from "@phosphor-icons/react";
+import { useAction } from "convex/react";
 import {
 	ChevronLeft,
 	ChevronRight,
@@ -13,11 +13,17 @@ import {
 	SendIcon,
 	Settings,
 	Trash2,
+	X,
 } from "lucide-react";
+import { Square } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ModelSelector } from "~/components/chat-input/model-selector";
 import { Conversation } from "~/components/chat/conversation";
-import { ModelConfigPanel } from "~/components/model-config/model-config";
+import { UnifiedConfigDropdown } from "~/components/model-config";
+import { filterValidFiles } from "~/lib/file-upload/validation";
+import { generateReactHelpers } from "@uploadthing/react";
+import type { UploadRouter } from "~/app/api/uploadthing/core";
+import { toast } from "~/components/ui/toast";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -34,7 +40,8 @@ import type { LLMGatewayModel } from "~/types/llmgateway";
 import { Button } from "../ui/button";
 import { Separator } from "../ui/separator";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
-import { Square } from "lucide-react";
+import { useEffect as _useEffect } from "react";
+import { cn } from "~/lib/utils";
 
 interface PlaygroundColumnProps {
 	column: ChatColumn;
@@ -46,12 +53,98 @@ export function PlaygroundColumn({
 	columnIndex,
 }: PlaygroundColumnProps) {
 	const { user } = useUser();
-  const getKeys = useAction(api.userKeys.getKeys);
+	const getKeys = useAction(api.userKeys.getKeys);
 
 	const [isSubmitting, setIsSubmitting] = useState(false);
-	const [isConfigMenuOpen, setIsConfigMenuOpen] = useState(false);
-  const [hasLlmKey, setHasLlmKey] = useState<boolean>(false);
-  const [hasAiKey, setHasAiKey] = useState<boolean>(false);
+	const [hasLlmKey, setHasLlmKey] = useState<boolean>(false);
+	const [hasAiKey, setHasAiKey] = useState<boolean>(false);
+
+	// Drag and drop state
+	const [isDragOver, setIsDragOver] = useState(false);
+	const [dragCounter, setDragCounter] = useState(0);
+	const [files, setFiles] = useState<import("~/components/chat-input/file-items").UploadedFile[]>([]);
+
+	// UploadThing setup
+	const uploadHelpers = generateReactHelpers<UploadRouter>();
+	const { useUploadThing } = uploadHelpers;
+	const { startUpload, isUploading } = useUploadThing("chatFiles");
+
+	// Track files selected/pasted but not yet uploaded
+	const pendingFilesRef = useRef<File[]>([]);
+
+	// File input ref for manual file selection
+	const fileInputRef = useRef<HTMLInputElement>(null);
+
+	// Track storage provider
+	const [storageProvider, setStorageProvider] = useState<"uploadthing" | "vercelblob">("uploadthing");
+	useEffect(() => {
+		const readStorageProvider = () => {
+			try {
+				const raw = window.localStorage.getItem("chai-storage-provider");
+				setStorageProvider(raw === "vercelblob" ? "vercelblob" : "uploadthing");
+			} catch {
+				setStorageProvider("uploadthing");
+			}
+		};
+		readStorageProvider();
+		const onChange = () => readStorageProvider();
+		window.addEventListener("storageProviderChanged", onChange);
+		window.addEventListener("storage", onChange);
+		return () => {
+			window.removeEventListener("storageProviderChanged", onChange);
+			window.removeEventListener("storage", onChange);
+		};
+	}, []);
+
+	// Upload function that handles both storage providers
+	const uploadFile = async (file: File): Promise<{ url: string; name: string; size: number; contentType: string } | null> => {
+		if (storageProvider === "vercelblob") {
+			// Upload to Vercel Blob
+			const formData = new FormData();
+			formData.append("file", file);
+
+			// Get localStorage keys to pass to the API
+			const localKeys = {
+				llmGatewayApiKey: localStorage.getItem("chaichat_keys_llmgateway") || undefined,
+				aiGatewayApiKey: localStorage.getItem("chaichat_keys_aigateway") || undefined,
+				uploadThingApiKey: localStorage.getItem("chaichat_keys_uploadthing") || undefined,
+				vercelBlobApiKey: localStorage.getItem("chaichat_keys_vercelblob") || undefined,
+				storageProvider: localStorage.getItem("chai-storage-provider") || "uploadthing",
+			};
+
+			const response = await fetch("/api/upload/vercel-blob", {
+				method: "POST",
+				body: formData,
+				headers: {
+					"X-Local-Keys": JSON.stringify(localKeys),
+				},
+			});
+
+			if (response.ok) {
+				const data = await response.json();
+				return {
+					url: data.file.url,
+					name: data.file.name,
+					size: data.file.size,
+					contentType: data.file.contentType,
+				};
+			}
+			const error = await response.json();
+			throw new Error(error.error || "Failed to upload to Vercel Blob");
+		}
+		// Upload to UploadThing (existing logic)
+		const uploadResult = await startUpload([file]);
+		if (uploadResult?.[0]) {
+			const uploadedFile = uploadResult[0];
+			return {
+				url: uploadedFile.url,
+				name: uploadedFile.name || file.name,
+				size: uploadedFile.size || file.size,
+				contentType: file.type,
+			};
+		}
+		throw new Error("Failed to upload to UploadThing");
+	};
 
 	// Per-column scroll API so Enter can scroll to bottom if needed
 	const conversationScrollApiRef = useRef<{
@@ -71,33 +164,32 @@ export function PlaygroundColumn({
 		setColumnSource(next);
 	}, [column.gatewaySource]);
 
-  // Load both keys on mount and on apiKeysChanged
-  useEffect(() => {
-    const loadKeys = async () => {
-      try {
-        if (user?.id) {
-          const result = (await getKeys({})) as {
-            llmGatewayApiKey?: string;
-            aiGatewayApiKey?: string;
-          };
-          setHasLlmKey(Boolean(result?.llmGatewayApiKey));
-          setHasAiKey(Boolean(result?.aiGatewayApiKey));
-        } else {
-          const { getAllKeys } = await import("~/lib/local-keys");
-          const local = await getAllKeys();
-          setHasLlmKey(Boolean(local?.llmGatewayApiKey));
-          setHasAiKey(Boolean(local?.aiGatewayApiKey));
-        }
-      } catch {
-        setHasLlmKey(false);
-        setHasAiKey(false);
-      }
-    };
-    void loadKeys();
-    const onChanged = () => void loadKeys();
-    window.addEventListener("apiKeysChanged", onChanged);
-    return () => window.removeEventListener("apiKeysChanged", onChanged);
-  }, [user?.id, getKeys]);
+	useEffect(() => {
+		const loadKeys = async () => {
+			try {
+				if (user?.id) {
+					const result = (await getKeys({})) as {
+						llmGatewayApiKey?: string;
+						aiGatewayApiKey?: string;
+					};
+					setHasLlmKey(Boolean(result?.llmGatewayApiKey));
+					setHasAiKey(Boolean(result?.aiGatewayApiKey));
+				} else {
+					const { getAllKeys } = await import("~/lib/local-keys");
+					const local = await getAllKeys();
+					setHasLlmKey(Boolean(local?.llmGatewayApiKey));
+					setHasAiKey(Boolean(local?.aiGatewayApiKey));
+				}
+			} catch {
+				setHasLlmKey(false);
+				setHasAiKey(false);
+			}
+		};
+		void loadKeys();
+		const onChanged = () => void loadKeys();
+		window.addEventListener("apiKeysChanged", onChanged);
+		return () => window.removeEventListener("apiKeysChanged", onChanged);
+	}, [user?.id, getKeys]);
 	const {
 		models,
 		isLoading: isModelsLoading,
@@ -183,6 +275,8 @@ export function PlaygroundColumn({
 		registerColumnScrollApi,
 		stopColumn,
 		stopSyncedColumns,
+		sharedAttachments,
+		setSharedAttachments,
 	} = usePlayground();
 
 	const handleModelChange = (modelId: string) => {
@@ -210,10 +304,269 @@ export function PlaygroundColumn({
 		updateColumn(column.id, { config: { ...column.config, ...config } });
 	};
 
+	const handleDragEnter = useCallback((e: React.DragEvent) => {
+		e.preventDefault();
+		e.stopPropagation();
+		setDragCounter(prev => prev + 1);
+		if (e.dataTransfer?.types.includes('Files')) {
+			setIsDragOver(true);
+		}
+	}, []);
+
+	const handleDragLeave = useCallback((e: React.DragEvent) => {
+		e.preventDefault();
+		e.stopPropagation();
+		setDragCounter(prev => {
+			const newCounter = prev - 1;
+			if (newCounter === 0) {
+				setIsDragOver(false);
+			}
+			return newCounter;
+		});
+	}, []);
+
+	const handleDragOver = useCallback((e: React.DragEvent) => {
+		e.preventDefault();
+		e.stopPropagation();
+	}, []);
+
+	const handleDrop = useCallback(async (e: React.DragEvent) => {
+		e.preventDefault();
+		e.stopPropagation();
+		setIsDragOver(false);
+		setDragCounter(0);
+
+		if (!user?.id) {
+			toast({ title: "Please log in to upload files", status: "error" });
+			return;
+		}
+
+		const droppedFiles = Array.from(e.dataTransfer.files);
+		if (droppedFiles.length === 0) return;
+
+		// Filter for image files only
+		const imageFiles = droppedFiles.filter(file => file.type.startsWith('image/'));
+
+		if (imageFiles.length === 0) {
+			toast({ title: "Please drop image files only", status: "error" });
+			return;
+		}
+
+		// Validate against limits and mime types
+		const { validFiles, errors } = filterValidFiles(
+			imageFiles,
+			files.length,
+		);
+		if (errors.length) {
+			toast({ title: errors.join("\n"), status: "error" });
+		}
+
+		if (validFiles.length === 0) return;
+
+		// Create local preview objects and queue files
+		const previews = validFiles.map((file) => {
+			pendingFilesRef.current.push(file);
+			return {
+				name: file.name,
+				url: URL.createObjectURL(file),
+				contentType: file.type,
+				size: file.size,
+				local: true,
+			} as import("~/components/chat-input/file-items").UploadedFile;
+		});
+		const nextFiles = [...files, ...previews];
+		setFiles(nextFiles);
+		// Broadcast to synced columns for preview reuse
+		try { setSharedAttachments(nextFiles.map(f => ({ name: f.name, url: f.url, contentType: f.contentType, size: f.size }))); } catch {}
+	}, [user?.id, files, setSharedAttachments]);
+
+	// Mirror shared attachments (previews) into this column when synced
+	_useEffect(() => {
+		if (!column.synced) return;
+		if (!Array.isArray(sharedAttachments)) return;
+		// Only update if local files differ and no local pending uploads
+		if (pendingFilesRef.current.length === 0) {
+			setFiles((prev) => {
+				const same = prev.length === sharedAttachments.length && prev.every((p, i) => p.url === sharedAttachments[i]?.url);
+				return same ? prev : [...sharedAttachments];
+			});
+		}
+	}, [column.synced, sharedAttachments]);
+
+	const handleLocalFileChange = async (
+		e: React.ChangeEvent<HTMLInputElement>,
+	) => {
+		if (!e.target.files) return;
+		const rawFiles = Array.from(e.target.files);
+
+		const { validFiles, errors } = filterValidFiles(rawFiles, files.length);
+		if (errors.length) {
+			toast({ title: errors.join("\n"), status: "error" });
+		}
+
+		if (validFiles.length === 0) {
+			e.target.value = "";
+			return;
+		}
+
+		// Store validated files locally and show previews
+		const previews = validFiles.map((file) => {
+			pendingFilesRef.current.push(file);
+			return {
+				name: file.name,
+				url: URL.createObjectURL(file),
+				contentType: file.type,
+				size: file.size,
+				local: true,
+			} as import("~/components/chat-input/file-items").UploadedFile;
+		});
+		const nextFiles2 = [...files, ...previews];
+		setFiles(nextFiles2);
+		try { setSharedAttachments(nextFiles2.map(f => ({ name: f.name, url: f.url, contentType: f.contentType, size: f.size }))); } catch {}
+		// reset input so same file can be selected again
+		e.target.value = "";
+	};
+
+	const handleFileRemove = useCallback((file: import("~/components/chat-input/file-items").UploadedFile) => {
+		setFiles(prev => prev.filter(f => f.name !== file.name || f.size !== file.size));
+		if (file.local) {
+			pendingFilesRef.current = pendingFilesRef.current.filter(
+				(f) => f.name !== file.name || f.size !== file.size,
+			);
+		}
+	}, []);
+
 	const handleSend = async () => {
 		if (isSubmitting) return;
 		const inputValue = column.synced ? sharedInput : column.input;
-		if (!inputValue.trim()) return;
+		const trimmedInput = inputValue.trim();
+
+		// Check for image generation commands
+		// TODO: we should not need patterns for this
+		const imageGenPatterns = [
+			/^\/generate\s+(.+)$/i,
+			/^\/image\s+(.+)$/i,
+			/^\/img\s+(.+)$/i,
+			/^\/dalle\s+(.+)$/i,
+		];
+
+		let imagePrompt: string | null = null;
+		for (const pattern of imageGenPatterns) {
+			const match = trimmedInput.match(pattern);
+			if (match && typeof match[1] === "string") {
+				imagePrompt = match[1].trim();
+				break;
+			}
+		}
+
+		if (imagePrompt) {
+			// Handle image generation
+			try {
+				setIsSubmitting(true);
+
+				const localKeys = {
+					llmGatewayApiKey: localStorage.getItem("chaichat_keys_llmgateway") || undefined,
+					aiGatewayApiKey: localStorage.getItem("chaichat_keys_aigateway") || undefined,
+					uploadThingApiKey: localStorage.getItem("chaichat_keys_uploadthing") || undefined,
+					vercelBlobApiKey: localStorage.getItem("chaichat_keys_vercelblob") || undefined,
+					storageProvider: localStorage.getItem("chai-storage-provider") || "uploadthing",
+				};
+
+				const response = await fetch("/api/chat", {
+					method: "POST",
+					headers: {
+						"Content-Type": "application/json",
+						"X-Local-Keys": JSON.stringify(localKeys),
+					},
+					body: JSON.stringify({
+						imageGeneration: {
+							prompt: imagePrompt,
+							size: "1024x1024",
+							model: column.modelId.includes("dall-e") ? column.modelId : "openai/dall-e-3",
+							n: 1,
+						},
+						gateway: columnSource === "aigateway" ? "vercel-ai-gateway" : "llm-gateway",
+					}),
+				});
+
+				if (response.ok) {
+					const result = await response.json();
+					if (result.images && result.images.length > 0) {
+						// Convert generated images to attachment format
+						const generatedAttachments = result.images.map((img: { name: string; url: string; contentType: string; size: number }) => ({
+							name: img.name,
+							url: img.url,
+							contentType: img.contentType,
+							size: img.size,
+							local: false,
+						})) as import("~/components/chat-input/file-items").UploadedFile[];
+
+						// Add generated images to the files
+						setFiles([...files, ...generatedAttachments]);
+
+						toast({
+							title: `Generated ${result.images.length} image(s)`,
+							status: "success"
+						});
+
+						// Clear the input
+						if (column.synced) {
+							updateSharedInput("");
+						} else {
+							updateColumnInput(column.id, "");
+						}
+					} else {
+						toast({ title: "No images were generated", status: "error" });
+					}
+				} else {
+					const error = await response.json();
+					toast({
+						title: "Image generation failed",
+						description: error.details || error.error,
+						status: "error"
+					});
+				}
+			} catch (err) {
+				console.error("Image generation error:", err);
+				toast({ title: "Failed to generate image", status: "error" });
+			} finally {
+				setIsSubmitting(false);
+			}
+			return;
+		}
+
+		if (!trimmedInput && files.length === 0) return;
+
+		// Prepare attachment list
+		let attachmentsToSend: import("~/components/chat-input/file-items").UploadedFile[] = files;
+
+		// First, upload any pending local files
+		if (pendingFilesRef.current.length > 0) {
+			try {
+				const uploadPromises = pendingFilesRef.current.map(file => uploadFile(file));
+				const uploadResults = await Promise.all(uploadPromises);
+
+				const uploaded = uploadResults
+					.filter((result): result is NonNullable<typeof result> => result !== null)
+					.map(result => ({
+						name: result.name,
+						url: result.url,
+						contentType: result.contentType,
+						size: result.size,
+					})) as import("~/components/chat-input/file-items").UploadedFile[];
+
+				const newList = files.filter((f) => !f.local).concat(uploaded);
+				setFiles(newList);
+				try { setSharedAttachments(newList.map(f => ({ name: f.name, url: f.url, contentType: f.contentType, size: f.size }))); } catch {}
+				attachmentsToSend = newList;
+			} catch (err) {
+				console.error("Upload before send failed", err);
+				toast({ title: "Upload failed", status: "error" });
+				return; // abort send
+			} finally {
+				pendingFilesRef.current = [];
+			}
+		}
 
 		// Optimistically clear the input for snappy UX
 		if (column.synced) {
@@ -221,6 +574,8 @@ export function PlaygroundColumn({
 		} else {
 			updateColumnInput(column.id, "");
 		}
+		setFiles([]); // Clear files after sending
+		try { setSharedAttachments([]); } catch {}
 
 		setIsSubmitting(true);
 
@@ -241,11 +596,11 @@ export function PlaygroundColumn({
 
 		try {
 			if (column.synced) {
-				// If this column is synced, delegate to the provider to handle all synced columns
-				await sendToSyncedColumns(inputValue);
+				// Delegate to provider for synced columns, sharing uploaded attachments
+				await sendToSyncedColumns(trimmedInput, attachmentsToSend);
 			} else {
-				// Handle individual column send
-				await sendToColumn(column.id, inputValue);
+				// Handle individual column send with attachments
+				await sendToColumn(column.id, trimmedInput);
 			}
 
 			// Clear input
@@ -261,8 +616,8 @@ export function PlaygroundColumn({
 		}
 	};
 
-  const currentInput = column.synced ? sharedInput : column.input;
-  const hasRequiredKey = columnSource === "aigateway" ? hasAiKey : hasLlmKey;
+	const currentInput = column.synced ? sharedInput : column.input;
+	const hasRequiredKey = columnSource === "aigateway" ? hasAiKey : hasLlmKey;
 
 	const canMoveLeft = columnIndex > 0;
 	const canMoveRight = columnIndex < columns.length - 1;
@@ -312,48 +667,39 @@ export function PlaygroundColumn({
 										</div>
 									)}
 
-									{/* Model Configuration button */}
-									<DropdownMenu
-										open={isConfigMenuOpen}
-										onOpenChange={(open) => {
-											setIsConfigMenuOpen(open);
-											if (open) {
-												setTimeout(() => {
-													const el = document.getElementById(
-														"temperature",
-													) as HTMLInputElement | null;
-													el?.focus();
-													el?.select?.();
-												}, 0);
-											}
+									{/* Unified Model & Provider Configuration */}
+									<UnifiedConfigDropdown
+										selectedModelId={column.modelId}
+										value={{
+											temperature: column.config.temperature,
+											maxOutputTokens: column.config.maxOutputTokens,
+											topP: column.config.topP,
+											topK: column.config.topK,
+											frequencyPenalty: column.config.frequencyPenalty,
+											presencePenalty: column.config.presencePenalty,
+											openai: column.config.openai,
+											google: column.config.google,
+											anthropic: column.config.anthropic,
 										}}
+										onChange={(u) => handleConfigChange(u)}
+										gateway={
+											columnSource === "aigateway"
+												? "vercel-ai-gateway"
+												: "llm-gateway"
+										}
 									>
-										<DropdownMenuTrigger asChild>
-											<Button
-												aria-label="Model Settings"
-												variant={"ghost"}
-												size={"icon"}
-											>
-												<span className="button_content__eYZtX button_flex___f_3o">
-													<span className="pointer-events-none flex rounded-md p-2">
-														<Settings className="h-4 w-4" />
-													</span>
+										<Button
+											aria-label="Model & Provider Settings"
+											variant={"ghost"}
+											size={"icon"}
+										>
+											<span className="button_content__eYZtX button_flex___f_3o">
+												<span className="pointer-events-none flex rounded-md p-2">
+													<Settings className="h-4 w-4" />
 												</span>
-											</Button>
-										</DropdownMenuTrigger>
-										<DropdownMenuContent align="end" className="w-[420px]">
-											<div className="space-y-2 p-2">
-												<div className="px-1 font-semibold text-sm">
-													Model Configuration
-												</div>
-												<ModelConfigPanel
-													modelId={column.modelId}
-													value={column.config}
-													onChange={(u) => handleConfigChange(u)}
-												/>
-											</div>
-										</DropdownMenuContent>
-									</DropdownMenu>
+											</span>
+										</Button>
+									</UnifiedConfigDropdown>
 								</div>
 
 								{/* Add Column button */}
@@ -568,85 +914,173 @@ export function PlaygroundColumn({
 					</div>
 
 					{/* Sticky bottom input */}
-					<div className="sticky bottom-0 min-h-0 min-w-0 flex-shrink-0">
+					<div
+						className={cn(
+							"sticky bottom-0 min-h-0 min-w-0 flex-shrink-0 relative",
+							isDragOver && "ring-2 ring-primary ring-offset-2 ring-offset-background"
+						)}
+						onDragEnter={handleDragEnter}
+						onDragLeave={handleDragLeave}
+						onDragOver={handleDragOver}
+						onDrop={handleDrop}
+					>
+						{/* Drag overlay */}
+						{isDragOver && (
+							<div className="absolute inset-0 z-20 bg-primary/10 backdrop-blur-sm rounded-lg border-2 border-dashed border-primary flex items-center justify-center">
+								<div className="text-center text-primary">
+									<div className="text-2xl mb-2">📸</div>
+									<div className="font-medium">Drop images here</div>
+									<div className="text-sm text-muted-foreground">Supported: JPEG, PNG, WebP, GIF</div>
+								</div>
+							</div>
+						)}
 						<div className="flex items-center gap-2 border-t bg-background-200 p-3 pr-2.5">
 							<form
-								className="relative flex w-full items-center"
+								className="relative flex w-full flex-col items-center"
 								onSubmit={(e) => {
 									e.preventDefault();
 									handleSend();
 								}}
 							>
-                            <textarea
-                          placeholder={
-                            hasRequiredKey
-                              ? (column.synced ? "Type a synced message..." : "Type your message…")
-                              : `Please add your ${columnSource === "aigateway" ? "Vercel AI Gateway" : "LLM Gateway"} API key to start chatting`
-                          }
-                          value={currentInput}
-                          onChange={(e) => {
-                            handleInputChange(e.target.value);
-                            const target = e.target as HTMLTextAreaElement;
-                            target.style.height = "auto";
-                            target.style.height = `${Math.min(target.scrollHeight, 120)}px`;
-                          }}
-                          className="flex-1 max-h-[120px] min-h-[38px] resize-none overflow-y-auto rounded-md border bg-background-100 py-2 pl-4 pr-9 text-sm focus:border-zinc-400 focus:outline-none focus:ring-0 dark:focus:border-zinc-600 disabled:cursor-not-allowed disabled:opacity-60"
-                          spellCheck="false"
-                          rows={1}
-                          style={{
-                            fontFamily: "var(--font-geist-sans)",
-                            height: "38px",
-                            lineHeight: "1.5",
-                          }}
-                          disabled={!hasRequiredKey}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter" && !e.shiftKey) {
-                              e.preventDefault();
-                              if (!hasRequiredKey) return;
-                              handleSend();
-                            }
-                          }}
-                        />
-                                <div className="absolute right-1 bottom-[3px] inline-flex items-center justify-end">
-                                    {column.isStreaming || derivedStatus === "streaming" ? (
-                                        <button
-                                            type="button"
-                                            aria-label="Stop"
-                                            onClick={() => (column.synced ? stopSyncedColumns() : stopColumn(column.id))}
-                                            className="button_base__IZQUR reset_reset__sz7UJ button_button__dyHAB reset_reset__sz7UJ geist-new-themed geist-new-tertiary geist-new-tertiary-fill button_tertiary__t8MGO button_shape__4NO5k button_small__BoUqH button_invert__WPMQW"
-                                            data-geist-button=""
-                                            data-prefix="false"
-                                            data-suffix="false"
-                                            data-version="v1"
-                                            style={{ "--geist-icon-size": "16px" } as React.CSSProperties}
-                                        >
-                                            <span className="button_content__eYZtX button_flex___f_3o">
-                                                <span className="pointer-events-none flex rounded-md p-2">
-                                                    <Square className="h-4 w-4" />
-                                                </span>
-                                            </span>
-                                        </button>
-                                    ) : (
-                                        <button
-                                            type="button"
-                                            aria-label="Send Message"
-                                            onClick={handleSend}
-                                            disabled={!hasRequiredKey || isSubmitting || !currentInput.trim()}
-                                            className="button_base__IZQUR reset_reset__sz7UJ button_button__dyHAB reset_reset__sz7UJ geist-new-themed geist-new-tertiary geist-new-tertiary-fill button_tertiary__t8MGO button_shape__4NO5k button_small__BoUqH button_invert__WPMQW"
-                                            data-geist-button=""
-                                            data-prefix="false"
-                                            data-suffix="false"
-                                            data-version="v1"
-                                            style={{ "--geist-icon-size": "16px" } as React.CSSProperties}
-                                        >
-                                            <span className="button_content__eYZtX button_flex___f_3o">
-                                                <span className="pointer-events-none flex rounded-md p-2">
-                                                    <SendIcon className="h-4 w-4" />
-                                                </span>
-                                            </span>
-                                        </button>
-                                    )}
-                                </div>
+								{/* File display */}
+								{files.length > 0 && (
+									<div className="mb-2 flex w-full flex-wrap gap-2">
+										{files.map((file, index) => (
+											<div key={`${file.name}-${file.size}-${index}`} className="relative mr-2 mb-0 flex items-center">
+												<div className="flex w-full items-center gap-3 rounded-2xl border border-input bg-background p-2 pr-3 transition-colors hover:bg-accent">
+													<div className="flex h-10 w-10 flex-shrink-0 items-center justify-center overflow-hidden rounded-md bg-accent-foreground">
+														{file.contentType.includes("image") ? (
+															<img
+																src={file.url}
+																alt={file.name}
+																className="h-full w-full object-cover"
+															/>
+														) : (
+															<div className="text-center text-gray-400 text-xs">
+																{file.name.split(".").pop()?.toUpperCase()}
+															</div>
+														)}
+													</div>
+													<div className="flex flex-col overflow-hidden">
+														<span className="truncate font-medium text-xs">{file.name}</span>
+														<span className="text-gray-500 text-xs">
+															{(file.size / 1024).toFixed(2)}kB
+														</span>
+													</div>
+												</div>
+												<button
+													type="button"
+													onClick={() => handleFileRemove(file)}
+													className="-translate-y-1/2 absolute top-1 right-1 z-10 inline-flex size-6 translate-x-1/2 items-center justify-center rounded-full border-[3px] border-background bg-black text-white shadow-none transition-colors"
+													aria-label="Remove file"
+												>
+													<X className="size-3" />
+												</button>
+											</div>
+										))}
+									</div>
+								)}
+								{/* File upload button */}
+								{files.length === 0 && (
+									<label
+										htmlFor={`file-upload-${column.id}`}
+										className="absolute left-2 top-1/2 -translate-y-1/2 z-10 flex h-6 w-6 items-center justify-center rounded cursor-pointer hover:bg-muted/40"
+									>
+										<input
+											id={`file-upload-${column.id}`}
+											ref={fileInputRef}
+											type="file"
+											multiple
+											accept="image/*"
+											onChange={handleLocalFileChange}
+											className="hidden"
+											disabled={!hasRequiredKey}
+										/>
+										<Paperclip className="size-4 text-muted-foreground hover:text-primary" />
+									</label>
+								)}
+								<textarea
+									placeholder={
+										hasRequiredKey
+											? column.synced
+												? "Type a synced message..."
+												: "Type your message…"
+											: `Please add your ${columnSource === "aigateway" ? "Vercel AI Gateway" : "LLM Gateway"} API key to start chatting`
+									}
+									value={currentInput}
+									onChange={(e) => {
+										handleInputChange(e.target.value);
+										const target = e.target as HTMLTextAreaElement;
+										target.style.height = "auto";
+										target.style.height = `${Math.min(target.scrollHeight, 120)}px`;
+									}}
+									className={`max-h-[120px] min-h-[38px] flex-1 resize-none overflow-y-auto rounded-md border bg-background-100 py-2 pr-9 ${files.length === 0 ? 'pl-10' : 'pl-4'} text-sm focus:border-zinc-400 focus:outline-none focus:ring-0 disabled:cursor-not-allowed disabled:opacity-60 dark:focus:border-zinc-600`}
+									spellCheck="false"
+									rows={1}
+									style={{
+										fontFamily: "var(--font-geist-sans)",
+										height: "38px",
+										lineHeight: "1.5",
+									}}
+									disabled={!hasRequiredKey}
+									onKeyDown={(e) => {
+										if (e.key === "Enter" && !e.shiftKey) {
+											e.preventDefault();
+											if (!hasRequiredKey) return;
+											handleSend();
+										}
+									}}
+								/>
+								<div className="absolute right-1 bottom-[3px] inline-flex items-center justify-end">
+									{column.isStreaming || derivedStatus === "streaming" ? (
+										<button
+											type="button"
+											aria-label="Stop"
+											onClick={() =>
+												column.synced
+													? stopSyncedColumns()
+													: stopColumn(column.id)
+											}
+											className="button_base__IZQUR reset_reset__sz7UJ button_button__dyHAB reset_reset__sz7UJ geist-new-themed geist-new-tertiary geist-new-tertiary-fill button_tertiary__t8MGO button_shape__4NO5k button_small__BoUqH button_invert__WPMQW"
+											data-geist-button=""
+											data-prefix="false"
+											data-suffix="false"
+											data-version="v1"
+											style={
+												{ "--geist-icon-size": "16px" } as React.CSSProperties
+											}
+										>
+											<span className="button_content__eYZtX button_flex___f_3o">
+												<span className="pointer-events-none flex rounded-md p-2">
+													<Square className="h-4 w-4" />
+												</span>
+											</span>
+										</button>
+									) : (
+										<button
+											type="button"
+											aria-label="Send Message"
+											onClick={handleSend}
+											disabled={
+												!hasRequiredKey || isSubmitting || !currentInput.trim()
+											}
+											className="button_base__IZQUR reset_reset__sz7UJ button_button__dyHAB reset_reset__sz7UJ geist-new-themed geist-new-tertiary geist-new-tertiary-fill button_tertiary__t8MGO button_shape__4NO5k button_small__BoUqH button_invert__WPMQW"
+											data-geist-button=""
+											data-prefix="false"
+											data-suffix="false"
+											data-version="v1"
+											style={
+												{ "--geist-icon-size": "16px" } as React.CSSProperties
+											}
+										>
+											<span className="button_content__eYZtX button_flex___f_3o">
+												<span className="pointer-events-none flex rounded-md p-2">
+													<SendIcon className="h-4 w-4" />
+												</span>
+											</span>
+										</button>
+									)}
+								</div>
 							</form>
 						</div>
 					</div>

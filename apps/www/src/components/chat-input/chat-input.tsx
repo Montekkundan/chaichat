@@ -1,26 +1,20 @@
 "use client";
 import { api } from "@/convex/_generated/api";
-import { ArrowUp, Stop } from "@phosphor-icons/react";
+import { ArrowUp, Paperclip, Stop } from "@phosphor-icons/react";
 import { generateReactHelpers } from "@uploadthing/react";
 import { useAction } from "convex/react";
-import { Settings as SettingsIcon } from "lucide-react";
+
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { UploadRouter } from "~/app/api/uploadthing/core";
 import { CookiePreferencesModal } from "~/components/modals/cookie-preferences-modal";
-import { ModelConfigPanel } from "~/components/model-config/model-config";
-import { Button } from "~/components/ui/button";
-import { Button as UIButton } from "~/components/ui/button";
-import {
-	DropdownMenu,
-	DropdownMenuContent,
-	DropdownMenuTrigger,
-} from "~/components/ui/dropdown-menu";
+import { UnifiedConfigSheet } from "~/components/model-config";
 import {
 	PromptInput,
 	PromptInputAction,
 	PromptInputActions,
 	PromptInputTextarea,
 } from "~/components/prompt-kit/prompt-input";
+import { Button } from "~/components/ui/button";
 import { toast } from "~/components/ui/toast";
 import {
 	Tooltip,
@@ -29,15 +23,15 @@ import {
 } from "~/components/ui/tooltip";
 import { filterValidFiles } from "~/lib/file-upload/validation";
 import { useMessages } from "~/lib/providers/messages-provider";
+import { cn } from "~/lib/utils";
 import { FileList } from "./file-list";
 import { ModelSelector } from "./model-selector";
-import { cn } from "~/lib/utils";
 
 // TODO cleanup: use all user keys
 
 type UserKeys = {
-    llmGatewayApiKey?: string;
-    aiGatewayApiKey?: string;
+	llmGatewayApiKey?: string;
+	aiGatewayApiKey?: string;
 };
 
 type ChatInputProps = {
@@ -92,61 +86,85 @@ export function ChatInput({
 
 	// User keys state for search capabilities
 	const getKeys = useAction(api.userKeys.getKeys);
-  const [_userKeys, setUserKeys] = useState<UserKeys | undefined>(undefined);
-  const [hasLlmKey, setHasLlmKey] = useState<boolean>(false);
-  const [hasAiKey, setHasAiKey] = useState<boolean>(false);
-  const [modelsSource, setModelsSource] = useState<"llmgateway" | "aigateway">(
-    "llmgateway",
-  );
+	const [_userKeys, setUserKeys] = useState<UserKeys | undefined>(undefined);
+	const [hasLlmKey, setHasLlmKey] = useState<boolean>(false);
+	const [hasAiKey, setHasAiKey] = useState<boolean>(false);
+	const [modelsSource, setModelsSource] = useState<"llmgateway" | "aigateway">(
+		"llmgateway",
+	);
 
 	// Load user keys on mount
-  useEffect(() => {
-    const loadKeys = async () => {
-      if (isUserAuthenticated) {
-        const result = (await getKeys({})) as UserKeys;
-        setUserKeys(result);
-        setHasLlmKey(Boolean(result?.llmGatewayApiKey));
-        setHasAiKey(Boolean(result?.aiGatewayApiKey));
-      } else {
-        try {
-          const { getAllKeys } = await import("~/lib/local-keys");
-          const localKeys = await getAllKeys();
-          setUserKeys(localKeys);
-          setHasLlmKey(Boolean(localKeys?.llmGatewayApiKey));
-          setHasAiKey(Boolean(localKeys?.aiGatewayApiKey));
-        } catch {
-          setUserKeys({});
-          setHasLlmKey(false);
-          setHasAiKey(false);
-        }
-      }
-    };
+	useEffect(() => {
+		const loadKeys = async () => {
+			if (isUserAuthenticated) {
+				const result = (await getKeys({})) as UserKeys;
+				setUserKeys(result);
+				setHasLlmKey(Boolean(result?.llmGatewayApiKey));
+				setHasAiKey(Boolean(result?.aiGatewayApiKey));
+			} else {
+				try {
+					const { getAllKeys } = await import("~/lib/local-keys");
+					const localKeys = await getAllKeys();
+					setUserKeys(localKeys);
+					setHasLlmKey(Boolean(localKeys?.llmGatewayApiKey));
+					setHasAiKey(Boolean(localKeys?.aiGatewayApiKey));
+				} catch {
+					setUserKeys({});
+					setHasLlmKey(false);
+					setHasAiKey(false);
+				}
+			}
+		};
 
-    loadKeys();
-    const onKeysChanged = () => void loadKeys();
-    window.addEventListener("apiKeysChanged", onKeysChanged);
-    return () => window.removeEventListener("apiKeysChanged", onKeysChanged);
-  }, [isUserAuthenticated, getKeys]);
+		loadKeys();
+		const onKeysChanged = () => void loadKeys();
+		window.addEventListener("apiKeysChanged", onKeysChanged);
+		return () => window.removeEventListener("apiKeysChanged", onKeysChanged);
+	}, [isUserAuthenticated, getKeys]);
 
-  // Track current models source (global toggle in ModelSelector) to decide which key is required
-  useEffect(() => {
-    const readSource = () => {
-      try {
-        const raw = window.localStorage.getItem("chaichat_models_source");
-        setModelsSource(raw === "aigateway" ? "aigateway" : "llmgateway");
-      } catch {
-        setModelsSource("llmgateway");
-      }
-    };
-    readSource();
-    const onChange = () => readSource();
-    window.addEventListener("modelsSourceChanged", onChange as EventListener);
-    window.addEventListener("storage", onChange);
-    return () => {
-      window.removeEventListener("modelsSourceChanged", onChange as EventListener);
-      window.removeEventListener("storage", onChange);
-    };
-  }, []);
+	// Track current models source (global toggle in ModelSelector) to decide which key is required
+	useEffect(() => {
+		const readSource = () => {
+			try {
+				const raw = window.localStorage.getItem("chaichat_models_source");
+				setModelsSource(raw === "aigateway" ? "aigateway" : "llmgateway");
+			} catch {
+				setModelsSource("llmgateway");
+			}
+		};
+		readSource();
+		const onChange = () => readSource();
+		window.addEventListener("modelsSourceChanged", onChange as EventListener);
+		window.addEventListener("storage", onChange);
+		return () => {
+			window.removeEventListener(
+				"modelsSourceChanged",
+				onChange as EventListener,
+			);
+			window.removeEventListener("storage", onChange);
+		};
+	}, []);
+
+	// Track storage provider
+	const [storageProvider, setStorageProvider] = useState<"uploadthing" | "vercelblob">("uploadthing");
+	useEffect(() => {
+		const readStorageProvider = () => {
+			try {
+				const raw = window.localStorage.getItem("chai-storage-provider");
+				setStorageProvider(raw === "vercelblob" ? "vercelblob" : "uploadthing");
+			} catch {
+				setStorageProvider("uploadthing");
+			}
+		};
+		readStorageProvider();
+		const onChange = () => readStorageProvider();
+		window.addEventListener("storageProviderChanged", onChange);
+		window.addEventListener("storage", onChange);
+		return () => {
+			window.removeEventListener("storageProviderChanged", onChange);
+			window.removeEventListener("storage", onChange);
+		};
+	}, []);
 
 	// For now, enable search for all models - LLM Gateway will handle capabilities
 	// const allowWebSearch = true;
@@ -154,16 +172,75 @@ export function ChatInput({
 	// Helper to check if a string is only whitespace characters
 	const isOnlyWhitespace = (text: string) => !/[^\s]/.test(text);
 
-	// Determine if the current model supports file/image attachments.
-	// Prefer explicit `attachments` flag, otherwise fall back to models that have vision capability.
-	const supportsAttachments = true; // Assume all models support attachments via LLM Gateway	// -------- UploadThing setup (must come before handlers that use startUpload) --------
+	// TODO: check model support for attachments
+	const supportsAttachments = true; // Assume all models support attachments via LLM Gateway
+
 	const uploadHelpers = generateReactHelpers<UploadRouter>();
 	const { useUploadThing } = uploadHelpers;
 	const { startUpload, isUploading } = useUploadThing("chatFiles");
 
+	// File input ref for manual file selection
+	const fileInputRef = useRef<HTMLInputElement>(null);
+
+	const uploadFile = useCallback(async (file: File): Promise<{ url: string; name: string; size: number; contentType: string } | null> => {
+		if (storageProvider === "vercelblob") {
+			// Upload to Vercel Blob
+			const formData = new FormData();
+			formData.append("file", file);
+
+			// Get localStorage keys to pass to the API
+			const localKeys = {
+				llmGatewayApiKey: localStorage.getItem("chaichat_keys_llmgateway") || undefined,
+				aiGatewayApiKey: localStorage.getItem("chaichat_keys_aigateway") || undefined,
+				uploadThingApiKey: localStorage.getItem("chaichat_keys_uploadthing") || undefined,
+				vercelBlobApiKey: localStorage.getItem("chaichat_keys_vercelblob") || undefined,
+				storageProvider: localStorage.getItem("chai-storage-provider") || "uploadthing",
+			};
+
+			const response = await fetch("/api/upload/vercel-blob", {
+				method: "POST",
+				body: formData,
+				headers: {
+					"X-Local-Keys": JSON.stringify(localKeys),
+				},
+			});
+
+			if (response.ok) {
+				const data = await response.json();
+				return {
+					url: data.file.url,
+					name: data.file.name,
+					size: data.file.size,
+					contentType: data.file.contentType,
+				};
+			}
+			const error = await response.json();
+			throw new Error(error.error || "Failed to upload to Vercel Blob");
+		}
+
+		// Upload to UploadThing
+		const uploadResult = await startUpload([file]);
+		if (uploadResult?.[0]) {
+			const uploadedFile = uploadResult[0];
+			// Prefer ufsUrl when available (UploadThing v9+)
+			// biome-ignore lint/suspicious/noExplicitAny: upstream client type
+			const anyFile = uploadedFile as any;
+			const finalUrl = typeof anyFile.ufsUrl === 'string' && anyFile.ufsUrl.length > 0 ? anyFile.ufsUrl : uploadedFile.url;
+			return {
+				url: finalUrl,
+				name: uploadedFile.name || file.name,
+				size: uploadedFile.size || file.size,
+				contentType: file.type,
+			};
+		}
+		throw new Error("Failed to upload to UploadThing");
+	}, [storageProvider, startUpload]);
 
 	// Track files selected/pasted but not yet uploaded
 	const pendingFilesRef = useRef<File[]>([]);
+
+	const [isDragOver, setIsDragOver] = useState(false);
+	const [_dragCounter, setDragCounter] = useState(0);
 
 	// Handle paste events (defined after startUpload to avoid TS errors)
 	const _handlePaste = useCallback(
@@ -227,43 +304,225 @@ export function ChatInput({
 		[isUserAuthenticated, onFileUpload, files.length],
 	);
 
+	const handleDragEnter = useCallback((e: React.DragEvent) => {
+		e.preventDefault();
+		e.stopPropagation();
+		setDragCounter(prev => prev + 1);
+		if (e.dataTransfer?.types.includes('Files')) {
+			setIsDragOver(true);
+		}
+	}, []);
+
+	const handleDragLeave = useCallback((e: React.DragEvent) => {
+		e.preventDefault();
+		e.stopPropagation();
+		setDragCounter(prev => {
+			const newCounter = prev - 1;
+			if (newCounter === 0) {
+				setIsDragOver(false);
+			}
+			return newCounter;
+		});
+	}, []);
+
+	const handleDragOver = useCallback((e: React.DragEvent) => {
+		e.preventDefault();
+		e.stopPropagation();
+	}, []);
+
+	const handleDrop = useCallback(async (e: React.DragEvent) => {
+		e.preventDefault();
+		e.stopPropagation();
+		setIsDragOver(false);
+		setDragCounter(0);
+
+		if (!isUserAuthenticated) {
+			toast({ title: "Please log in to upload files", status: "error" });
+			return;
+		}
+
+		const droppedFiles = Array.from(e.dataTransfer.files);
+		if (droppedFiles.length === 0) return;
+
+		// Filter for image files only
+		const imageFiles = droppedFiles.filter(file => file.type.startsWith('image/'));
+
+		if (imageFiles.length === 0) {
+			toast({ title: "Please drop image files only", status: "error" });
+			return;
+		}
+
+		// Validate against limits and mime types
+		const { validFiles, errors } = filterValidFiles(
+			imageFiles,
+			files.length,
+		);
+		if (errors.length) {
+			toast({ title: errors.join("\n"), status: "error" });
+		}
+
+		if (validFiles.length === 0) return;
+
+		// Create local preview objects and queue files
+		const previews = validFiles.map((file) => {
+			pendingFilesRef.current.push(file);
+			return {
+				name: file.name,
+				url: URL.createObjectURL(file),
+				contentType: file.type,
+				size: file.size,
+				local: true,
+			} as import("./file-items").UploadedFile;
+		});
+		onFileUpload(previews);
+	}, [isUserAuthenticated, onFileUpload, files.length]);
+
 	// Web search toggle state
 	const [isSearchEnabled, _setIsSearchEnabled] = useState(false);
 	// const toggleSearch = () => {
 	//   setIsSearchEnabled((prev) => !prev);
 	// };
 
-  // Derived: does the current source have the required key?
-  const hasRequiredKey = modelsSource === "aigateway" ? hasAiKey : hasLlmKey;
-    const handleSend = useCallback(async () => {
-        // Streaming: call stop immediately (do not block on isSubmitting)
-        if (status === "streaming") {
-            // Always stop client-side consumption of the stream
-            // even if the provider may not support server-side cancellation.
-            stop();
-            return;
-        }
+	// Derived: does the current source have the required key?
+	const hasRequiredKey = modelsSource === "aigateway" ? hasAiKey : hasLlmKey;
+	const handleSend = useCallback(async () => {
+		// Streaming: call stop immediately (do not block on isSubmitting)
+		if (status === "streaming") {
+			// Always stop client-side consumption of the stream
+			// even if the provider may not support server-side cancellation.
+			stop();
+			return;
+		}
 
-        if (isSubmitting || disabled) {
-            return;
-        }
+		if (isSubmitting || disabled) {
+			return;
+		}
 
-		// Prepare attachment list (defaults to current files prop)
+		const inputValue = value.trim();
+
+		// Check for image generation commands
+		// TODO: we should not need patterns for this
+		const imageGenPatterns = [
+			/^\/generate\s+(.+)$/i,
+			/^\/image\s+(.+)$/i,
+			/^\/img\s+(.+)$/i,
+			/^\/dalle\s+(.+)$/i,
+		];
+
+		let imagePrompt: string | null = null;
+		for (const pattern of imageGenPatterns) {
+			const match = inputValue.match(pattern);
+			if (match && typeof match[1] === "string") {
+				imagePrompt = match[1].trim();
+				break;
+			}
+		}
+
+		if (imagePrompt) {
+			// Handle image generation
+			try {
+				// Note: isSubmitting is handled by the parent component
+
+				// Get localStorage keys to pass to the API
+				const localKeys = {
+					llmGatewayApiKey: localStorage.getItem("chaichat_keys_llmgateway") || undefined,
+					aiGatewayApiKey: localStorage.getItem("chaichat_keys_aigateway") || undefined,
+					uploadThingApiKey: localStorage.getItem("chaichat_keys_uploadthing") || undefined,
+					vercelBlobApiKey: localStorage.getItem("chaichat_keys_vercelblob") || undefined,
+					storageProvider: localStorage.getItem("chai-storage-provider") || "uploadthing",
+				};
+
+				const response = await fetch("/api/chat", {
+					method: "POST",
+					headers: {
+						"Content-Type": "application/json",
+						"X-Local-Keys": JSON.stringify(localKeys),
+					},
+					body: JSON.stringify({
+						imageGeneration: {
+							prompt: imagePrompt,
+							size: "1024x1024",
+							model: selectedModel.includes("dall-e") ? selectedModel : "openai/dall-e-3",
+							n: 1,
+						},
+						gateway: modelsSource === "aigateway" ? "vercel-ai-gateway" : "llm-gateway",
+					}),
+				});
+
+				if (response.ok) {
+					const result = await response.json();
+					if (result.images && result.images.length > 0) {
+						// Convert generated images to attachment format
+						const generatedAttachments = result.images.map((img: { name: string; url: string; contentType: string; size: number }) => ({
+							name: img.name,
+							url: img.url,
+							contentType: img.contentType,
+							size: img.size,
+							local: false,
+						})) as import("./file-items").UploadedFile[];
+
+						// Add generated images to the attachments
+						onFileUpload([...files, ...generatedAttachments]);
+
+						toast({
+							title: `Generated ${result.images.length} image(s)`,
+							status: "success"
+						});
+
+						// Clear the input
+						onValueChange("");
+					} else {
+						toast({ title: "No images were generated", status: "error" });
+					}
+				} else {
+					const error = await response.json();
+					toast({
+						title: "Image generation failed",
+						description: error.details || error.error,
+						status: "error"
+					});
+				}
+							} catch (err) {
+					console.error("Image generation error:", err);
+					toast({ title: "Failed to generate image", status: "error" });
+				}
+			return;
+		}
+
+			// Prepare attachment list (defaults to current files prop)
 		let attachmentsToSend: import("./file-items").UploadedFile[] = files;
 
-		// First, upload any pending local files
-		if (pendingFilesRef.current.length > 0) {
+		// Collect all local files that need to be uploaded
+		const localFilesFromPending = pendingFilesRef.current;
+		const localFilesFromProps = files.filter(f => f.local === true);
+
+		console.log('Local files from pending:', localFilesFromPending.length);
+		console.log('Local files from props:', localFilesFromProps.length);
+
+		// Convert local UploadedFile objects to File objects for upload
+		const filesToUpload: File[] = [];
+
+		// Only use files from pendingFilesRef to avoid duplicates
+		// The files prop should contain the same files after they're uploaded
+		filesToUpload.push(...localFilesFromPending);
+
+		// Upload any local files
+		if (filesToUpload.length > 0) {
 			try {
-				const uploadRes = await startUpload(pendingFilesRef.current);
-				if (!uploadRes) throw new Error("Upload failed");
-				const uploaded = uploadRes.map(
-					(r: { name: string; url: string }, idx: number) => ({
-						name: r.name,
-						url: r.url,
-						contentType: pendingFilesRef.current[idx]?.type ?? "",
-						size: pendingFilesRef.current[idx]?.size ?? 0,
-					}),
-				) as import("./file-items").UploadedFile[];
+				console.log(`Uploading ${filesToUpload.length} files`);
+				const uploadPromises = filesToUpload.map(file => uploadFile(file));
+				const uploadResults = await Promise.all(uploadPromises);
+
+				const uploaded = uploadResults
+					.filter((result): result is NonNullable<typeof result> => result !== null)
+					.map(result => ({
+						name: result.name,
+						url: result.url,
+						contentType: result.contentType,
+						size: result.size,
+					})) as import("./file-items").UploadedFile[];
+
+				console.log('Upload results:', uploaded);
 
 				const newList = files.filter((f) => !f.local).concat(uploaded);
 				// Update Chat state so previews convert to real files
@@ -286,10 +545,14 @@ export function ChatInput({
 		status,
 		stop,
 		onSend,
-		startUpload,
 		files,
 		onFileUpload,
 		isSearchEnabled,
+		value,
+		onValueChange,
+		selectedModel,
+		modelsSource,
+		uploadFile,
 	]);
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: <explanation>
@@ -323,17 +586,13 @@ export function ChatInput({
 	);
 
 	// ---------------- Upload handling -----------------
-	const _fileInputRef = useRef<HTMLInputElement>(null);
 	const [showCookieModal, setShowCookieModal] = useState(false);
 
-	// Uploads are disabled when the selected model doesn't support attachments
-	const uploadDisabled = !supportsAttachments;
-
-	const _handleLocalFileChange = async (
+	// Handle manual file selection via click
+	const handleLocalFileChange = async (
 		e: React.ChangeEvent<HTMLInputElement>,
 	) => {
-		if (uploadDisabled) return;
-		if (!e.target.files) return;
+		if (!supportsAttachments || !e.target.files) return;
 		const rawFiles = Array.from(e.target.files);
 
 		const { validFiles, errors } = filterValidFiles(rawFiles, files.length);
@@ -364,6 +623,11 @@ export function ChatInput({
 		e.target.value = "";
 	};
 
+	// Uploads are disabled when the selected model doesn't support attachments
+	const uploadDisabled = !supportsAttachments;
+
+
+
 	const handleFileRemove = (file: import("./file-items").UploadedFile) => {
 		onFileRemove(file);
 		if (file.local) {
@@ -375,10 +639,28 @@ export function ChatInput({
 
 	// Model configuration state from messages provider
 	const { modelConfig, setModelConfig } = useMessages();
-	const [isConfigMenuOpen, setIsConfigMenuOpen] = useState(false);
 
 	const mainContent = (
-		<div className={cn("w-full max-w-3xl", "")}>
+		<div
+			className={cn(
+				"w-full max-w-3xl relative",
+				isDragOver && "ring-2 ring-primary ring-offset-2 ring-offset-background"
+			)}
+			onDragEnter={handleDragEnter}
+			onDragLeave={handleDragLeave}
+			onDragOver={handleDragOver}
+			onDrop={handleDrop}
+		>
+			{/* Drag overlay */}
+			{isDragOver && (
+				<div className="absolute inset-0 z-20 bg-primary/10 backdrop-blur-sm rounded-lg border-2 border-dashed border-primary flex items-center justify-center">
+					<div className="text-center text-primary">
+						<div className="text-2xl mb-2">📸</div>
+						<div className="font-medium">Drop images here</div>
+						<div className="text-sm text-muted-foreground">Supported: JPEG, PNG, WebP, GIF</div>
+					</div>
+				</div>
+			)}
 			<PromptInput
 				className={cn(
 					"relative z-10 bg-chat-background p-0 pt-1 shadow-xs backdrop-blur-xl",
@@ -410,25 +692,31 @@ export function ChatInput({
 				{supportsAttachments && (
 					<FileList files={files} onFileRemove={handleFileRemove} />
 				)}
-                {!hasRequiredKey ? (
+				{!hasRequiredKey ? (
 					<Tooltip>
 						<TooltipTrigger asChild>
 							<div>
 								<PromptInputTextarea
-                          placeholder={`Please add your ${modelsSource === "aigateway" ? "Vercel AI Gateway" : "LLM Gateway"} API key to start chatting`}
+									placeholder={`Please add your ${modelsSource === "aigateway" ? "Vercel AI Gateway" : "LLM Gateway"} API key to start chatting`}
 									onKeyDown={handleKeyDown}
 									onChange={(e) => onValueChange(e.target.value)}
-								className={cn(
-									"min-h-[44px] cursor-not-allowed pt-3 pl-4 text-base leading-[1.3] sm:text-base md:text-base",
-									textareaClassName,
-								)}
+									className={cn(
+										"min-h-[44px] cursor-not-allowed pt-3 pl-4 text-base leading-[1.3] sm:text-base md:text-base",
+										textareaClassName,
+									)}
 									disabled={true}
 									// ref={agentCommand.textareaRef}
 								/>
 							</div>
 						</TooltipTrigger>
 						<TooltipContent side="top">
-                      <div className="text-xs">Please add your {modelsSource === "aigateway" ? "Vercel AI Gateway" : "LLM Gateway"} API key</div>
+							<div className="text-xs">
+								Please add your{" "}
+								{modelsSource === "aigateway"
+									? "Vercel AI Gateway"
+									: "LLM Gateway"}{" "}
+								API key
+							</div>
 						</TooltipContent>
 					</Tooltip>
 				) : (
@@ -444,20 +732,23 @@ export function ChatInput({
 						// ref={agentCommand.textareaRef}
 					/>
 				)}
-                <PromptInputActions className="mt-5 w-full justify-between px-3 pb-3">
+				<PromptInputActions className="mt-5 w-full justify-between px-3 pb-3">
 					<div className="flex items-center gap-2">
-						{/* TODO: Implement file upload functionality */}
-						{/* {supportsAttachments && (
+						{supportsAttachments && (
 							<PromptInputAction tooltip="Attach files">
 								<label
-									className={`flex h-8 w-8 items-center justify-center rounded-2xl ${uploadDisabled ? "cursor-not-allowed opacity-40" : "cursor-pointer hover:bg-muted/40"}`}
+									htmlFor="file-upload"
+									className={`flex h-8 w-8 items-center justify-center rounded-2xl cursor-pointer hover:bg-muted/40 ${uploadDisabled ? "cursor-not-allowed opacity-40" : ""}`}
 								>
 									<input
+										id="file-upload"
 										ref={fileInputRef}
 										type="file"
 										multiple
+										accept="image/*"
 										onChange={handleLocalFileChange}
 										className="hidden"
+										disabled={uploadDisabled}
 									/>
 									{isUploading ? (
 										<svg
@@ -479,57 +770,34 @@ export function ChatInput({
 									)}
 								</label>
 							</PromptInputAction>
-						)} */}
+						)}
 						<ModelSelector
 							selectedModelId={selectedModel}
 							setSelectedModelId={onSelectModel}
 							className="rounded-full"
 						/>
-						{/* Model Configuration popover */}
-						<DropdownMenu
-							open={isConfigMenuOpen}
-							onOpenChange={(open) => {
-								setIsConfigMenuOpen(open);
-								if (open) {
-									setTimeout(() => {
-										const el = document.getElementById(
-											"temperature",
-										) as HTMLInputElement | null;
-										el?.focus();
-										el?.select?.();
-									}, 0);
-								}
+						{/* Unified Model & Provider Configuration Sheet */}
+						<UnifiedConfigSheet
+							selectedModelId={selectedModel}
+							value={{
+								temperature: modelConfig.temperature,
+								maxOutputTokens: modelConfig.maxOutputTokens,
+								topP: modelConfig.topP,
+								topK: modelConfig.topK,
+								frequencyPenalty: modelConfig.frequencyPenalty,
+								presencePenalty: modelConfig.presencePenalty,
+								openai: modelConfig.openai,
+								google: modelConfig.google,
+								anthropic: modelConfig.anthropic,
 							}}
-						>
-							<DropdownMenuTrigger asChild>
-								<UIButton
-									aria-label="Model Settings"
-									variant={"ghost"}
-									size={"icon"}
-								>
-									<span className="button_content__eYZtX button_flex___f_3o">
-										<span className="pointer-events-none flex rounded-md p-2">
-											<SettingsIcon className="h-4 w-4" />
-										</span>
-									</span>
-								</UIButton>
-							</DropdownMenuTrigger>
-							<DropdownMenuContent align="start" className="w-[420px]">
-								<div className="space-y-2 p-2">
-									<div className="px-1 font-semibold text-sm">
-										Model Configuration
-									</div>
-									<ModelConfigPanel
-										modelId={selectedModel}
-										// Narrow typing to the shared shape
-										// biome-ignore lint/suspicious/noExplicitAny: Component typing expects ChatColumn["config"]; runtime shape is compatible
-										value={modelConfig as unknown as any}
-										// biome-ignore lint/suspicious/noExplicitAny: See above note; we convert partials into provider setter
-										onChange={(u: any) => setModelConfig(u)}
-									/>
-								</div>
-							</DropdownMenuContent>
-						</DropdownMenu>
+							onChange={(update) => setModelConfig(update)}
+							gateway={
+								modelsSource === "aigateway"
+									? "vercel-ai-gateway"
+									: "llm-gateway"
+							}
+							disabled={!hasRequiredKey}
+						/>
 						{/* TODO: Implement web search functionality */}
 						{/* {allowWebSearch && (
 							<PromptInputAction
@@ -558,38 +826,42 @@ export function ChatInput({
 							</PromptInputAction>
 						)} */}
 					</div>
-                    <PromptInputAction
-                        tooltip={
-                            !hasRequiredKey
-                                ? `Please add your ${modelsSource === "aigateway" ? "Vercel AI Gateway" : "LLM Gateway"} API key`
-                                : status === "streaming"
-                                    ? "Stop"
-                                    : "Send"
-                        }
-                    >
-                        {(() => {
-                            const isStopPhase = status === "streaming";
-                            const isButtonDisabled = isStopPhase
-                                ? disabled || !hasRequiredKey
-                                : disabled || !hasRequiredKey || isUploading || ((isOnlyWhitespace(value) && files.length === 0)) || isSubmitting;
-                            const ariaLabel = isStopPhase ? "Stop" : "Send message";
-                            return (
-						<Button
-							size="sm"
-							className="size-9 rounded-full transition-all duration-300 ease-out"
-                            disabled={isButtonDisabled}
-							type="button"
-							onClick={handleSend}
-                            aria-label={ariaLabel}
-						>
-                            {isStopPhase ? (
-								<Stop className="size-4" />
-							) : (
-								<ArrowUp className="size-4" />
-							)}
-						</Button>
-                            );
-                        })()}
+					<PromptInputAction
+						tooltip={
+							!hasRequiredKey
+								? `Please add your ${modelsSource === "aigateway" ? "Vercel AI Gateway" : "LLM Gateway"} API key`
+								: status === "streaming"
+									? "Stop"
+									: "Send"
+						}
+					>
+						{(() => {
+							const isStopPhase = status === "streaming";
+							const isButtonDisabled = isStopPhase
+								? disabled || !hasRequiredKey
+								: disabled ||
+									!hasRequiredKey ||
+									isUploading ||
+									(isOnlyWhitespace(value) && files.length === 0) ||
+									isSubmitting;
+							const ariaLabel = isStopPhase ? "Stop" : "Send message";
+							return (
+								<Button
+									size="sm"
+									className="size-9 rounded-full transition-all duration-300 ease-out"
+									disabled={isButtonDisabled}
+									type="button"
+									onClick={handleSend}
+									aria-label={ariaLabel}
+								>
+									{isStopPhase ? (
+										<Stop className="size-4" />
+									) : (
+										<ArrowUp className="size-4" />
+									)}
+								</Button>
+							);
+						})()}
 					</PromptInputAction>
 				</PromptInputActions>
 			</PromptInput>

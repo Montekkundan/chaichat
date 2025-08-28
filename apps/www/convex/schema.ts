@@ -15,10 +15,14 @@ export default defineSchema({
     userId: v.string(),            // Clerk userId
     llmGatewayApiKey: v.optional(v.string()),
     aiGatewayApiKey: v.optional(v.string()),
+    uploadThingApiKey: v.optional(v.string()),
+    vercelBlobApiKey: v.optional(v.string()),
 
     // User preferences
     theme: v.optional(v.string()),
     preferredModels: v.optional(v.array(v.string())),
+    storageProvider: v.optional(v.union(v.literal("uploadthing"), v.literal("vercelblob"))),
+    imageGenerationModel: v.optional(v.string()), // Preferred model for image generation
   }),
   messages: defineTable({
     chatId: v.id("chats"),

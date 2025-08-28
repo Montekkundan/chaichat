@@ -146,8 +146,27 @@ export function CacheProvider({
 	const convex = useConvex();
 	const router = useRouter();
 	const routerRef = useRef(router);
-	const [chats, setChats] = useState<Chat[]>(initialChats);
-	const [isLoading, setIsLoading] = useState(initialChats.length === 0);
+	const [chats, setChats] = useState<Chat[]>(() => {
+		if (typeof window !== "undefined") {
+			try {
+				const raw = window.localStorage.getItem("cc_chats_ls");
+				if (raw) {
+					const parsed = JSON.parse(raw) as Chat[];
+					if (Array.isArray(parsed)) return parsed;
+				}
+			} catch {}
+		}
+		return initialChats;
+	});
+	const [isLoading, setIsLoading] = useState(() => {
+		if (typeof window !== "undefined") {
+			try {
+				const raw = window.localStorage.getItem("cc_chats_ls");
+				if (raw) return false;
+			} catch {}
+		}
+		return initialChats.length === 0;
+	});
 	const [isSyncing, setIsSyncing] = useState(false);
 
 	// Message cache - keyed by chatId
@@ -342,9 +361,14 @@ export function CacheProvider({
 				/* ignore parse errors */
 			}
 		}
+
+		// Request persistent storage to reduce eviction risk of Dexie + snapshots
+		try {
+			if (navigator?.storage?.persist) void navigator.storage.persist();
+		} catch {}
 	}, []);
 
-	// Persist minimal chat list (id + name) to cookie for fast SSR
+	// Persist minimal chat list (id + name) to cookie for fast SSR and to localStorage for sync hydration
 	useEffect(() => {
 		if (typeof document === "undefined") return;
 		try {
@@ -356,6 +380,10 @@ export function CacheProvider({
 			}));
 			const value = encodeURIComponent(JSON.stringify(minimal));
 			document.cookie = `cc_chats=${value}; path=/; max-age=604800; SameSite=Lax`;
+			// Also mirror full chats to localStorage for synchronous hydration
+			try {
+				window.localStorage.setItem("cc_chats_ls", JSON.stringify(chats));
+			} catch {}
 
 			// Also save chat titles to our dedicated chat titles cookie
 			for (const chat of chats) {
@@ -937,21 +965,67 @@ export function CacheProvider({
 				// If chatId is still optimistic, delay server sync until realId exists
 				let newMessageId: string | undefined;
 				if (!targetChatId.startsWith(OPTIMISTIC_PREFIX)) {
+					// --- Sanitize large content for Convex payload ---
+					const sanitizePartsJson = (raw?: string): string | undefined => {
+						if (!raw) return undefined;
+						try {
+							const _data = JSON.parse(raw) as unknown;
+							const walk = (node: unknown): unknown => {
+								if (node && typeof node === "object") {
+									if (Array.isArray(node)) return node.map(walk);
+									const out: Record<string, unknown> = {};
+									for (const [k, v] of Object.entries(node as Record<string, unknown>)) {
+										if (typeof v === "string") {
+											const isDataUrl = v.startsWith("data:");
+											if (isDataUrl && v.length > 2048) {
+												// Replace long data URLs with an omitted marker
+												out[k] = "[omitted-data-url]";
+												continue;
+											}
+										}
+										out[k] = walk(v);
+									}
+									return out;
+								}
+								return node;
+							};
+							const sanitized = walk(_data);
+							return JSON.stringify(sanitized);
+						} catch {
+							return undefined;
+						}
+					};
+					const sanitizeAttachments = (
+						atts?: {
+							name: string;
+							url: string;
+							contentType: string;
+							size: number;
+						}[],
+					) =>
+						Array.isArray(atts)
+							? atts.map((a) =>
+								({
+									...a,
+									url: a.url.startsWith("data:") && a.url.length > 2048 ? "" : a.url,
+								})
+							)
+							: undefined;
+
 					const convexData: Record<string, unknown> = {
 						chatId: targetChatId as Id<"chats">,
 						userId: messageData.userId,
 						role: messageData.role,
 						content: messageData.content,
 						model: messageData.model,
-						attachments: messageData.attachments,
+						attachments: sanitizeAttachments(messageData.attachments),
 						...(messageData.parentMessageId && {
 							parentMessageId: messageData.parentMessageId as Id<"messages">,
 						}),
 						...(messageData.version && { version: messageData.version }),
 					};
-					if (messageData.partsJson) {
-						convexData.partsJson = messageData.partsJson;
-					}
+					const sanitizedParts = sanitizePartsJson(messageData.partsJson);
+					if (sanitizedParts) convexData.partsJson = sanitizedParts;
 					newMessageId = await addMessageMutation(
 						convexData as unknown as {
 							chatId: Id<"chats">;

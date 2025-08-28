@@ -162,23 +162,23 @@ export function isOpenAIReasoningModel(modelId: string): boolean {
 		modelName.startsWith("o1-") ||
 		modelName === "o3" ||
 		modelName.startsWith("o3-") ||
+		modelName === "gpt-5" ||
+		modelName.startsWith("gpt-5") ||
 		modelName === "o4-mini" ||
-    modelName.startsWith("o4-mini-") ||
-    modelName === "gpt-5" ||
-    modelName.startsWith("gpt-5")
+		modelName.startsWith("o4-mini-")
 	);
 }
 
 export function isGoogleModel(modelId: string): boolean {
 	const { providerId } = parseProviderAndModel(modelId);
 	const rootProvider = providerId || modelId.split("/")[0];
-	return /^(google|gemini)$/i.test(rootProvider ?? "");
+	return /^(google|gemini|google-ai-studio)$/i.test(rootProvider ?? "");
 }
 
 export function isOpenAIProvider(modelId: string): boolean {
-  const { providerId } = parseProviderAndModel(modelId);
-  const rootProvider = providerId || modelId.split("/")[0];
-  return /^(openai|azure-openai)$/i.test(rootProvider ?? "");
+	const { providerId } = parseProviderAndModel(modelId);
+	const rootProvider = providerId || modelId.split("/")[0];
+	return /^(openai|azure-openai|openai-chat)$/i.test(rootProvider ?? "");
 }
 
 export function combineTextFromUIMessages(uiMessages: MessageAISDK[]): string {
@@ -222,55 +222,63 @@ export function combineTextFromUIMessages(uiMessages: MessageAISDK[]): string {
  * any message with empty content except the optional final assistant stub.
  * This runs after `convertToModelMessages` so content is normalized.
  */
-export function removeEmptyModelMessages<T extends { role: string; content: unknown }>(
-  messages: T[],
-): T[] {
-  if (!Array.isArray(messages)) return [];
+export function removeEmptyModelMessages<
+	T extends { role: string; content: unknown },
+>(messages: T[]): T[] {
+	if (!Array.isArray(messages)) return [];
 
-  const isNonEmpty = (content: unknown): boolean => {
-    if (content == null) return false;
-    if (typeof content === "string") return content.trim().length > 0;
-    if (Array.isArray(content)) {
-      // Heuristic: keep if any text part has non-empty text
-      for (const part of content as unknown[]) {
-        if (
-          part &&
-          typeof part === "object" &&
-          // biome-ignore lint/suspicious/noExplicitAny: shape from provider
-          (part as any).type === "text" &&
-          typeof (part as { text?: unknown }).text === "string" &&
-          ((part as { text: string }).text.trim().length > 0)
-        ) {
-          return true;
-        }
-      }
-      return false;
-    }
-    if (typeof content === "object") {
-      // Try common single-part shape { type: 'text', text: string }
-      const maybeText = (content as { text?: unknown }).text;
-      if (typeof maybeText === "string") return maybeText.trim().length > 0;
-      // Unknown object content: assume non-empty to avoid dropping valid structured content
-      return true;
-    }
-    // Primitives other than string are treated as empty
-    return false;
-  };
+	const isNonEmpty = (content: unknown): boolean => {
+		if (content == null) return false;
+		if (typeof content === "string") return content.trim().length > 0;
+		if (Array.isArray(content)) {
+			// Heuristic: keep if any text part has non-empty text OR any image/file part exists
+			for (const part of content as unknown[]) {
+				if (
+					part &&
+					typeof part === "object" &&
+					// biome-ignore lint/suspicious/noExplicitAny: shape from provider
+					(part as any).type === "text" &&
+					typeof (part as { text?: unknown }).text === "string" &&
+					(part as { text: string }).text.trim().length > 0
+				) {
+					return true;
+				}
+				if (
+					part &&
+					typeof part === "object" &&
+					// biome-ignore lint/suspicious/noExplicitAny: shape from provider
+					((part as any).type === "image" || (part as any).type === "file")
+				) {
+					return true;
+				}
+			}
+			return false;
+		}
+		if (typeof content === "object") {
+			// Try common single-part shape { type: 'text', text: string }
+			const maybeText = (content as { text?: unknown }).text;
+			if (typeof maybeText === "string") return maybeText.trim().length > 0;
+			// Unknown object content: assume non-empty to avoid dropping valid structured content
+			return true;
+		}
+		// Primitives other than string are treated as empty
+		return false;
+	};
 
-  const filtered: T[] = messages.filter((m) => isNonEmpty(m?.content));
+	const filtered: T[] = messages.filter((m) => isNonEmpty(m?.content));
 
-  // Special-case: if the last message is assistant and empty, drop it
-  if (filtered.length > 0) {
-    const last = filtered[filtered.length - 1] as T | undefined;
-    if (last) {
-      const lastIsEmpty = !isNonEmpty((last as { content: unknown }).content);
-      if (lastIsEmpty && (last as { role: string }).role === "assistant") {
-        filtered.pop();
-      }
-    }
-  }
+	// Special-case: if the last message is assistant and empty, drop it
+	if (filtered.length > 0) {
+		const last = filtered[filtered.length - 1] as T | undefined;
+		if (last) {
+			const lastIsEmpty = !isNonEmpty((last as { content: unknown }).content);
+			if (lastIsEmpty && (last as { role: string }).role === "assistant") {
+				filtered.pop();
+			}
+		}
+	}
 
-  return filtered;
+	return filtered;
 }
 
 export type OpenAIConfig = {
@@ -296,21 +304,37 @@ export type GoogleConfig = {
 	thinkingConfig?: { thinkingBudget?: number; includeThoughts?: boolean };
 };
 
+export type AnthropicConfig = {
+	thinkingBudget?: number;
+	maxTokens?: number;
+	temperature?: number;
+	topP?: number;
+	topK?: number;
+};
+
 export function buildProviderOptions(params: {
 	modelId: string;
 	isOAIReasoning: boolean;
 	openai?: OpenAIConfig;
 	google?: GoogleConfig;
+	anthropic?: AnthropicConfig;
 	maxOutputTokens?: number;
 	system?: string;
 }): Record<string, Record<string, JSONValue>> | undefined {
-	const { modelId, isOAIReasoning, openai, google, maxOutputTokens, system } =
-		params;
+	const {
+		modelId,
+		isOAIReasoning,
+		openai,
+		google,
+		anthropic,
+		maxOutputTokens,
+		system,
+	} = params;
 	const { providerId } = parseProviderAndModel(modelId);
 	const rootProvider = providerId || modelId.split("/")[0];
 	const options: Record<string, Record<string, JSONValue>> = {};
 
-	if (/openai/i.test(rootProvider ?? "")) {
+	if (/^(openai|azure-openai|openai-chat)$/i.test(rootProvider ?? "")) {
 		const openaiOpts: Record<string, JSONValue> = {};
 		if (openai) {
 			const {
@@ -357,7 +381,11 @@ export function buildProviderOptions(params: {
 		if (Object.keys(openaiOpts).length > 0) options.openai = openaiOpts;
 	}
 
-	if (/^(google|gemini)$/i.test(rootProvider ?? "")) {
+	if (
+		/^(google|gemini|google-ai-studio|google-generative-ai)$/i.test(
+			rootProvider ?? "",
+		)
+	) {
 		const googleOpts: Record<string, JSONValue> = {};
 		if (google) {
 			const {
@@ -396,6 +424,22 @@ export function buildProviderOptions(params: {
 			googleOpts.systemInstruction = system;
 		}
 		if (Object.keys(googleOpts).length > 0) options.google = googleOpts;
+	}
+
+	if (/^(anthropic|anthropic-claude)$/i.test(rootProvider ?? "")) {
+		const anthropicOpts: Record<string, JSONValue> = {};
+		if (anthropic) {
+			const { thinkingBudget, maxTokens, temperature, topP, topK } = anthropic;
+			if (typeof thinkingBudget === "number")
+				anthropicOpts.thinkingBudget = thinkingBudget;
+			if (typeof maxTokens === "number") anthropicOpts.maxTokens = maxTokens;
+			if (typeof temperature === "number")
+				anthropicOpts.temperature = temperature;
+			if (typeof topP === "number") anthropicOpts.topP = topP;
+			if (typeof topK === "number") anthropicOpts.topK = topK;
+		}
+		if (Object.keys(anthropicOpts).length > 0)
+			options.anthropic = anthropicOpts;
 	}
 
 	return Object.keys(options).length ? options : undefined;

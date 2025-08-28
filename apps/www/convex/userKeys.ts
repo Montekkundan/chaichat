@@ -7,7 +7,13 @@ import { v } from "convex/values";
 
 export const storeKey = mutation({
   args: {
-    provider: v.union(v.literal("llmgateway"), v.literal("aigateway")),
+    provider: v.union(
+      v.literal("llmgateway"),
+      v.literal("aigateway"),
+      v.literal("uploadthing"),
+      v.literal("vercelblob"),
+      v.literal("storage")
+    ),
     apiKey: v.string(),
   },
   handler: async (ctx, { provider, apiKey }) => {
@@ -17,27 +23,39 @@ export const storeKey = mutation({
     }
 
     const userId = identity.subject;
-    
+
     // Check if user already exists
     const existingUser = await ctx.db
       .query("users")
       .filter((q) => q.eq(q.field("userId"), userId))
       .first();
 
+    const updateData: any = {};
+
+    switch (provider) {
+      case "llmgateway":
+        updateData.llmGatewayApiKey = apiKey;
+        break;
+      case "aigateway":
+        updateData.aiGatewayApiKey = apiKey;
+        break;
+      case "uploadthing":
+        updateData.uploadThingApiKey = apiKey;
+        break;
+      case "vercelblob":
+        updateData.vercelBlobApiKey = apiKey;
+        break;
+      case "storage":
+        updateData.storageProvider = apiKey as "uploadthing" | "vercelblob";
+        break;
+    }
+
     if (existingUser) {
       // Update existing user
-      if (provider === "llmgateway") {
-        await ctx.db.patch(existingUser._id, { llmGatewayApiKey: apiKey });
-      } else {
-        await ctx.db.patch(existingUser._id, { aiGatewayApiKey: apiKey });
-      }
+      await ctx.db.patch(existingUser._id, updateData);
     } else {
-      // Create new user record
-      if (provider === "llmgateway") {
-        await ctx.db.insert("users", { userId, llmGatewayApiKey: apiKey });
-      } else {
-        await ctx.db.insert("users", { userId, aiGatewayApiKey: apiKey });
-      }
+      // Create new user record with the provided data
+      await ctx.db.insert("users", { userId, ...updateData });
     }
   },
 });
@@ -67,17 +85,26 @@ export const getKeys = action({
       return {};
     }
 
-    // Return BYOK keys
+    // Return all stored keys
     return {
       llmGatewayApiKey: user.llmGatewayApiKey,
       aiGatewayApiKey: user.aiGatewayApiKey,
+      uploadThingApiKey: user.uploadThingApiKey,
+      vercelBlobApiKey: user.vercelBlobApiKey,
+      storageProvider: user.storageProvider,
+      imageGenerationModel: user.imageGenerationModel,
     };
   },
 });
 
 export const removeKey = mutation({
   args: {
-    provider: v.union(v.literal("llmgateway"), v.literal("aigateway")),
+    provider: v.union(
+      v.literal("llmgateway"),
+      v.literal("aigateway"),
+      v.literal("uploadthing"),
+      v.literal("vercelblob")
+    ),
   },
   handler: async (ctx, { provider }) => {
     const identity = await ctx.auth.getUserIdentity();
@@ -92,11 +119,24 @@ export const removeKey = mutation({
       .first();
 
     if (user) {
-      if (provider === "llmgateway") {
-        await ctx.db.patch(user._id, { llmGatewayApiKey: undefined });
-      } else {
-        await ctx.db.patch(user._id, { aiGatewayApiKey: undefined });
+      const updateData: any = {};
+
+      switch (provider) {
+        case "llmgateway":
+          updateData.llmGatewayApiKey = undefined;
+          break;
+        case "aigateway":
+          updateData.aiGatewayApiKey = undefined;
+          break;
+        case "uploadthing":
+          updateData.uploadThingApiKey = undefined;
+          break;
+        case "vercelblob":
+          updateData.vercelBlobApiKey = undefined;
+          break;
       }
+
+      await ctx.db.patch(user._id, updateData);
     }
   },
 });
@@ -114,6 +154,38 @@ export const getUserKeysForAPI = action({
     return {
       llmGatewayApiKey: user.llmGatewayApiKey,
       aiGatewayApiKey: user.aiGatewayApiKey,
+      uploadThingApiKey: user.uploadThingApiKey,
+      vercelBlobApiKey: user.vercelBlobApiKey,
+      storageProvider: user.storageProvider,
     };
+  },
+});
+
+// Set user preferences (like image generation model)
+export const setUserPreference = mutation({
+  args: {
+    key: v.union(v.literal("imageGenerationModel")),
+    value: v.string(),
+  },
+  handler: async (ctx, { key, value }) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Not authenticated");
+    }
+
+    const userId = identity.subject;
+    const user = await ctx.db
+      .query("users")
+      .filter((q) => q.eq(q.field("userId"), userId))
+      .first();
+
+    const updateData: any = {};
+    updateData[key] = value;
+
+    if (user) {
+      await ctx.db.patch(user._id, updateData);
+    } else {
+      await ctx.db.insert("users", { userId, [key]: value });
+    }
   },
 }); 

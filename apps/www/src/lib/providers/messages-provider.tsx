@@ -30,12 +30,13 @@ type UploadedFile = {
 };
 
 // Extended message type with Convex ID for persistence
-type ExtendedMessage = UIMessage & {
+export type ExtendedMessage = UIMessage & {
 	convexId?: string;
 	parentMessageId?: string;
 	model?: string;
 	_creationTime?: number;
 	gateway?: "llm-gateway" | "vercel-ai-gateway";
+	attachments?: UploadedFile[];
 };
 
 type ModelConfig = {
@@ -64,6 +65,13 @@ type ModelConfig = {
 		responseModalities?: string[];
 		thinkingConfig?: { thinkingBudget?: number; includeThoughts?: boolean };
 	};
+	anthropic?: {
+		thinkingBudget?: number;
+		maxTokens?: number;
+		temperature?: number;
+		topP?: number;
+		topK?: number;
+	};
 };
 
 const createDefaultConfig = (): ModelConfig => ({
@@ -91,6 +99,13 @@ const createDefaultConfig = (): ModelConfig => ({
 		safetySettings: undefined,
 		responseModalities: undefined,
 		thinkingConfig: undefined,
+	},
+	anthropic: {
+		thinkingBudget: undefined,
+		maxTokens: undefined,
+		temperature: undefined,
+		topP: undefined,
+		topK: undefined,
 	},
 });
 
@@ -294,10 +309,20 @@ export function MessagesProvider({ children, chatId }: MessagesProviderProps) {
 
 				const userApiKeys = await getUserApiKeys();
 				const gateway = (() => {
+					// First check the current ref, then fall back to localStorage
+					const refGateway = currentGatewayRef.current;
+					if (refGateway && refGateway !== 'llm-gateway') {
+						console.log('Using gateway from ref:', refGateway);
+						return refGateway;
+					}
+
 					try {
 						const src = window.localStorage.getItem("chaichat_models_source");
-						return src === "aigateway" ? "vercel-ai-gateway" : "llm-gateway";
+						const lsGateway = src === "aigateway" ? "vercel-ai-gateway" : "llm-gateway";
+						console.log('Using gateway from localStorage:', lsGateway, 'src:', src);
+						return lsGateway;
 					} catch {
+						console.log('Using default gateway: llm-gateway');
 						return "llm-gateway";
 					}
 				})();
@@ -500,6 +525,12 @@ export function MessagesProvider({ children, chatId }: MessagesProviderProps) {
 								_creationTime?: number;
 								parentMessageId?: string;
 								gateway?: "llm-gateway" | "vercel-ai-gateway";
+								attachments?: {
+									name: string;
+									url: string;
+									contentType: string;
+									size: number;
+								}[];
 							}>;
 							if (Array.isArray(parsed) && parsed.length > 0) {
 								const v5: ExtendedMessage[] = parsed.map((m) => {
@@ -522,6 +553,7 @@ export function MessagesProvider({ children, chatId }: MessagesProviderProps) {
 										model: m.model,
 										gateway: m.gateway,
 										_creationTime: m._creationTime,
+										attachments: m.attachments,
 									} as ExtendedMessage;
 								});
 								setMessages(v5);
@@ -556,6 +588,7 @@ export function MessagesProvider({ children, chatId }: MessagesProviderProps) {
 								| "vercel-ai-gateway"
 								| undefined,
 							_creationTime: msg._creationTime,
+							attachments: msg.attachments,
 						} as ExtendedMessage;
 					});
 					setMessages(v5Messages);
@@ -615,35 +648,119 @@ export function MessagesProvider({ children, chatId }: MessagesProviderProps) {
 				return;
 			}
 
-			// Handle new chat creation if no chatId
-			let targetChatId = chatId;
-			if (!chatId || chatId === "new") {
-				try {
-					// Create new chat
-					targetChatId = await createNewChat(message, selectedModel);
+				// Handle new chat creation if no chatId
+				let targetChatId = chatId;
+				if (!chatId || chatId === "new") {
+					try {
+						// Create new chat
+						targetChatId = await createNewChat(message, selectedModel);
 
-					// Navigate to the new chat with the message as a query parameter
-					const url = `/chat/${targetChatId}?message=${encodeURIComponent(message)}`;
-					router.push(url);
-					return;
-				} catch (error) {
-					console.error("Failed to create new chat:", error);
-					return;
+						// Persist pending payload (message + attachments) for the next page
+						try {
+							const pending = {
+								chatId: targetChatId,
+								message,
+								attachments,
+							};
+							window.localStorage.setItem("chaichat_pending_send", JSON.stringify(pending));
+						} catch {}
+
+						// Navigate to the new chat with the message as a query parameter (for text fallback)
+						const url = `/chat/${targetChatId}?message=${encodeURIComponent(message)}`;
+						router.push(url);
+						return;
+					} catch (error) {
+						console.error("Failed to create new chat:", error);
+						return;
+					}
 				}
-			}
 
 			setIsSubmitting(true);
 
 			try {
+				const messageText = message;
+
+				// Check if model supports vision
+				const modelParts = selectedModel.split('/');
+				const provider = modelParts[0];
+				const modelName = modelParts[1] || selectedModel;
+
+				const visionModels = ['gpt-4-vision-preview', 'gpt-4o', 'gpt-4o-mini'];
+				const supportsVision = provider === 'openai' && visionModels.some(vm => modelName.includes(vm));
+
+				console.log('Model supports vision:', supportsVision);
+
+				// Check if we need to warn about non-vision model with images
+				if (!supportsVision && attachments && attachments.some(att => att.contentType.startsWith('image/'))) {
+					console.warn('User is trying to send images with a non-vision model:', selectedModel);
+					console.warn('Vision-capable models include: gpt-4-vision-preview, gpt-4o, gpt-4o-mini');
+
+					// If using an invalid model, try to correct it
+					if (selectedModel === 'openai/gpt-4.1') {
+						console.log('Detected invalid model gpt-4.1, this might be causing the issue');
+						console.log('Suggesting user switch to gpt-4o for vision capabilities');
+					}
+				}
+
+				// For vision models, we need to send images in the proper format
+				// Include image attachments as separate parts in the message
+				console.log('Processing attachments:', attachments);
+				type TextPart = { type: 'text'; text: string };
+				type FilePart = { type: 'file'; url: string; mediaType?: string; filename?: string };
+				type MessagePart = TextPart | FilePart;
+				let messageParts: MessagePart[] = [{ type: 'text', text: messageText }];
+
+				// Declare imageAttachments outside the conditional block
+				let imageAttachments: UploadedFile[] = [];
+
+				if (attachments && attachments.length > 0) {
+					imageAttachments = attachments.filter(att => att.contentType.startsWith('image/'));
+					console.log('Image attachments found:', imageAttachments);
+
+					if (imageAttachments.length > 0) {
+						// Add image attachments as file parts for better provider compatibility
+						const fileParts = imageAttachments.map(att => ({
+							type: 'file' as const,
+							url: att.url,
+							mediaType: att.contentType,
+							filename: att.name,
+						}));
+
+						messageParts = [...messageParts, ...fileParts];
+						console.log('Message parts with images:', messageParts);
+
+						// Test if image URLs are accessible
+						for (const att of imageAttachments) {
+							console.log('Testing image URL accessibility:', att.url);
+							try {
+								fetch(att.url, { method: 'HEAD' })
+									.then(response => {
+										console.log(`Image URL ${att.url} accessibility: ${response.status} ${response.statusText}`);
+										if (!response.ok) {
+											console.warn(`Image URL ${att.url} is not accessible: ${response.status}`);
+										}
+									})
+									.catch(error => {
+										console.error(`Failed to access image URL ${att.url}:`, error);
+									});
+							} catch (error) {
+								console.error(`Error testing image URL ${att.url}:`, error);
+							}
+						}
+					}
+				} else {
+					console.log('No attachments found');
+				}
+
 				// Persist user message to cache first
 				if (targetChatId && targetChatId !== "new") {
 					await cache.addMessage({
 						chatId: targetChatId,
 						userId: currentUserId,
 						role: "user",
-						content: message,
-						// Persist the user's input as text parts for consistency with v5 structure
-						partsJson: JSON.stringify([{ type: "text", text: message }]),
+						content: messageText,
+						// Persist the user's input with images as separate parts for vision models
+						partsJson: JSON.stringify(messageParts),
 						model: selectedModel,
 						attachments: attachments || [],
 						parentMessageId: undefined,
@@ -652,25 +769,59 @@ export function MessagesProvider({ children, chatId }: MessagesProviderProps) {
 						createdAt: Date.now(),
 						gateway: getGatewayLabel(),
 					});
+
 				}
 
-				// Send message using AI SDK v5
-				const _messageResult = await chatSendMessage({
-					text: message,
-				});
+				const placeholderId = `assistant-placeholder-${Date.now()}`;
+				setMessages((prev) => [
+					...prev,
+					{
+						id: placeholderId,
+						role: "assistant",
+						parts: createTextParts(""),
+						model: selectedModel,
+						gateway: getGatewayLabel(),
+						attachments: [], // Placeholder for assistant messages
+					} as ExtendedMessage,
+				]);
 
-				// Add model information to the user message that was just added
+				// Send message with proper format for vision models
+				const messageToSend = messageParts.length > 1
+					? { parts: messageParts }
+					: { text: messageText };
+				console.log('Sending message to AI:', messageToSend);
+				console.log('Message parts details:', messageParts.map((part, i) => ({
+					index: i,
+					type: part.type,
+					content: part.type === 'text' ? `${part.text.substring(0, 100)}...` : part.type === 'file' ? `FILE: ${part.url}` : part
+				})));
+
+				try {
+					await chatSendMessage(messageToSend as Parameters<typeof chatSendMessage>[0]);
+					console.log('Message sent successfully to AI');
+				} catch (error) {
+					console.error('Error sending message to AI:', error);
+					throw error;
+				}
+
+				// Add model information and preserve attachments in the user message
 				// We need to use a timeout to ensure the message has been added by the AI SDK
 				setTimeout(() => {
 					setMessages((prevMessages) => {
 						const updatedMessages = [...prevMessages];
 
-						// Find the most recent user message and add model info if it doesn't have it
+						// Find the most recent user message and add model info and attachments if missing
 						for (let i = updatedMessages.length - 1; i >= 0; i--) {
 							const msg = updatedMessages[i] as ExtendedMessage;
-							if (msg && msg.role === "user" && !msg.model) {
-								msg.model = selectedModel;
-								msg.gateway = getGatewayLabel();
+							if (msg && msg.role === "user") {
+								if (!msg.model) {
+									msg.model = selectedModel;
+									msg.gateway = getGatewayLabel();
+								}
+								// Preserve attachments from the original message
+								if (!msg.attachments && attachments.length > 0) {
+									msg.attachments = attachments;
+								}
 								break;
 							}
 						}
@@ -711,8 +862,29 @@ export function MessagesProvider({ children, chatId }: MessagesProviderProps) {
 				!isSubmitting &&
 				selectedModel
 			) {
-				const decodedMessage = decodeURIComponent(messageFromQuery);
-				await sendMessage(decodedMessage);
+				// First, check if a pending payload exists (attachments + message)
+				let handled = false;
+				try {
+					const raw = window.localStorage.getItem("chaichat_pending_send");
+					if (raw) {
+						const parsed = JSON.parse(raw) as {
+							chatId?: string;
+							message?: string;
+							attachments?: UploadedFile[];
+						} | null;
+						if (parsed && parsed.chatId === chatId) {
+							const msg = typeof parsed.message === 'string' ? parsed.message : decodeURIComponent(messageFromQuery);
+							await sendMessage(msg, Array.isArray(parsed.attachments) ? parsed.attachments : []);
+							handled = true;
+							window.localStorage.removeItem("chaichat_pending_send");
+						}
+					}
+				} catch {}
+
+				if (!handled) {
+					const decodedMessage = decodeURIComponent(messageFromQuery);
+					await sendMessage(decodedMessage);
+				}
 
 				// Clean up URL
 				const newUrl = new URL(window.location.href);
