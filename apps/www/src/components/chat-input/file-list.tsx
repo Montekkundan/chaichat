@@ -30,9 +30,9 @@ export function FileList({ files, onFileRemove }: FileListProps) {
 				>
 					<div className="flex flex-row overflow-x-auto pl-3">
 						<AnimatePresence initial={false}>
-							{files.map((file) => (
+							{files.map((file, idx) => (
 								<motion.div
-									key={file.name + file.size}
+									key={`${file.url ?? `${file.name}:${file.size}`}-${idx}`}
 									initial={{ width: 0 }}
 									animate={{ width: 180 }}
 									exit={{ width: 0 }}

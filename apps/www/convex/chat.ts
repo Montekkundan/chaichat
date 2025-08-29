@@ -4,8 +4,12 @@ import { v } from "convex/values";
 export const createChat = mutation({
   args: { name: v.string(), userId: v.string(), model: v.string(), parentChatId: v.optional(v.id("chats")), isPublic: v.optional(v.boolean()) },
   handler: async (ctx, { name, userId, model, parentChatId, isPublic = false }) => {
+    // Require authentication for server-side persistence
     const identity = await ctx.auth.getUserIdentity();
-    const actualUserId = identity?.subject || userId;
+    if (!identity?.subject) {
+      throw new Error("Unauthorized: login required to persist chats.");
+    }
+    const actualUserId = identity.subject || userId;
     const chatId = await ctx.db.insert("chats", {
       name,
       userId: actualUserId,
@@ -58,6 +62,11 @@ export const addMessage = mutation({
     ctx,
     { chatId, userId, role, content, partsJson, model, gateway, attachments, parentMessageId, version }
   ) => {
+    // Require authentication for server-side persistence
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity?.subject) {
+      throw new Error("Unauthorized: login required to persist messages.");
+    }
     const messageId = await ctx.db.insert("messages", {
       chatId,
       userId,
@@ -114,6 +123,10 @@ export const getMessages = query({
 export const deleteChat = mutation({
   args: { chatId: v.id("chats") },
   handler: async (ctx, { chatId }) => {
+    // Require authentication
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity?.subject) throw new Error("Unauthorized");
+
     // Delete all messages for this chat
     const messages = await ctx.db
       .query("messages")
@@ -154,6 +167,14 @@ export const searchChats = query({
 export const updateChatModel = mutation({
   args: { chatId: v.id("chats"), model: v.string() },
   handler: async (ctx, { chatId, model }) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity?.subject) throw new Error("Unauthorized");
+
+    // Optional: ensure only owner can update
+    try {
+      const chat = await ctx.db.get(chatId);
+      if (chat && chat.userId !== identity.subject) throw new Error("Not authorized");
+    } catch {}
     await ctx.db.patch(chatId, {
       currentModel: model,
     });
@@ -189,6 +210,8 @@ export const getMessageVersions = query({
 export const switchMessageVersion = mutation({
   args: { messageId: v.id("messages") },
   handler: async (ctx, { messageId }) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity?.subject) throw new Error("Unauthorized");
     const message = await ctx.db.get(messageId);
     if (!message) return;
 
@@ -254,6 +277,8 @@ export const getNextVersionNumber = query({
 export const markAsOriginalVersion = mutation({
   args: { messageId: v.id("messages") },
   handler: async (ctx, { messageId }) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity?.subject) throw new Error("Unauthorized");
     await ctx.db.patch(messageId, {
       version: 1,
       isActive: false, // The new regenerated version will be active
@@ -265,11 +290,12 @@ export const markAsOriginalVersion = mutation({
 export const toggleChatVisibility = mutation({
   args: { chatId: v.id("chats"), isPublic: v.boolean(), userId: v.string() },
   handler: async (ctx, { chatId, isPublic, userId }) => {
-    // Only the chat owner can toggle visibility
+    // Require auth and only the chat owner can toggle visibility
     const chat = await ctx.db.get(chatId);
     if (!chat) throw new Error("Chat not found");
 
     const identity = await ctx.auth.getUserIdentity();
+    if (!identity?.subject) throw new Error("Unauthorized");
     const actualUserId = identity?.subject || userId;
     if (chat.userId !== actualUserId) {
       throw new Error("Not authorized");

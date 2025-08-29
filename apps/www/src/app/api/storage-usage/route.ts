@@ -143,6 +143,7 @@ export async function GET(request: Request) {
 				// Use Vercel Blob SDK to list all blobs and calculate usage
 				const { blobs } = await list({
 					limit: 1000, // Get up to 1000 blobs to calculate usage
+					token: vercelBlobKey,
 				});
 
 				let totalBytes = 0;

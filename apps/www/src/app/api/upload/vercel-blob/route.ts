@@ -15,33 +15,25 @@ export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
 	try {
-		const user = await currentUser();
-		if (!user?.id) {
-			return new Response(
-				JSON.stringify({ error: "Unauthorized" }),
-				{ status: 401, headers: { "Content-Type": "application/json" } },
-			);
-		}
+        const user = await currentUser().catch(() => null);
 
 		// Get user's Vercel Blob API key - try Convex first, then fallback to localStorage
 		let vercelBlobKey: string | undefined;
-		try {
-			// Try to get keys from Convex for logged-in users
+		if (user?.id) {
 			try {
 				const convexKeys = await convex.action(
 					api.userKeys.getUserKeysForAPI,
-					{
-						userId: user.id,
-					},
+					{ userId: user.id },
 				) as { vercelBlobApiKey?: string };
 				if (convexKeys?.vercelBlobApiKey) {
 					vercelBlobKey = convexKeys.vercelBlobApiKey;
 				}
 			} catch (convexError) {
-				console.warn("Failed to get Vercel Blob API key from Convex, falling back to localStorage:", convexError);
+				console.warn(
+					"Failed to get Vercel Blob API key from Convex, falling back to localStorage:",
+					convexError,
+				);
 			}
-		} catch (error) {
-			console.warn("Failed to get current user:", error);
 		}
 
 		// Fallback to localStorage keys from request headers if keys not found in Convex
@@ -97,12 +89,14 @@ export async function POST(request: Request) {
 		try {
 			// Generate a unique filename
 			const timestamp = Date.now();
-			const filename = `user-${user.id}/${timestamp}-${file.name}`;
+			const userPrefix = user?.id ? `user-${user.id}` : "anon";
+			const filename = `${userPrefix}/${timestamp}-${file.name}`;
 
-			// Upload to Vercel Blob
+			// Upload to Vercel Blob with provided token
 			const blob = await put(filename, file, {
 				access: "public",
 				contentType: file.type,
+				token: vercelBlobKey,
 			});
 
 			return new Response(

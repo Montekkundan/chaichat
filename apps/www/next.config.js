@@ -10,6 +10,7 @@ const nextConfig = {
 		remotePatterns: [
 			{ protocol: "https", hostname: "utfs.io" },
 			{ protocol: "https", hostname: "pbs.twimg.com" },
+			{ protocol: "https", hostname: "*.public.blob.vercel-storage.com", pathname: "/**" },
 		],
 	},
 };

@@ -47,14 +47,14 @@ function saveMessagesSnapshotLocal(chatId: string, messages: Message[]): void {
 			LOCAL_MSG_PREFIX + chatId,
 			JSON.stringify(minimal),
 		);
-	} catch {}
+	} catch { }
 }
 
 function deleteMessagesSnapshotLocal(chatId: string): void {
 	if (typeof window === "undefined") return;
 	try {
 		window.localStorage.removeItem(LOCAL_MSG_PREFIX + chatId);
-	} catch {}
+	} catch { }
 }
 
 interface CacheContextType {
@@ -154,7 +154,7 @@ export function CacheProvider({
 					const parsed = JSON.parse(raw) as Chat[];
 					if (Array.isArray(parsed)) return parsed;
 				}
-			} catch {}
+			} catch { }
 		}
 		return initialChats;
 	});
@@ -163,7 +163,7 @@ export function CacheProvider({
 			try {
 				const raw = window.localStorage.getItem("cc_chats_ls");
 				if (raw) return false;
-			} catch {}
+			} catch { }
 		}
 		return initialChats.length === 0;
 	});
@@ -257,7 +257,7 @@ export function CacheProvider({
 						// Save local snapshot for instant hydration
 						try {
 							saveMessagesSnapshotLocal(chat._id, sortedMessages);
-						} catch {}
+						} catch { }
 					}
 				} else {
 					// Anonymous users: hydrate from Dexie using storage user id
@@ -284,7 +284,7 @@ export function CacheProvider({
 							messagesCache.current.set(chat._id, sortedMessages);
 							try {
 								saveMessagesSnapshotLocal(chat._id, sortedMessages);
-							} catch {}
+							} catch { }
 						}
 					} catch (error) {
 						console.error(
@@ -324,7 +324,7 @@ export function CacheProvider({
 						...c,
 						modelConfigJson: idToConfig.get(c._id) ?? c.modelConfigJson,
 					}));
-				} catch {}
+				} catch { }
 
 				if (user?.id) {
 					// For authenticated users: Update Dexie with fresh Convex data while preserving local-only fields
@@ -365,7 +365,7 @@ export function CacheProvider({
 		// Request persistent storage to reduce eviction risk of Dexie + snapshots
 		try {
 			if (navigator?.storage?.persist) void navigator.storage.persist();
-		} catch {}
+		} catch { }
 	}, []);
 
 	// Persist minimal chat list (id + name) to cookie for fast SSR and to localStorage for sync hydration
@@ -383,7 +383,7 @@ export function CacheProvider({
 			// Also mirror full chats to localStorage for synchronous hydration
 			try {
 				window.localStorage.setItem("cc_chats_ls", JSON.stringify(chats));
-			} catch {}
+			} catch { }
 
 			// Also save chat titles to our dedicated chat titles cookie
 			for (const chat of chats) {
@@ -410,8 +410,7 @@ export function CacheProvider({
 			userIdOverride?: string,
 			parentChatId?: string,
 		): Promise<string> => {
-			const uid = userIdOverride ?? user?.id;
-			if (!uid) throw new Error("User not authenticated");
+			const uid = userIdOverride ?? user?.id ?? userSessionManager.getStorageUserId();
 
 			const optimisticId = `${OPTIMISTIC_PREFIX}${Date.now()}`;
 			const optimisticChat: Chat = {
@@ -448,86 +447,89 @@ export function CacheProvider({
 				...(parentChatId ? { parentChatId: parentChatId as Id<"chats"> } : {}),
 			};
 
-			void createChatMutation(mutationArgs)
-				.then(async (realId) => {
-					const realChat = { ...optimisticChat, _id: realId };
-					await db.chats.put(realChat);
-					setChats((prev) =>
-						prev.map((c) => (c._id === optimisticId ? realChat : c)),
-					);
+			// Only sync to Convex if the user is authenticated
+			if (user?.id) {
+				void createChatMutation(mutationArgs)
+					.then(async (realId) => {
+						const realChat = { ...optimisticChat, _id: realId };
+						await db.chats.put(realChat);
+						setChats((prev) =>
+							prev.map((c) => (c._id === optimisticId ? realChat : c)),
+						);
 
-					const msgs = messagesCache.current.get(optimisticId) || [];
+						const msgs = messagesCache.current.get(optimisticId) || [];
 
-					// Re-associate any optimistic messages with the new real chat id
-					const reassignedMsgs = msgs.map((m) => ({ ...m, chatId: realId }));
+						// Re-associate any optimistic messages with the new real chat id
+						const reassignedMsgs = msgs.map((m) => ({ ...m, chatId: realId }));
 
-					messagesCache.current.delete(optimisticId);
-					messagesCache.current.set(realId, reassignedMsgs);
+						messagesCache.current.delete(optimisticId);
+						messagesCache.current.set(realId, reassignedMsgs);
 
-					// Persist reassigned messages to Dexie so they survive reloads
-					try {
-						await db.messages.bulkPut(reassignedMsgs);
-					} catch {
-						/* ignore */
-					}
+						// Persist reassigned messages to Dexie so they survive reloads
+						try {
+							await db.messages.bulkPut(reassignedMsgs);
+						} catch {
+							/* ignore */
+						}
 
-					// --- Push any optimistic messages to Convex now that we have a real chat id ---
-					for (const localMsg of reassignedMsgs) {
-						if (localMsg._id.startsWith(OPTIMISTIC_PREFIX)) {
-							try {
-								const newMessageId = await addMessageMutation({
-									chatId: realId as Id<"chats">,
-									userId: localMsg.userId,
-									role: localMsg.role,
-									content: localMsg.content,
-									model: localMsg.model,
-									// gateway intentionally omitted for broader backend compatibility
-									attachments: localMsg.attachments,
-									...(localMsg.parentMessageId && {
-										parentMessageId: localMsg.parentMessageId as Id<"messages">,
-									}),
-									...(localMsg.version && { version: localMsg.version }),
-								});
+						// --- Push any optimistic messages to Convex now that we have a real chat id ---
+						for (const localMsg of reassignedMsgs) {
+							if (localMsg._id.startsWith(OPTIMISTIC_PREFIX)) {
+								try {
+									const newMessageId = await addMessageMutation({
+										chatId: realId as Id<"chats">,
+										userId: localMsg.userId,
+										role: localMsg.role,
+										content: localMsg.content,
+										model: localMsg.model,
+										// gateway intentionally omitted for broader backend compatibility
+										attachments: localMsg.attachments,
+										...(localMsg.parentMessageId && {
+											parentMessageId: localMsg.parentMessageId as Id<"messages">,
+										}),
+										...(localMsg.version && { version: localMsg.version }),
+									});
 
-								// update caches with real message id
-								localMsg._id = newMessageId;
-							} catch {
-								/* ignore network errors */
+									// update caches with real message id
+									localMsg._id = newMessageId;
+								} catch {
+									/* ignore network errors */
+								}
 							}
 						}
-					}
-					onMessagesChangedCallback.current?.(realId);
+						onMessagesChangedCallback.current?.(realId);
 
-					// Record mapping so future message writes use the real id
-					optimisticToRealChatId.current.set(optimisticId, realId);
+						// Record mapping so future message writes use the real id
+						optimisticToRealChatId.current.set(optimisticId, realId);
 
-					// --- Clean up any leftover optimistic rows in Dexie & memory ---
-					try {
-						// Remove the optimistic chat record now that we have the real id
-						await db.chats.delete(optimisticId);
-						await db.messages
-							.where("chatId")
-							.equals(realId)
-							.and((m) => m._id.startsWith(OPTIMISTIC_PREFIX))
-							.delete();
+						// --- Clean up any leftover optimistic rows in Dexie & memory ---
+						try {
+							// Remove the optimistic chat record now that we have the real id
+							await db.chats.delete(optimisticId);
+							await db.messages
+								.where("chatId")
+								.equals(realId)
+								.and((m) => m._id.startsWith(OPTIMISTIC_PREFIX))
+								.delete();
 
-						// Remove them from in-memory caches too
-						const withoutOpt = (messagesCache.current.get(realId) || []).filter(
-							(m) => !m._id.startsWith(OPTIMISTIC_PREFIX),
-						);
-						messagesCache.current.set(realId, withoutOpt);
-						memLRU.current.set(realId, { ts: Date.now(), msgs: withoutOpt });
-					} catch {
-						/* ignore */
-					}
+							// Remove them from in-memory caches too
+							const withoutOpt = (messagesCache.current.get(realId) || []).filter(
+								(m) => !m._id.startsWith(OPTIMISTIC_PREFIX),
+							);
+							messagesCache.current.set(realId, withoutOpt);
+							memLRU.current.set(realId, { ts: Date.now(), msgs: withoutOpt });
+						} catch {
+							/* ignore */
+						}
 
-					// TODO: ⚠️ Resumable stream URL-swap hack is fragile; needs cleanup.
-				})
-				.catch((error) => {
-					console.error("createChat mutation failed", error);
-					setChats((prev) => prev.filter((c) => c._id !== optimisticId));
-					messagesCache.current.delete(optimisticId);
-				});
+						// TODO: ⚠️ Resumable stream URL-swap hack is fragile; needs cleanup.
+					})
+					.catch((error) => {
+						console.error("createChat mutation failed", error);
+						setChats((prev) => prev.filter((c) => c._id !== optimisticId));
+						messagesCache.current.delete(optimisticId);
+					});
+			}
 
 			// Return optimistic id immediately for snappy navigation
 			return optimisticId;
@@ -585,10 +587,10 @@ export function CacheProvider({
 				) {
 					routerRef.current.replace("/");
 				}
-					// Clear local snapshot so UI doesn't rehydrate deleted messages
-					try {
-						deleteMessagesSnapshotLocal(chatId);
-					} catch {}
+				// Clear local snapshot so UI doesn't rehydrate deleted messages
+				try {
+					deleteMessagesSnapshotLocal(chatId);
+				} catch { }
 			} catch (error) {
 				console.error("Failed to delete chat:", error);
 
@@ -653,7 +655,7 @@ export function CacheProvider({
 			let json: string | undefined = undefined;
 			try {
 				json = JSON.stringify(config ?? {});
-			} catch {}
+			} catch { }
 
 			// Avoid unnecessary state churn if nothing changed
 			const current = chats.find((c) => c._id === chatId)?.modelConfigJson;
@@ -672,7 +674,7 @@ export function CacheProvider({
 
 			try {
 				await db.chats.update(chatId, { modelConfigJson: json });
-			} catch {}
+			} catch { }
 		},
 		[chats],
 	);
@@ -721,7 +723,7 @@ export function CacheProvider({
 								if (toDeleteIds.length > 0) {
 									try {
 										await db.messages.bulkDelete(toDeleteIds);
-									} catch {}
+									} catch { }
 
 									cleaned = localMessages.filter(
 										(m) => !m._id.startsWith(OPTIMISTIC_PREFIX),
@@ -758,7 +760,7 @@ export function CacheProvider({
 					memLRU.current.set(chatId, { ts: Date.now(), msgs: activeMessages });
 					try {
 						saveMessagesSnapshotLocal(chatId, activeMessages as unknown as Message[]);
-					} catch {}
+					} catch { }
 					return activeMessages.sort(
 						(a, b) => a._creationTime - b._creationTime,
 					);
@@ -784,7 +786,7 @@ export function CacheProvider({
 						});
 						try {
 							saveMessagesSnapshotLocal(chatId, sortedMessages);
-						} catch {}
+						} catch { }
 						return sortedMessages;
 					}
 				} catch (error) {
@@ -826,7 +828,7 @@ export function CacheProvider({
 						});
 						try {
 							saveMessagesSnapshotLocal(chatId, sortedMessages as unknown as Message[]);
-						} catch {}
+						} catch { }
 						return sortedMessages as Message[];
 					}
 				} catch (error) {
@@ -919,7 +921,7 @@ export function CacheProvider({
 							idsToPatch.map((id) =>
 								db.messages.update(id, { isActive: false }),
 							),
-						).catch(() => {});
+						).catch(() => { });
 					}
 				} catch {
 					/* ignore */
@@ -964,7 +966,7 @@ export function CacheProvider({
 			try {
 				// If chatId is still optimistic, delay server sync until realId exists
 				let newMessageId: string | undefined;
-				if (!targetChatId.startsWith(OPTIMISTIC_PREFIX)) {
+				if (!targetChatId.startsWith(OPTIMISTIC_PREFIX) && user?.id) {
 					// --- Sanitize large content for Convex payload ---
 					const sanitizePartsJson = (raw?: string): string | undefined => {
 						if (!raw) return undefined;
@@ -1005,10 +1007,10 @@ export function CacheProvider({
 					) =>
 						Array.isArray(atts)
 							? atts.map((a) =>
-								({
-									...a,
-									url: a.url.startsWith("data:") && a.url.length > 2048 ? "" : a.url,
-								})
+							({
+								...a,
+								url: a.url.startsWith("data:") && a.url.length > 2048 ? "" : a.url,
+							})
 							)
 							: undefined;
 

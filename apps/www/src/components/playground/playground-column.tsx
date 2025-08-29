@@ -42,6 +42,7 @@ import { Separator } from "../ui/separator";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
 import { useEffect as _useEffect } from "react";
 import { cn } from "~/lib/utils";
+import { modelSupportsVision, isStorageReady } from "~/lib/model-capabilities";
 
 interface PlaygroundColumnProps {
 	column: ChatColumn;
@@ -196,6 +197,35 @@ export function PlaygroundColumn({
 		error: modelsError,
 	} = useLLMModels({ source: columnSource, controlled: true });
 
+	// Determine model and storage capabilities
+	const supportsAttachments = useMemo(() => {
+		// While models load, don't block drag/drop
+		if (isModelsLoading) return true;
+		try {
+			return modelSupportsVision(models, column.modelId || "");
+		} catch {
+			return true;
+		}
+	}, [models, column.modelId, isModelsLoading]);
+
+	const [storageReady, setStorageReady] = useState<{ ready: boolean; reason?: string }>({ ready: false });
+	useEffect(() => {
+		const compute = () => {
+			try { setStorageReady(isStorageReady()); } catch { setStorageReady({ ready: false, reason: "Storage not configured" }); }
+		};
+		compute();
+		const onKeysChanged = () => compute();
+		const onStorageChanged = () => compute();
+		window.addEventListener("apiKeysChanged", onKeysChanged);
+		window.addEventListener("storageProviderChanged", onStorageChanged);
+		window.addEventListener("storage", onStorageChanged);
+		return () => {
+			window.removeEventListener("apiKeysChanged", onKeysChanged);
+			window.removeEventListener("storageProviderChanged", onStorageChanged);
+			window.removeEventListener("storage", onStorageChanged);
+		};
+	}, []);
+
 	const formatPrice = useCallback((price: string | undefined) => {
 		if (!price || price === "undefined" || price === "null") return "Free";
 		const num = Number.parseFloat(price);
@@ -305,15 +335,19 @@ export function PlaygroundColumn({
 	};
 
 	const handleDragEnter = useCallback((e: React.DragEvent) => {
+		const hasKey = columnSource === "aigateway" ? hasAiKey : hasLlmKey;
+		if (!storageReady.ready || !hasKey || !supportsAttachments) return;
 		e.preventDefault();
 		e.stopPropagation();
 		setDragCounter(prev => prev + 1);
 		if (e.dataTransfer?.types.includes('Files')) {
 			setIsDragOver(true);
 		}
-	}, []);
+	}, [supportsAttachments, storageReady.ready, hasAiKey, hasLlmKey, columnSource]);
 
 	const handleDragLeave = useCallback((e: React.DragEvent) => {
+		const hasKey = columnSource === "aigateway" ? hasAiKey : hasLlmKey;
+		if (!storageReady.ready || !hasKey || !supportsAttachments) return;
 		e.preventDefault();
 		e.stopPropagation();
 		setDragCounter(prev => {
@@ -323,12 +357,14 @@ export function PlaygroundColumn({
 			}
 			return newCounter;
 		});
-	}, []);
+	}, [supportsAttachments, storageReady.ready, hasAiKey, hasLlmKey, columnSource]);
 
 	const handleDragOver = useCallback((e: React.DragEvent) => {
+		const hasKey = columnSource === "aigateway" ? hasAiKey : hasLlmKey;
+		if (!storageReady.ready || !hasKey || !supportsAttachments) return;
 		e.preventDefault();
 		e.stopPropagation();
-	}, []);
+	}, [supportsAttachments, storageReady.ready, hasAiKey, hasLlmKey, columnSource]);
 
 	const handleDrop = useCallback(async (e: React.DragEvent) => {
 		e.preventDefault();
@@ -336,9 +372,8 @@ export function PlaygroundColumn({
 		setIsDragOver(false);
 		setDragCounter(0);
 
-		if (!user?.id) {
-			toast({ title: "Please log in to upload files", status: "error" });
-			return;
+		if (!supportsAttachments && !isModelsLoading) {
+			toast({ title: "Selected model may not support image inputs", status: "warning" });
 		}
 
 		const droppedFiles = Array.from(e.dataTransfer.files);
@@ -377,7 +412,7 @@ export function PlaygroundColumn({
 		const nextFiles = [...files, ...previews];
 		setFiles(nextFiles);
 		// Broadcast to synced columns for preview reuse
-		try { setSharedAttachments(nextFiles.map(f => ({ name: f.name, url: f.url, contentType: f.contentType, size: f.size }))); } catch {}
+		try { setSharedAttachments(nextFiles.map(f => ({ name: f.name, url: f.url, contentType: f.contentType, size: f.size }))); } catch { }
 	}, [user?.id, files, setSharedAttachments]);
 
 	// Mirror shared attachments (previews) into this column when synced
@@ -422,19 +457,26 @@ export function PlaygroundColumn({
 		});
 		const nextFiles2 = [...files, ...previews];
 		setFiles(nextFiles2);
-		try { setSharedAttachments(nextFiles2.map(f => ({ name: f.name, url: f.url, contentType: f.contentType, size: f.size }))); } catch {}
+		try { setSharedAttachments(nextFiles2.map(f => ({ name: f.name, url: f.url, contentType: f.contentType, size: f.size }))); } catch { }
 		// reset input so same file can be selected again
 		e.target.value = "";
 	};
 
 	const handleFileRemove = useCallback((file: import("~/components/chat-input/file-items").UploadedFile) => {
-		setFiles(prev => prev.filter(f => f.name !== file.name || f.size !== file.size));
+		const next = files.filter(f => f.name !== file.name || f.size !== file.size);
+		setFiles(next);
 		if (file.local) {
 			pendingFilesRef.current = pendingFilesRef.current.filter(
 				(f) => f.name !== file.name || f.size !== file.size,
 			);
 		}
-	}, []);
+		// Propagate to shared attachments outside of render/update closures
+		try {
+			if (column.synced) {
+				setSharedAttachments(next.map(f => ({ name: f.name, url: f.url, contentType: f.contentType, size: f.size })));
+			}
+		} catch { }
+	}, [files, column.synced, setSharedAttachments]);
 
 	const handleSend = async () => {
 		if (isSubmitting) return;
@@ -557,7 +599,7 @@ export function PlaygroundColumn({
 
 				const newList = files.filter((f) => !f.local).concat(uploaded);
 				setFiles(newList);
-				try { setSharedAttachments(newList.map(f => ({ name: f.name, url: f.url, contentType: f.contentType, size: f.size }))); } catch {}
+				try { setSharedAttachments(newList.map(f => ({ name: f.name, url: f.url, contentType: f.contentType, size: f.size }))); } catch { }
 				attachmentsToSend = newList;
 			} catch (err) {
 				console.error("Upload before send failed", err);
@@ -575,14 +617,14 @@ export function PlaygroundColumn({
 			updateColumnInput(column.id, "");
 		}
 		setFiles([]); // Clear files after sending
-		try { setSharedAttachments([]); } catch {}
+		try { setSharedAttachments([]); } catch { }
 
 		setIsSubmitting(true);
 
 		// Optimistically mark this column as streaming for immediate UI feedback
 		try {
 			updateColumn(column.id, { isStreaming: true, status: "submitted" });
-		} catch {}
+		} catch { }
 
 		// Scroll to bottom if not at bottom already
 		try {
@@ -592,7 +634,7 @@ export function PlaygroundColumn({
 			) {
 				conversationScrollApiRef.current.scrollToBottom();
 			}
-		} catch {}
+		} catch { }
 
 		try {
 			if (column.synced) {
@@ -618,6 +660,7 @@ export function PlaygroundColumn({
 
 	const currentInput = column.synced ? sharedInput : column.input;
 	const hasRequiredKey = columnSource === "aigateway" ? hasAiKey : hasLlmKey;
+	const uploadDisabled = !hasRequiredKey || !supportsAttachments || !storageReady.ready;
 
 	const canMoveLeft = columnIndex > 0;
 	const canMoveRight = columnIndex < columns.length - 1;
@@ -633,7 +676,25 @@ export function PlaygroundColumn({
 					: "ready";
 
 	return (
-		<div className="flex h-full min-h-0 flex-col rounded-xl border">
+		<div
+			className={cn(
+				"relative flex h-full min-h-0 flex-col rounded-xl border",
+				isDragOver && "ring-2 ring-primary ring-offset-2 ring-offset-background"
+			)}
+			onDragEnter={handleDragEnter}
+			onDragLeave={handleDragLeave}
+			onDragOver={handleDragOver}
+			onDrop={handleDrop}
+		>
+			{/* Full-column drag overlay */}
+			{isDragOver && (
+				<div className="pointer-events-none absolute inset-0 z-20 bg-primary/10 backdrop-blur-sm rounded-xl border-2 border-dashed border-primary flex items-center justify-center">
+					<div className="text-center text-primary">
+						<div className="font-medium">Drop images anywhere</div>
+						<div className="text-sm text-muted-foreground">Supported: JPEG, PNG, WebP, GIF</div>
+					</div>
+				</div>
+			)}
 			<div className="h-full min-h-0 w-full rounded-b-md">
 				<div
 					id={`scroll-container-${column.id}_${columnIndex}`}
@@ -810,7 +871,7 @@ export function PlaygroundColumn({
 										// Register with provider so synced sends can scroll all columns
 										try {
 											registerColumnScrollApi(column.id, api ?? null);
-										} catch {}
+										} catch { }
 									}}
 									onDelete={(id) => {
 										updateColumn(column.id, {
@@ -822,10 +883,10 @@ export function PlaygroundColumn({
 											messages: column.messages.map((msg) =>
 												msg.id === id
 													? {
-															...msg,
-															content: newText,
-															parts: [{ type: "text", text: newText }],
-														}
+														...msg,
+														content: newText,
+														parts: [{ type: "text", text: newText }],
+													}
 													: msg,
 											),
 										});
@@ -917,23 +978,8 @@ export function PlaygroundColumn({
 					<div
 						className={cn(
 							"sticky bottom-0 min-h-0 min-w-0 flex-shrink-0 relative",
-							isDragOver && "ring-2 ring-primary ring-offset-2 ring-offset-background"
 						)}
-						onDragEnter={handleDragEnter}
-						onDragLeave={handleDragLeave}
-						onDragOver={handleDragOver}
-						onDrop={handleDrop}
 					>
-						{/* Drag overlay */}
-						{isDragOver && (
-							<div className="absolute inset-0 z-20 bg-primary/10 backdrop-blur-sm rounded-lg border-2 border-dashed border-primary flex items-center justify-center">
-								<div className="text-center text-primary">
-									<div className="text-2xl mb-2">📸</div>
-									<div className="font-medium">Drop images here</div>
-									<div className="text-sm text-muted-foreground">Supported: JPEG, PNG, WebP, GIF</div>
-								</div>
-							</div>
-						)}
 						<div className="flex items-center gap-2 border-t bg-background-200 p-3 pr-2.5">
 							<form
 								className="relative flex w-full flex-col items-center"
@@ -982,22 +1028,42 @@ export function PlaygroundColumn({
 								)}
 								{/* File upload button */}
 								{files.length === 0 && (
-									<label
-										htmlFor={`file-upload-${column.id}`}
-										className="absolute left-2 top-1/2 -translate-y-1/2 z-10 flex h-6 w-6 items-center justify-center rounded cursor-pointer hover:bg-muted/40"
-									>
-										<input
-											id={`file-upload-${column.id}`}
-											ref={fileInputRef}
-											type="file"
-											multiple
-											accept="image/*"
-											onChange={handleLocalFileChange}
-											className="hidden"
-											disabled={!hasRequiredKey}
-										/>
-										<Paperclip className="size-4 text-muted-foreground hover:text-primary" />
-									</label>
+									<Tooltip>
+										<TooltipTrigger asChild>
+											<label
+												htmlFor={`file-upload-${column.id}`}
+												className={`absolute left-2 top-1/2 -translate-y-1/2 z-10 flex h-6 w-6 items-center justify-center rounded cursor-pointer hover:bg-muted/40 ${uploadDisabled ? 'cursor-not-allowed opacity-50' : ''}`}
+												aria-disabled={uploadDisabled}
+											>
+												<input
+													id={`file-upload-${column.id}`}
+													ref={fileInputRef}
+													type="file"
+													multiple
+													accept="image/*"
+													onChange={handleLocalFileChange}
+													className="hidden"
+													disabled={uploadDisabled}
+												/>
+												<Paperclip className="size-4 text-muted-foreground hover:text-primary" />
+											</label>
+										</TooltipTrigger>
+										{uploadDisabled ? (
+											<TooltipContent side="top">
+												<div className="text-xs">
+													{!supportsAttachments
+														? 'Selected model does not support image inputs'
+														: (!storageReady.ready
+															? (storageReady.reason || 'Storage not configured')
+															: (!hasRequiredKey
+																? `Please add your ${columnSource === 'aigateway' ? 'Vercel AI Gateway' : 'LLM Gateway'} API key`
+																: ''))}
+												</div>
+											</TooltipContent>
+										) : (
+											<TooltipContent side="top">Attach images</TooltipContent>
+										)}
+									</Tooltip>
 								)}
 								<textarea
 									placeholder={
@@ -1014,7 +1080,7 @@ export function PlaygroundColumn({
 										target.style.height = "auto";
 										target.style.height = `${Math.min(target.scrollHeight, 120)}px`;
 									}}
-									className={`max-h-[120px] min-h-[38px] flex-1 resize-none overflow-y-auto rounded-md border bg-background-100 py-2 pr-9 ${files.length === 0 ? 'pl-10' : 'pl-4'} text-sm focus:border-zinc-400 focus:outline-none focus:ring-0 disabled:cursor-not-allowed disabled:opacity-60 dark:focus:border-zinc-600`}
+									className={`max-h-[120px] min-h-[38px] w-full resize-none overflow-y-auto rounded-md border bg-background-100 py-2 pr-9 ${files.length === 0 ? 'pl-10' : 'pl-4'} text-sm focus:border-zinc-400 focus:outline-none focus:ring-0 disabled:cursor-not-allowed disabled:opacity-60 dark:focus:border-zinc-600`}
 									spellCheck="false"
 									rows={1}
 									style={{
@@ -1031,56 +1097,29 @@ export function PlaygroundColumn({
 										}
 									}}
 								/>
-								<div className="absolute right-1 bottom-[3px] inline-flex items-center justify-end">
-									{column.isStreaming || derivedStatus === "streaming" ? (
-										<button
-											type="button"
-											aria-label="Stop"
-											onClick={() =>
-												column.synced
-													? stopSyncedColumns()
-													: stopColumn(column.id)
-											}
-											className="button_base__IZQUR reset_reset__sz7UJ button_button__dyHAB reset_reset__sz7UJ geist-new-themed geist-new-tertiary geist-new-tertiary-fill button_tertiary__t8MGO button_shape__4NO5k button_small__BoUqH button_invert__WPMQW"
-											data-geist-button=""
-											data-prefix="false"
-											data-suffix="false"
-											data-version="v1"
-											style={
-												{ "--geist-icon-size": "16px" } as React.CSSProperties
-											}
-										>
-											<span className="button_content__eYZtX button_flex___f_3o">
-												<span className="pointer-events-none flex rounded-md p-2">
-													<Square className="h-4 w-4" />
-												</span>
-											</span>
-										</button>
-									) : (
-										<button
-											type="button"
-											aria-label="Send Message"
-											onClick={handleSend}
-											disabled={
-												!hasRequiredKey || isSubmitting || !currentInput.trim()
-											}
-											className="button_base__IZQUR reset_reset__sz7UJ button_button__dyHAB reset_reset__sz7UJ geist-new-themed geist-new-tertiary geist-new-tertiary-fill button_tertiary__t8MGO button_shape__4NO5k button_small__BoUqH button_invert__WPMQW"
-											data-geist-button=""
-											data-prefix="false"
-											data-suffix="false"
-											data-version="v1"
-											style={
-												{ "--geist-icon-size": "16px" } as React.CSSProperties
-											}
-										>
-											<span className="button_content__eYZtX button_flex___f_3o">
-												<span className="pointer-events-none flex rounded-md p-2">
-													<SendIcon className="h-4 w-4" />
-												</span>
-											</span>
-										</button>
-									)}
-								</div>
+								{/* Right icon overlay inside input */}
+								{column.isStreaming || derivedStatus === "streaming" ? (
+									<button
+										type="button"
+										aria-label="Stop"
+										onClick={() =>
+											column.synced ? stopSyncedColumns() : stopColumn(column.id)
+										}
+										className="absolute right-2 bottom-2 inline-flex items-center justify-center rounded-md p-1 text-muted-foreground hover:text-primary"
+									>
+										<Square className="h-4 w-4" />
+									</button>
+								) : (
+									<button
+										type="button"
+										aria-label="Send Message"
+										onClick={handleSend}
+										disabled={!hasRequiredKey || isSubmitting || !currentInput.trim()}
+										className="absolute right-2 bottom-2 inline-flex items-center justify-center rounded-md p-1 text-muted-foreground hover:text-primary disabled:opacity-50"
+									>
+										<SendIcon className="h-4 w-4" />
+									</button>
+								)}
 							</form>
 						</div>
 					</div>

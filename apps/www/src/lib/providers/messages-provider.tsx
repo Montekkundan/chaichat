@@ -214,7 +214,7 @@ export function MessagesProvider({ children, chatId }: MessagesProviderProps) {
 				_didHydrate = true;
 				setModelConfigState((prev) => ({ ...prev, ...cached }));
 			}
-		} catch {}
+		} catch { }
 		if (typeof window !== "undefined") {
 			try {
 				const key = `chaichat_chat_config_${chatId}`;
@@ -226,7 +226,7 @@ export function MessagesProvider({ children, chatId }: MessagesProviderProps) {
 						setModelConfigState((prev) => ({ ...prev, ...parsed }));
 					}
 				}
-			} catch {}
+			} catch { }
 		}
 		hasHydratedConfigRef.current = chatId;
 	}, [chatId, getChatConfig]);
@@ -235,12 +235,12 @@ export function MessagesProvider({ children, chatId }: MessagesProviderProps) {
 		if (!chatId) return;
 		try {
 			void setChatConfig(chatId, modelConfigState as unknown as Record<string, unknown>);
-		} catch {}
+		} catch { }
 		if (typeof window !== "undefined") {
 			try {
 				const key = `chaichat_chat_config_${chatId}`;
 				window.localStorage.setItem(key, JSON.stringify(modelConfigState));
-			} catch {}
+			} catch { }
 		}
 	}, [chatId, modelConfigState, setChatConfig]);
 
@@ -251,6 +251,29 @@ export function MessagesProvider({ children, chatId }: MessagesProviderProps) {
 	const currentGatewayRef = useRef<"llm-gateway" | "vercel-ai-gateway">(
 		"llm-gateway",
 	);
+
+	// Keep gateway ref in sync with the current source in localStorage
+	useEffect(() => {
+		const sync = () => {
+			try {
+				const src = window.localStorage.getItem("chaichat_models_source");
+				currentGatewayRef.current =
+					src === "aigateway" ? "vercel-ai-gateway" : "llm-gateway";
+			} catch {
+				currentGatewayRef.current = "llm-gateway";
+			}
+		};
+		sync();
+		window.addEventListener("modelsSourceChanged", sync as EventListener);
+		window.addEventListener("storage", sync);
+		return () => {
+			window.removeEventListener(
+				"modelsSourceChanged",
+				sync as EventListener,
+			);
+			window.removeEventListener("storage", sync);
+		};
+	}, []);
 
 	// Save selected model to localStorage whenever it changes
 	useEffect(() => {
@@ -309,13 +332,7 @@ export function MessagesProvider({ children, chatId }: MessagesProviderProps) {
 
 				const userApiKeys = await getUserApiKeys();
 				const gateway = (() => {
-					// First check the current ref, then fall back to localStorage
-					const refGateway = currentGatewayRef.current;
-					if (refGateway && refGateway !== 'llm-gateway') {
-						console.log('Using gateway from ref:', refGateway);
-						return refGateway;
-					}
-
+					// Always reflect the latest selection from localStorage
 					try {
 						const src = window.localStorage.getItem("chaichat_models_source");
 						const lsGateway = src === "aigateway" ? "vercel-ai-gateway" : "llm-gateway";
@@ -558,9 +575,9 @@ export function MessagesProvider({ children, chatId }: MessagesProviderProps) {
 								});
 								setMessages(v5);
 							}
-						} catch {}
+						} catch { }
 					}
-				} catch {}
+				} catch { }
 
 				// 2) Hydrate from cache (Dexie/Convex) and replace if different/newer
 				try {
@@ -618,12 +635,12 @@ export function MessagesProvider({ children, chatId }: MessagesProviderProps) {
 			// Save current model config for this new chat id immediately
 			try {
 				await cache.setChatModelConfig(newChatId, modelConfigState);
-			} catch {}
+			} catch { }
 			if (typeof window !== "undefined") {
 				try {
 					const key = `chaichat_chat_config_${newChatId}`;
 					window.localStorage.setItem(key, JSON.stringify(modelConfigState));
-				} catch {}
+				} catch { }
 			}
 
 			return newChatId;
@@ -648,32 +665,32 @@ export function MessagesProvider({ children, chatId }: MessagesProviderProps) {
 				return;
 			}
 
-				// Handle new chat creation if no chatId
-				let targetChatId = chatId;
-				if (!chatId || chatId === "new") {
+			// Handle new chat creation if no chatId
+			let targetChatId = chatId;
+			if (!chatId || chatId === "new") {
+				try {
+					// Create new chat
+					targetChatId = await createNewChat(message, selectedModel);
+
+					// Persist pending payload (message + attachments) for the next page
 					try {
-						// Create new chat
-						targetChatId = await createNewChat(message, selectedModel);
+						const pending = {
+							chatId: targetChatId,
+							message,
+							attachments,
+						};
+						window.localStorage.setItem("chaichat_pending_send", JSON.stringify(pending));
+					} catch { }
 
-						// Persist pending payload (message + attachments) for the next page
-						try {
-							const pending = {
-								chatId: targetChatId,
-								message,
-								attachments,
-							};
-							window.localStorage.setItem("chaichat_pending_send", JSON.stringify(pending));
-						} catch {}
-
-						// Navigate to the new chat with the message as a query parameter (for text fallback)
-						const url = `/chat/${targetChatId}?message=${encodeURIComponent(message)}`;
-						router.push(url);
-						return;
-					} catch (error) {
-						console.error("Failed to create new chat:", error);
-						return;
-					}
+					// Navigate to the new chat with the message as a query parameter (for text fallback)
+					const url = `/chat/${targetChatId}?message=${encodeURIComponent(message)}`;
+					router.push(url);
+					return;
+				} catch (error) {
+					console.error("Failed to create new chat:", error);
+					return;
 				}
+			}
 
 			setIsSubmitting(true);
 
@@ -879,7 +896,7 @@ export function MessagesProvider({ children, chatId }: MessagesProviderProps) {
 							window.localStorage.removeItem("chaichat_pending_send");
 						}
 					}
-				} catch {}
+				} catch { }
 
 				if (!handled) {
 					const decodedMessage = decodeURIComponent(messageFromQuery);

@@ -605,87 +605,17 @@ export function SettingsDialog({
 							<div className="rounded-lg border bg-card p-4">
 								<h4 className="mb-4 font-medium">Image Gallery</h4>
 								<div className="space-y-4">
-									{/* Debug Info */}
-									{process.env.NODE_ENV === "development" && (
-										<div className="rounded border p-3 bg-muted/20">
-											<div className="text-sm">
-												<div><strong>Debug Info:</strong></div>
-												<div>Storage Provider: {selectedStorageProvider}</div>
-												<div>Images Count: {galleryImages.length}</div>
-												<div>Loading: {galleryLoading ? "Yes" : "No"}</div>
-												<div>Storage Data: {storageUsage ? "Available" : "None"}</div>
-											</div>
-										</div>
-									)}
-
-									{/* Storage Usage Stats */}
-									<div className="grid grid-cols-2 gap-4 text-sm">
-										<div className="rounded border p-3">
-											<div className="font-medium text-muted-foreground">Storage Used</div>
-											<div className="text-lg font-semibold">
-												{storageUsage
-													? (() => {
-														const activeUsage = selectedStorageProvider === "uploadthing"
-															? storageUsage.uploadThing
-															: storageUsage.vercelBlob;
-														return activeUsage
-															? formatBytes(activeUsage.usedBytes)
-															: "0 B";
-													})()
-													: "Loading..."}
-											</div>
-											<div className="text-xs text-muted-foreground">
-												{storageUsage
-													? (() => {
-														const activeUsage = selectedStorageProvider === "uploadthing"
-															? storageUsage.uploadThing
-															: storageUsage.vercelBlob;
-														return activeUsage && 'totalBytes' in activeUsage && activeUsage.totalBytes !== undefined
-															? `of ${formatBytes(activeUsage.totalBytes)}`
-															: "unlimited";
-													})()
-													: "unlimited"}
-											</div>
-										</div>
-										<div className="rounded border p-3">
-											<div className="font-medium text-muted-foreground">Images Count</div>
-											<div className="text-lg font-semibold">
-												{storageUsage
-													? (() => {
-														const activeUsage = selectedStorageProvider === "uploadthing"
-															? storageUsage.uploadThing
-															: storageUsage.vercelBlob;
-														return activeUsage?.fileCount || 0;
-													})()
-													: "Loading..."}
-											</div>
-											<div className="text-xs text-muted-foreground">total images</div>
-										</div>
-									</div>
-
-									{/* Gallery Grid */}
+									{/* Minimal Gallery */}
 									<div className="space-y-3">
 										<div className="flex items-center justify-between">
-											<div>
-												<span className="font-medium">Recent Images</span>
-												<div className="text-xs text-muted-foreground">
-													from {selectedStorageProvider === "uploadthing" ? "UploadThing" : "Vercel Blob"}
-												</div>
+											<div className="text-sm text-muted-foreground">
+												{selectedStorageProvider === "uploadthing" ? "UploadThing" : "Vercel Blob"}
 											</div>
-											<Button
-												variant="outline"
-												size="sm"
-												onClick={() => {
-													fetchStorageUsage();
-													fetchGalleryImages();
-												}}
-												disabled={galleryLoading}
-											>
+											<Button variant="outline" size="sm" onClick={() => { fetchStorageUsage(); fetchGalleryImages(); }} disabled={galleryLoading}>
 												{galleryLoading ? "Loading..." : "Refresh"}
 											</Button>
 										</div>
 
-										{/* Gallery Content */}
 										{galleryLoading ? (
 											<div className="flex items-center justify-center p-8">
 												<div className="text-sm text-muted-foreground">Loading images...</div>
@@ -693,71 +623,20 @@ export function SettingsDialog({
 										) : galleryImages.length > 0 ? (
 											<div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
 												{galleryImages.map((image) => (
-													<div key={image.id} className="relative group rounded-lg overflow-hidden border">
+													<div key={image.id} className="rounded-md overflow-hidden border">
 														{image.url ? (
-															<Image
-																src={image.url}
-																alt={image.name}
-																width={150}
-																height={150}
-																className="w-full h-32 object-cover transition-transform group-hover:scale-105"
-															/>
+															<Image src={image.url} alt={image.name} width={200} height={200} className="w-full h-32 object-cover" />
 														) : (
-															<div className="w-full h-32 bg-gray-200 flex items-center justify-center">
-																<span className="text-gray-500 text-xs">No preview</span>
-															</div>
+															<div className="w-full h-32 bg-muted flex items-center justify-center text-xs text-muted-foreground">No preview</div>
 														)}
-														<div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
-														<div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2">
-															<div className="text-white text-xs truncate">{image.name}</div>
-															<div className="text-white/70 text-xs">{formatBytes(image.size)}</div>
-														</div>
 													</div>
 												))}
 											</div>
 										) : (
-											/* Empty State */
-											<div className="flex flex-col items-center justify-center rounded-lg border border-dashed p-8 text-center">
-												<div className="text-4xl mb-4">🖼️</div>
-												<h4 className="font-medium mb-2">No images found</h4>
-												<p className="text-sm text-muted-foreground mb-4">
-													{selectedStorageProvider === "uploadthing"
-														? "No images found in UploadThing. UploadThing v7 API integration is limited - try using Vercel Blob for full gallery features."
-														: "No images found in Vercel Blob. Upload some images or generate new ones to see them here."
-													}
-												</p>
-												<div className="space-y-2">
-													<Button variant="outline" size="sm">
-														Generate Image
-													</Button>
-													<p className="text-xs text-muted-foreground">
-														Or drag & drop images in chat/playground
-													</p>
-													{selectedStorageProvider === "uploadthing" && (
-														<Button
-															variant="ghost"
-															size="sm"
-															onClick={() => setActiveSection("api-keys")}
-														>
-															Switch to Vercel Blob
-														</Button>
-													)}
-												</div>
+											<div className="flex items-center justify-center rounded-lg border border-dashed p-8 text-sm text-muted-foreground">
+												No images found
 											</div>
 										)}
-									</div>
-
-									{/* Storage Provider Info */}
-									<div className="rounded-lg bg-muted/50 p-3">
-										<div className="flex items-center justify-between text-sm">
-											<span className="font-medium">Storage Provider</span>
-											<Badge variant="secondary">
-												{selectedStorageProvider === "uploadthing" ? "UploadThing" : "Vercel Blob"}
-											</Badge>
-										</div>
-										<p className="text-xs text-muted-foreground mt-1">
-											Images are stored securely with your chosen provider
-										</p>
 									</div>
 								</div>
 							</div>

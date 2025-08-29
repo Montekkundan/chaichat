@@ -26,6 +26,8 @@ import { useMessages } from "~/lib/providers/messages-provider";
 import { cn } from "~/lib/utils";
 import { FileList } from "./file-list";
 import { ModelSelector } from "./model-selector";
+import { useLLMModels } from "~/hooks/use-models";
+import { isStorageReady, modelSupportsVision } from "~/lib/model-capabilities";
 
 // TODO cleanup: use all user keys
 
@@ -172,8 +174,12 @@ export function ChatInput({
 	// Helper to check if a string is only whitespace characters
 	const isOnlyWhitespace = (text: string) => !/[^\s]/.test(text);
 
-	// TODO: check model support for attachments
-	const supportsAttachments = true; // Assume all models support attachments via LLM Gateway
+	// Determine if selected model supports image inputs
+	const { models } = useLLMModels({
+		source: modelsSource === "aigateway" ? "aigateway" : "llmgateway",
+		controlled: true,
+	});
+	const supportsAttachments = modelSupportsVision(models, selectedModel);
 
 	const uploadHelpers = generateReactHelpers<UploadRouter>();
 	const { useUploadThing } = uploadHelpers;
@@ -242,6 +248,29 @@ export function ChatInput({
 	const [isDragOver, setIsDragOver] = useState(false);
 	const [_dragCounter, setDragCounter] = useState(0);
 
+	// Track storage readiness from keys + explicit provider selection
+	const [storageReady, setStorageReady] = useState<{ ready: boolean; reason?: string }>({ ready: false });
+	useEffect(() => {
+		const compute = () => {
+			try {
+				setStorageReady(isStorageReady());
+			} catch {
+				setStorageReady({ ready: false, reason: "Storage not configured" });
+			}
+		};
+		compute();
+		const onKeysChanged = () => compute();
+		const onStorageChanged = () => compute();
+		window.addEventListener("apiKeysChanged", onKeysChanged);
+		window.addEventListener("storageProviderChanged", onStorageChanged);
+		window.addEventListener("storage", onStorageChanged);
+		return () => {
+			window.removeEventListener("apiKeysChanged", onKeysChanged);
+			window.removeEventListener("storageProviderChanged", onStorageChanged);
+			window.removeEventListener("storage", onStorageChanged);
+		};
+	}, []);
+
 	// Handle paste events (defined after startUpload to avoid TS errors)
 	const _handlePaste = useCallback(
 		async (e: ClipboardEvent) => {
@@ -252,12 +281,8 @@ export function ChatInput({
 				item.type.startsWith("image/"),
 			);
 
-			if (!isUserAuthenticated && hasImageContent) {
-				e.preventDefault();
-				return;
-			}
 
-			if (isUserAuthenticated && hasImageContent) {
+			if (hasImageContent) {
 				const imageFiles: File[] = [];
 
 				for (const item of Array.from(items)) {
@@ -305,15 +330,17 @@ export function ChatInput({
 	);
 
 	const handleDragEnter = useCallback((e: React.DragEvent) => {
+		if (!supportsAttachments || !storageReady.ready) return;
 		e.preventDefault();
 		e.stopPropagation();
 		setDragCounter(prev => prev + 1);
 		if (e.dataTransfer?.types.includes('Files')) {
 			setIsDragOver(true);
 		}
-	}, []);
+	}, [supportsAttachments, storageReady.ready]);
 
 	const handleDragLeave = useCallback((e: React.DragEvent) => {
+		if (!supportsAttachments || !storageReady.ready) return;
 		e.preventDefault();
 		e.stopPropagation();
 		setDragCounter(prev => {
@@ -323,21 +350,25 @@ export function ChatInput({
 			}
 			return newCounter;
 		});
-	}, []);
+	}, [supportsAttachments, storageReady.ready]);
 
 	const handleDragOver = useCallback((e: React.DragEvent) => {
+		if (!supportsAttachments || !storageReady.ready) return;
 		e.preventDefault();
 		e.stopPropagation();
-	}, []);
+	}, [supportsAttachments, storageReady.ready]);
 
 	const handleDrop = useCallback(async (e: React.DragEvent) => {
 		e.preventDefault();
 		e.stopPropagation();
 		setIsDragOver(false);
 		setDragCounter(0);
-
-		if (!isUserAuthenticated) {
-			toast({ title: "Please log in to upload files", status: "error" });
+		if (!supportsAttachments) {
+			toast({ title: "Selected model does not support image inputs", status: "error" });
+			return;
+		}
+		if (!storageReady.ready) {
+			toast({ title: storageReady.reason || "Storage not configured", status: "error" });
 			return;
 		}
 
@@ -375,7 +406,36 @@ export function ChatInput({
 			} as import("./file-items").UploadedFile;
 		});
 		onFileUpload(previews);
-	}, [isUserAuthenticated, onFileUpload, files.length]);
+	}, [supportsAttachments, storageReady, onFileUpload, files.length]);
+
+	// Accept external image drops (from page-level overlays)
+	useEffect(() => {
+		const handler = (ev: Event) => {
+			try {
+				const ce = ev as CustomEvent<{ files: File[] }>;
+				const filesArr = Array.isArray(ce.detail?.files) ? ce.detail.files : [];
+				if (!supportsAttachments || !storageReady.ready) return;
+				const images = filesArr.filter((f) => f.type?.startsWith("image/"));
+				if (images.length === 0) return;
+				const { validFiles, errors } = filterValidFiles(images, files.length);
+				if (errors.length) toast({ title: errors.join("\n"), status: "error" });
+				if (validFiles.length === 0) return;
+				const previews = validFiles.map((file) => {
+					pendingFilesRef.current.push(file);
+					return {
+						name: file.name,
+						url: URL.createObjectURL(file),
+						contentType: file.type,
+						size: file.size,
+						local: true,
+					} as import("./file-items").UploadedFile;
+				});
+				onFileUpload(previews);
+			} catch { }
+		};
+		window.addEventListener("externalFilesDropped", handler as EventListener);
+		return () => window.removeEventListener("externalFilesDropped", handler as EventListener);
+	}, [supportsAttachments, storageReady, onFileUpload, files.length]);
 
 	// Web search toggle state
 	const [isSearchEnabled, _setIsSearchEnabled] = useState(false);
@@ -482,14 +542,14 @@ export function ChatInput({
 						status: "error"
 					});
 				}
-							} catch (err) {
-					console.error("Image generation error:", err);
-					toast({ title: "Failed to generate image", status: "error" });
-				}
+			} catch (err) {
+				console.error("Image generation error:", err);
+				toast({ title: "Failed to generate image", status: "error" });
+			}
 			return;
 		}
 
-			// Prepare attachment list (defaults to current files prop)
+		// Prepare attachment list (defaults to current files prop)
 		let attachmentsToSend: import("./file-items").UploadedFile[] = files;
 
 		// Collect all local files that need to be uploaded
@@ -623,8 +683,8 @@ export function ChatInput({
 		e.target.value = "";
 	};
 
-	// Uploads are disabled when the selected model doesn't support attachments
-	const uploadDisabled = !supportsAttachments;
+	// Disable when model doesn't support images or storage unavailable
+	const uploadDisabled = !supportsAttachments || !storageReady.ready;
 
 
 
@@ -644,7 +704,7 @@ export function ChatInput({
 		<div
 			className={cn(
 				"w-full max-w-3xl relative",
-				isDragOver && "ring-2 ring-primary ring-offset-2 ring-offset-background"
+				// isDragOver && "ring-2 ring-primary ring-offset-2 ring-offset-background"
 			)}
 			onDragEnter={handleDragEnter}
 			onDragLeave={handleDragLeave}
@@ -653,9 +713,8 @@ export function ChatInput({
 		>
 			{/* Drag overlay */}
 			{isDragOver && (
-				<div className="absolute inset-0 z-20 bg-primary/10 backdrop-blur-sm rounded-lg border-2 border-dashed border-primary flex items-center justify-center">
+				<div className="absolute inset-0 z-20 bg-primary/10 backdrop-blur-sm rounded-t-2xl border-2 border-dashed border-primary flex items-center justify-center">
 					<div className="text-center text-primary">
-						<div className="text-2xl mb-2">📸</div>
 						<div className="font-medium">Drop images here</div>
 						<div className="text-sm text-muted-foreground">Supported: JPEG, PNG, WebP, GIF</div>
 					</div>
@@ -705,7 +764,7 @@ export function ChatInput({
 										textareaClassName,
 									)}
 									disabled={true}
-									// ref={agentCommand.textareaRef}
+								// ref={agentCommand.textareaRef}
 								/>
 							</div>
 						</TooltipTrigger>
@@ -729,48 +788,54 @@ export function ChatInput({
 							textareaClassName,
 						)}
 						disabled={disabled || isSubmitting}
-						// ref={agentCommand.textareaRef}
+					// ref={agentCommand.textareaRef}
 					/>
 				)}
 				<PromptInputActions className="mt-5 w-full justify-between px-3 pb-3">
 					<div className="flex items-center gap-2">
-						{supportsAttachments && (
-							<PromptInputAction tooltip="Attach files">
-								<label
-									htmlFor="file-upload"
-									className={`flex h-8 w-8 items-center justify-center rounded-2xl cursor-pointer hover:bg-muted/40 ${uploadDisabled ? "cursor-not-allowed opacity-40" : ""}`}
-								>
-									<input
-										id="file-upload"
-										ref={fileInputRef}
-										type="file"
-										multiple
-										accept="image/*"
-										onChange={handleLocalFileChange}
-										className="hidden"
-										disabled={uploadDisabled}
-									/>
-									{isUploading ? (
-										<svg
-											className="size-5 animate-spin text-primary"
-											viewBox="0 0 24 24"
-											aria-hidden="true"
-										>
-											<circle
-												cx="12"
-												cy="12"
-												r="10"
-												stroke="currentColor"
-												strokeWidth="4"
-												fill="none"
-											/>
-										</svg>
-									) : (
-										<Paperclip className="size-5 text-primary" />
-									)}
-								</label>
-							</PromptInputAction>
-						)}
+						<PromptInputAction
+							tooltip={
+								!supportsAttachments
+									? "Selected model doesn’t support image inputs"
+									: !storageReady.ready
+										? storageReady.reason || "Configure storage to upload images"
+										: "Attach files"
+							}
+						>
+							<label
+								htmlFor="file-upload"
+								className={`flex h-8 w-8 items-center justify-center rounded-2xl cursor-pointer hover:bg-muted/40 ${uploadDisabled ? "cursor-not-allowed opacity-40" : ""}`}
+							>
+								<input
+									id="file-upload"
+									ref={fileInputRef}
+									type="file"
+									multiple
+									accept="image/*"
+									onChange={handleLocalFileChange}
+									className="hidden"
+									disabled={uploadDisabled}
+								/>
+								{isUploading ? (
+									<svg
+										className="size-5 animate-spin text-primary"
+										viewBox="0 0 24 24"
+										aria-hidden="true"
+									>
+										<circle
+											cx="12"
+											cy="12"
+											r="10"
+											stroke="currentColor"
+											strokeWidth="4"
+											fill="none"
+										/>
+									</svg>
+								) : (
+									<Paperclip className="size-5 text-primary" />
+								)}
+							</label>
+						</PromptInputAction>
 						<ModelSelector
 							selectedModelId={selectedModel}
 							setSelectedModelId={onSelectModel}
@@ -840,10 +905,10 @@ export function ChatInput({
 							const isButtonDisabled = isStopPhase
 								? disabled || !hasRequiredKey
 								: disabled ||
-									!hasRequiredKey ||
-									isUploading ||
-									(isOnlyWhitespace(value) && files.length === 0) ||
-									isSubmitting;
+								!hasRequiredKey ||
+								isUploading ||
+								(isOnlyWhitespace(value) && files.length === 0) ||
+								isSubmitting;
 							const ariaLabel = isStopPhase ? "Stop" : "Send message";
 							return (
 								<Button

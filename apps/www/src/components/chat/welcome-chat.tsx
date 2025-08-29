@@ -1,12 +1,15 @@
 "use client";
 
 import { useUser } from "@clerk/nextjs";
-import { useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ChatInput } from "~/components/chat-input/chat-input";
 import { BackgroundSpace } from "~/components/background/starfield-canvas";
 import type { UploadedFile } from "~/components/chat-input/file-items";
 import { useMessages } from "~/lib/providers/messages-provider";
 import { Suggestions, Suggestion } from "~/components/ai-elements/suggestion";
+import { useLLMModels } from "~/hooks/use-models";
+import { isStorageReady, modelSupportsVision } from "~/lib/model-capabilities";
+import { toast } from "~/components/ui/toast";
 
 // Background starfield moved to layout-level component
 
@@ -65,6 +68,76 @@ export default function WelcomeChat({ initialName: _initialName }: WelcomeChatPr
 
 	const isLoading = isSubmitting || status === "streaming";
 
+	// Global drag & drop for full screen
+	const [isDragOver, setIsDragOver] = useState(false);
+	const [dragCounter, setDragCounter] = useState(0);
+	const { models } = useLLMModels();
+	const supportsAttachments = useMemo(() => {
+		try { return modelSupportsVision(models, selectedModel); } catch { return false; }
+	}, [models, selectedModel]);
+	const [storageReady, setStorageReady] = useState<{ ready: boolean; reason?: string }>({ ready: false });
+	useEffect(() => {
+		const compute = () => {
+			try { setStorageReady(isStorageReady()); } catch { setStorageReady({ ready: false, reason: "Storage not configured" }); }
+		};
+		compute();
+		const onKeysChanged = () => compute();
+		const onStorageChanged = () => compute();
+		window.addEventListener("apiKeysChanged", onKeysChanged);
+		window.addEventListener("storageProviderChanged", onStorageChanged);
+		window.addEventListener("storage", onStorageChanged);
+		return () => {
+			window.removeEventListener("apiKeysChanged", onKeysChanged);
+			window.removeEventListener("storageProviderChanged", onStorageChanged);
+			window.removeEventListener("storage", onStorageChanged);
+		};
+	}, []);
+
+	const handleDragEnter = (e: React.DragEvent) => {
+		if (!supportsAttachments || !storageReady.ready) return;
+		e.preventDefault();
+		e.stopPropagation();
+		setDragCounter((c) => c + 1);
+		if (e.dataTransfer?.types.includes("Files")) setIsDragOver(true);
+	};
+	const handleDragLeave = (e: React.DragEvent) => {
+		if (!supportsAttachments || !storageReady.ready) return;
+		e.preventDefault();
+		e.stopPropagation();
+		setDragCounter((c) => {
+			const n = c - 1;
+			if (n === 0) setIsDragOver(false);
+			return n;
+		});
+	};
+	const handleDragOver = (e: React.DragEvent) => {
+		if (!supportsAttachments || !storageReady.ready) return;
+		e.preventDefault();
+		e.stopPropagation();
+	};
+	const handleDrop = (e: React.DragEvent) => {
+		e.preventDefault();
+		e.stopPropagation();
+		setIsDragOver(false);
+		setDragCounter(0);
+		if (!supportsAttachments) {
+			toast({ title: "Selected model does not support image inputs", status: "error" });
+			return;
+		}
+		if (!storageReady.ready) {
+			toast({ title: storageReady.reason || "Storage not configured", status: "error" });
+			return;
+		}
+		const droppedFiles = Array.from(e.dataTransfer.files || []);
+		const images = droppedFiles.filter((f) => f.type?.startsWith("image/"));
+		if (images.length === 0) {
+			toast({ title: "Please drop image files only", status: "error" });
+			return;
+		}
+		const event = new CustomEvent("externalFilesDropped", { detail: { files: images } });
+		window.dispatchEvent(event);
+	};
+
 	// Background handled globally in layout; no local fog/Canvas state
 
 	const suggestionItems = [
@@ -85,8 +158,22 @@ export default function WelcomeChat({ initialName: _initialName }: WelcomeChatPr
 	};
 
 	return (
-		<div className="relative mt-2 h-full w-full ">
+		<div
+			className="relative mt-2 h-full w-full "
+			onDragEnter={handleDragEnter}
+			onDragLeave={handleDragLeave}
+			onDragOver={handleDragOver}
+			onDrop={handleDrop}
+		>
 			<BackgroundSpace />
+			{isDragOver && (
+				<div className="pointer-events-none fixed inset-0 z-30 flex items-center justify-center">
+					<div className="rounded-2xl border-2 border-dashed border-primary/60 bg-background/70 p-6 text-primary shadow-xl">
+						<div className="text-2xl mb-1 text-center">Drop images anywhere</div>
+						<div className="text-sm text-center text-muted-foreground">JPEG, PNG, WebP, GIF</div>
+					</div>
+				</div>
+			)}
 			<div className="absolute inset-0 flex items-center justify-center px-4">
 				<div className="w-full max-w-3xl animate-in zoom-in-95 fade-in-50 duration-300 space-y-6 sm:px-4">
 					<h2 className="text-center font-black text-8xl text-muted-foreground opacity-50 translate-y-12">
@@ -125,5 +212,3 @@ export default function WelcomeChat({ initialName: _initialName }: WelcomeChatPr
 		</div>
 	);
 }
-
-

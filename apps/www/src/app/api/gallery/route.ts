@@ -150,12 +150,10 @@ export async function GET(request: Request) {
 		// Fetch from Vercel Blob if using Vercel Blob and key is available
 		if (storageProvider === "vercelblob" && vercelBlobKey) {
 			try {
-				// Set the BLOB_READ_WRITE_TOKEN environment variable for Vercel Blob
-				process.env.BLOB_READ_WRITE_TOKEN = vercelBlobKey;
-
 				// Use Vercel Blob SDK to list blobs
 				const { blobs } = await list({
 					limit: limit,
+					token: vercelBlobKey,
 				});
 
 				for (const blob of blobs) {

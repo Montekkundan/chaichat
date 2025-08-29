@@ -3,12 +3,15 @@
 import { useUser } from "@clerk/nextjs";
 import type { User } from "@clerk/nextjs/server";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ChatInput } from "~/components/chat-input/chat-input";
 import type { UploadedFile } from "~/components/chat-input/file-items";
 import { useChatHandlers } from "~/components/chat-input/use-chat-handlers";
 import { Conversation } from "~/components/chat/conversation";
 import { useMessages } from "~/lib/providers/messages-provider";
+import { useLLMModels } from "~/hooks/use-models";
+import { isStorageReady, modelSupportsVision } from "~/lib/model-capabilities";
+import { toast } from "~/components/ui/toast";
 
 import { useSidebar } from "../ui/sidebar";
 
@@ -85,7 +88,7 @@ export default function Chat({ initialName }: ChatProps = {}) {
 	const { handleInputChange, handleModelChange, handleDelete, handleEdit } =
 		useChatHandlers({
 			messages,
-			setMessages: () => {}, // Not needed with provider
+			setMessages: () => { }, // Not needed with provider
 			setInput,
 			setSelectedModel,
 			selectedModel,
@@ -127,7 +130,7 @@ export default function Chat({ initialName }: ChatProps = {}) {
 			) {
 				conversationScrollApiRef.current.scrollToBottom();
 			}
-		} catch {}
+		} catch { }
 
 		// If no chatId, create a new chat first (async)
 		if (!chatIdString) {
@@ -170,62 +173,127 @@ export default function Chat({ initialName }: ChatProps = {}) {
 	const { state } = useSidebar();
 	const _collapsed = state === "collapsed";
 
+	// Global drag & drop overlay for full screen
+	const [isDragOver, setIsDragOver] = useState(false);
+	const [dragCounter, setDragCounter] = useState(0);
+	const source = gateway === "vercel-ai-gateway" ? "aigateway" : "llmgateway";
+	const { models } = useLLMModels({ source, controlled: true });
+	const supportsAttachments = useMemo(() => {
+		try { return modelSupportsVision(models, selectedModel); } catch { return false; }
+	}, [models, selectedModel]);
+	const [storageReady, setStorageReady] = useState<{ ready: boolean; reason?: string }>({ ready: false });
+	useEffect(() => {
+		const compute = () => { try { setStorageReady(isStorageReady()); } catch { setStorageReady({ ready: false, reason: "Storage not configured" }); } };
+		compute();
+		const onKeysChanged = () => compute();
+		const onStorageChanged = () => compute();
+		window.addEventListener("apiKeysChanged", onKeysChanged);
+		window.addEventListener("storageProviderChanged", onStorageChanged);
+		window.addEventListener("storage", onStorageChanged);
+		return () => {
+			window.removeEventListener("apiKeysChanged", onKeysChanged);
+			window.removeEventListener("storageProviderChanged", onStorageChanged);
+			window.removeEventListener("storage", onStorageChanged);
+		};
+	}, []);
+
+	const onDragEnter = (e: React.DragEvent) => {
+		if (!supportsAttachments || !storageReady.ready) return;
+		e.preventDefault();
+		e.stopPropagation();
+		setDragCounter((c) => c + 1);
+		if (e.dataTransfer?.types.includes("Files")) setIsDragOver(true);
+	};
+	const onDragLeave = (e: React.DragEvent) => {
+		if (!supportsAttachments || !storageReady.ready) return;
+		e.preventDefault();
+		e.stopPropagation();
+		setDragCounter((c) => { const n = c - 1; if (n === 0) setIsDragOver(false); return n; });
+	};
+	const onDragOver = (e: React.DragEvent) => {
+		if (!supportsAttachments || !storageReady.ready) return;
+		e.preventDefault();
+		e.stopPropagation();
+	};
+	const onDrop = (e: React.DragEvent) => {
+		e.preventDefault();
+		e.stopPropagation();
+		setIsDragOver(false);
+		setDragCounter(0);
+		if (!supportsAttachments) { toast({ title: "Selected model does not support image inputs", status: "error" }); return; }
+		if (!storageReady.ready) { toast({ title: storageReady.reason || "Storage not configured", status: "error" }); return; }
+		const droppedFiles = Array.from(e.dataTransfer.files || []);
+		const images = droppedFiles.filter((f) => f.type?.startsWith("image/"));
+		if (images.length === 0) { toast({ title: "Please drop image files only", status: "error" }); return; }
+		window.dispatchEvent(new CustomEvent("externalFilesDropped", { detail: { files: images } }));
+	};
+
 	return (
-		<>
-			<div className="pointer-events-none absolute bottom-0 z-10 w-full px-2">
-				<div className="relative mx-auto flex w-full max-w-3xl flex-col text-center">
-					<div className="pointer-events-none">
-						<div className="pointer-events-auto">
-							<div className="rounded-t-3xl p-2 pb-0 backdrop-blur-lg ">
-								<ChatInput
-									value={input}
-									onValueChange={handleInputChange}
-									onSend={handleSend}
-									isSubmitting={isLoading}
-									disabled={quotaExceeded || rateLimited}
-									onSelectModel={handleModelChange}
-									selectedModel={selectedModel}
-									isUserAuthenticated={!!user?.id}
-									stop={stop}
-									status={status}
-									files={attachments}
-									onFileUpload={handleFileUpload}
-									onFileRemove={handleFileRemove}
-								/>
+		<div className="relative h-full w-full" onDragEnter={onDragEnter} onDragLeave={onDragLeave} onDragOver={onDragOver} onDrop={onDrop}>
+			{isDragOver && (
+				<div className="pointer-events-none fixed inset-0 z-30 flex items-center justify-center">
+					<div className="rounded-2xl border-2 border-dashed border-primary/60 bg-background/70 p-6 text-primary shadow-xl">
+						<div className="text-2xl mb-1 text-center">Drop images anywhere</div>
+						<div className="text-sm text-center text-muted-foreground">JPEG, PNG, WebP, GIF</div>
+					</div>
+				</div>
+			)}
+			<>
+				<div className="pointer-events-none absolute bottom-0 z-10 w-full px-2">
+					<div className="relative mx-auto flex w-full max-w-3xl flex-col text-center">
+						<div className="pointer-events-none">
+							<div className="pointer-events-auto">
+								<div className="rounded-t-3xl p-2 pb-0 backdrop-blur-lg ">
+									<ChatInput
+										value={input}
+										onValueChange={handleInputChange}
+										onSend={handleSend}
+										isSubmitting={isLoading}
+										disabled={quotaExceeded || rateLimited}
+										onSelectModel={handleModelChange}
+										selectedModel={selectedModel}
+										isUserAuthenticated={!!user?.id}
+										stop={stop}
+										status={status}
+										files={attachments}
+										onFileUpload={handleFileUpload}
+										onFileRemove={handleFileRemove}
+									/>
+								</div>
 							</div>
 						</div>
 					</div>
 				</div>
-			</div>
-			<div className="absolute inset-0 sm:pt-3.5">
-				{showOnboarding ? (
-					<div className="mx-auto flex w-full max-w-3xl flex-col space-y-12 px-4 pt-safe-offset-10 pb-10">
-						<div className="flex h-[calc(100vh-20rem)] items-start justify-center">
-							<div className="fade-in-50 zoom-in-95 w-full animate-in space-y-6 px-2 pt-[calc(max(15vh,2.5rem))] duration-300 sm:px-8">
-								<h2 className="font-semibold text-3xl">
-									How can I help you {user?.firstName ?? initialName ?? ""}?
-								</h2>
+				<div className="absolute inset-0 sm:pt-3.5">
+					{showOnboarding ? (
+						<div className="mx-auto flex w-full max-w-3xl flex-col space-y-12 px-4 pt-safe-offset-10 pb-10">
+							<div className="flex h-[calc(100vh-20rem)] items-start justify-center">
+								<div className="fade-in-50 zoom-in-95 w-full animate-in space-y-6 px-2 pt-[calc(max(15vh,2.5rem))] duration-300 sm:px-8">
+									<h2 className="font-semibold text-3xl">
+										How can I help you {user?.firstName ?? initialName ?? ""}?
+									</h2>
+								</div>
 							</div>
 						</div>
-					</div>
-				) : (
-					<div className="h-full min-h-0 w-full">
-						<Conversation
-							messages={messages}
-							status={status}
-							onDelete={handleDelete}
-							onEdit={handleEdit}
-							onReload={handleReload}
-							onBranch={handleBranch}
-							scrollButtonBottomClass="bottom-35 z-50 md:bottom-32"
-							registerScrollApi={(api) => {
-								conversationScrollApiRef.current = api;
-							}}
-							gateway={gateway}
-						/>
-					</div>
-				)}
-			</div>
-		</>
+					) : (
+						<div className="h-full min-h-0 w-full">
+							<Conversation
+								messages={messages}
+								status={status}
+								onDelete={handleDelete}
+								onEdit={handleEdit}
+								onReload={handleReload}
+								onBranch={handleBranch}
+								scrollButtonBottomClass="bottom-35 z-50 md:bottom-32"
+								registerScrollApi={(api) => {
+									conversationScrollApiRef.current = api;
+								}}
+								gateway={gateway}
+							/>
+						</div>
+					)}
+				</div>
+			</>
+		</div>
 	);
 }
