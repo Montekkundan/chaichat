@@ -1,7 +1,5 @@
 import { api } from "@/convex/_generated/api";
-import { createGateway as createVercelGateway } from "@ai-sdk/gateway";
 import { currentUser } from "@clerk/nextjs/server";
-import { createLLMGateway } from "@llmgateway/ai-sdk-provider";
 import {
   JsonToSseTransformStream,
   type UIMessage,
@@ -14,15 +12,12 @@ import {
 import type { ModelMessage } from "ai";
 import { ConvexHttpClient } from "convex/browser";
 import { env } from "~/env";
-import {
-  buildProviderOptions,
-  combineTextFromUIMessages,
-  isGoogleModel,
-  isOpenAIReasoningModel,
-  isOpenAIProvider,
-  cleanMessagesForTools,
-  removeEmptyModelMessages,
-} from "./utils";
+import { buildProviderOptions, isGoogleModel, isOpenAIReasoningModel, isOpenAIProvider, cleanMessagesForTools } from "./utils";
+import { errorResponseForChat, isNoStreamingError } from "./error-utils";
+import { normalizeGateway } from "./gateway-utils";
+import { hasImageParts as _hasImageParts, inlineExternalMedia as _inlineExternalMedia } from "./message-utils";
+import { buildPromptPayload } from "./prompt-builder";
+import { makeProviders, getBaseModel } from "./provider-factory";
 import { generateImagesViaGateway } from "./image-generation";
 
 const convex = new ConvexHttpClient(env.NEXT_PUBLIC_CONVEX_URL);
@@ -137,27 +132,10 @@ export async function POST(req: Request) {
         }
 
         // Normalize gateway just for image generation flow
-        const igUsedGateway = (() => {
-          if (typeof gateway === "string" && gateway.trim().length > 0) {
-            const g = gateway.trim().toLowerCase();
-            if (
-              g === "llm-gateway" ||
-              g === "llm" ||
-              g === "llmgateway" ||
-              g === "gateway-llm"
-            )
-              return "llm-gateway" as const;
-            if (
-              g === "vercel-ai-gateway" ||
-              g === "vercel" ||
-              g === "ai-gateway" ||
-              g === "vercel-ai" ||
-              g === "vercelaigateway"
-            )
-              return "vercel-ai-gateway" as const;
-          }
-          return "llm-gateway" as const;
-        })();
+        const igUsedGatewayRaw = normalizeGateway(gateway, "llm-gateway");
+        const igUsedGateway = (igUsedGatewayRaw === "unsupported"
+          ? "llm-gateway"
+          : igUsedGatewayRaw) as "llm-gateway" | "vercel-ai-gateway";
 
         if (igUsedGateway === "llm-gateway" && !llmKey) {
           return new Response(
@@ -223,30 +201,9 @@ export async function POST(req: Request) {
     }
 
     // Determine which gateway to use (string parameter only)
-    const normalizedGateway = (() => {
-      if (typeof gateway === "string" && gateway.trim().length > 0) {
-        const g = gateway.trim().toLowerCase();
-        if (
-          g === "llm-gateway" ||
-          g === "llm" ||
-          g === "llmgateway" ||
-          g === "gateway-llm"
-        )
-          return "llm-gateway" as const;
-        if (
-          g === "vercel-ai-gateway" ||
-          g === "vercel" ||
-          g === "ai-gateway" ||
-          g === "vercel-ai" ||
-          g === "vercelaigateway"
-        )
-          return "vercel-ai-gateway" as const;
-        return "unsupported" as const;
-      }
-      return "llm-gateway" as const;
-    })();
+    const normalizedGatewayRaw = normalizeGateway(gateway, "llm-gateway");
 
-    if (normalizedGateway === "unsupported") {
+    if (normalizedGatewayRaw === "unsupported") {
       const headers = new Headers({
         "Content-Type": "application/json",
         "X-Used-Gateway": "unsupported",
@@ -262,7 +219,7 @@ export async function POST(req: Request) {
       );
     }
 
-    const usedGateway = normalizedGateway;
+    const usedGateway = normalizedGatewayRaw as "llm-gateway" | "vercel-ai-gateway";
 
     console.log("API Route - Received gateway:", gateway);
     console.log("API Route - Normalized gateway:", usedGateway);
@@ -354,46 +311,17 @@ export async function POST(req: Request) {
     }
 
     // Check if this is a vision request (has image parts)
-    const hasImageParts = convertedMessages.some(
-      (msg) =>
-        Array.isArray(msg.content) &&
-        msg.content.some((part) => part.type === "image")
-    );
+    const containsImages = _hasImageParts(convertedMessages);
 
-    console.log("API Route - Has image parts:", hasImageParts);
+    console.log("API Route - Has image parts:", containsImages);
 
     modelToUse = model || "openai/gpt-4o";
 
-    // Inline external image URLs as data URIs so models can access them
-    async function inlineExternalMedia(
-      messages: ModelMessage[]
-    ): Promise<ModelMessage[]> {
-      const out: ModelMessage[] = [];
-      for (const m of messages) {
-        if (!Array.isArray(m.content as unknown)) {
-          out.push(m);
-          continue;
-        }
-        const parts = m.content as Array<unknown>;
-        const newParts: Array<unknown> = [];
-        for (const p of parts) {
-          const part = p as {
-            type?: string;
-            image?: string;
-            mimeType?: string;
-            url?: string;
-            mediaType?: string;
-          };
-          // Do NOT inline large remote media into base64; keep original URLs to avoid oversized payloads
-          newParts.push(part);
-        }
-        out.push({ ...m, content: newParts } as ModelMessage);
-      }
-      return out;
-    }
+    // Note: Do not block images for AI Gateway based on local heuristics.
+    // Some providers may support multimodal even when capability metadata is missing.
 
-    const finalConvertedMessages: ModelMessage[] =
-      await inlineExternalMedia(convertedMessages);
+    // Keep remote media URLs; avoid inlining large payloads
+    const finalConvertedMessages: ModelMessage[] = await _inlineExternalMedia(convertedMessages);
 
     // Some clients (AI SDK transports) send the user's latest input separately.
     // Capture it here to use as a fallback for providers that need a single text prompt (e.g., Google Gemini).
@@ -424,12 +352,9 @@ export async function POST(req: Request) {
     }
 
     // Update providers with the actual API keys
-    const llmGatewayProvider = createLLMGateway({
-      apiKey: apiKey ?? "",
-      compatibility: "strict",
-    });
-    const vercelGatewayProvider = createVercelGateway({
-      apiKey: aiGatewayApiKey ?? "",
+    const { llmGatewayProvider, vercelGatewayProvider } = makeProviders({
+      llmApiKey: apiKey,
+      aiGatewayApiKey,
     });
 
     if (!apiKey && usedGateway === "llm-gateway") {
@@ -470,10 +395,14 @@ export async function POST(req: Request) {
 
     try {
       // Use gateway providers for all requests (vision included)
-      const baseModel =
-        usedGateway === "vercel-ai-gateway"
-          ? vercelGatewayProvider(modelToUse)
-          : llmGatewayProvider(modelToUse);
+      const baseModel = getBaseModel({
+        usedGateway,
+        modelId: modelToUse,
+        isOAIReasoning: isOpenAIReasoningModel(modelToUse),
+        llmGatewayProvider,
+        vercelGatewayProvider,
+        reasoningEffort: (config?.openai?.reasoningEffort as "low" | "medium" | "high" | undefined) ?? "medium",
+      });
 
       // No <think> extraction: handle responses as-is per DeepSeek v5 docs and unified reasoning
       const modelForRequest = shouldUseSimulatedStreaming
@@ -486,32 +415,24 @@ export async function POST(req: Request) {
       const isOAIReasoning = isOpenAIReasoningModel(modelToUse);
       const isOpenAI = isOpenAIProvider(modelToUse);
       const isGoogle = isGoogleModel(modelToUse);
+      const _payload = buildPromptPayload({
+        isGoogle,
+        isOAIReasoning,
+        modelId: modelToUse,
+        uiMessages: messages as UIMessage[],
+        convertedMessages: finalConvertedMessages,
+        system,
+        bodyInput,
+      });
       const result = await streamText({
         model: modelForRequest,
-        ...(isGoogle
-          ? (() => {
-              // Prefer combined text from the provided UI messages; fallback to input when conversation is empty/new.
-              const combined = combineTextFromUIMessages(
-                messages as UIMessage[]
-              );
-              const prompt =
-                combined && combined.trim().length > 0
-                  ? combined
-                  : (bodyInput ?? "");
-              const googleMessages = [
-                {
-                  role: "user" as const,
-                  content: prompt && prompt.length > 0 ? prompt : "",
-                },
-              ];
-              return { system, messages: googleMessages };
-            })()
-          : {
-              system,
-              messages: removeEmptyModelMessages<ModelMessage>(
-                finalConvertedMessages
-              ),
-            }),
+        ...(usedGateway === "vercel-ai-gateway" && isOAIReasoning && containsImages
+          ? { system, messages: finalConvertedMessages }
+          : _payload.kind === "google"
+            ? { system: _payload.system, messages: _payload.messages }
+            : _payload.kind === "oai-reasoning"
+              ? { system: _payload.system, prompt: _payload.prompt }
+              : { system: _payload.system, messages: _payload.messages }),
         ...(isOAIReasoning
           ? {}
           : {
@@ -573,59 +494,40 @@ export async function POST(req: Request) {
         headers,
       });
     } catch (streamErr: unknown) {
-      const errMsg =
-        streamErr instanceof Error ? streamErr.message : String(streamErr);
-      // biome-ignore lint/suspicious/noExplicitAny: inspecting provider error shape
-      const responseBody: string | undefined = (streamErr as any)?.responseBody;
-      const lowerMsg = (errMsg || "").toLowerCase();
-      const lowerBody = (responseBody || "").toLowerCase();
-
-      const indicatesNoStreaming =
-        lowerMsg.includes("does not support streaming") ||
-        lowerMsg.includes("not support streaming") ||
-        lowerMsg.includes("streaming is not supported") ||
-        lowerBody.includes("does not support streaming") ||
-        lowerBody.includes("not support streaming") ||
-        lowerBody.includes("streaming is not supported");
-
-      if (indicatesNoStreaming) {
-        const providerForFallback =
-          usedGateway === "vercel-ai-gateway"
-            ? vercelGatewayProvider
-            : llmGatewayProvider;
+      if (isNoStreamingError(streamErr)) {
         const simulatedStreamingModel = wrapLanguageModel({
-          model: providerForFallback(modelToUse),
+          model: getBaseModel({
+            usedGateway,
+            modelId: modelToUse,
+            isOAIReasoning: isOpenAIReasoningModel(modelToUse),
+            llmGatewayProvider,
+            vercelGatewayProvider,
+            reasoningEffort: (config?.openai?.reasoningEffort as "low" | "medium" | "high" | undefined) ?? "medium",
+          }),
           middleware: simulateStreamingMiddleware(),
         });
 
         const isOAIReasoning2 = isOpenAIReasoningModel(modelToUse);
         const isOpenAI2 = isOpenAIProvider(modelToUse);
         const isGoogle2 = isGoogleModel(modelToUse);
+        const _payload2 = buildPromptPayload({
+          isGoogle: isGoogle2,
+          isOAIReasoning: isOAIReasoning2,
+          modelId: modelToUse,
+          uiMessages: messages as UIMessage[],
+          convertedMessages: finalConvertedMessages,
+          system,
+          bodyInput,
+        });
         const result = await streamText({
           model: simulatedStreamingModel,
-          ...(isGoogle2
-            ? (() => {
-                const combined = combineTextFromUIMessages(
-                  messages as UIMessage[]
-                );
-                const prompt =
-                  combined && combined.trim().length > 0
-                    ? combined
-                    : (bodyInput ?? "");
-                const googleMessages = [
-                  {
-                    role: "user" as const,
-                    content: prompt && prompt.length > 0 ? prompt : "",
-                  },
-                ];
-                return { system, messages: googleMessages };
-              })()
-            : {
-                system,
-                messages: removeEmptyModelMessages<ModelMessage>(
-                  finalConvertedMessages
-                ),
-              }),
+          ...(usedGateway === "vercel-ai-gateway" && isOAIReasoning2 && containsImages
+            ? { system, messages: finalConvertedMessages }
+            : _payload2.kind === "google"
+              ? { system: _payload2.system, messages: _payload2.messages }
+              : _payload2.kind === "oai-reasoning"
+                ? { system: _payload2.system, prompt: _payload2.prompt }
+                : { system: _payload2.system, messages: _payload2.messages }),
           ...(isOAIReasoning2 ? {} : { temperature }),
           ...(isOAIReasoning2
             ? {}
@@ -696,75 +598,6 @@ export async function POST(req: Request) {
     }
   } catch (err: unknown) {
     console.error("Chat API error:", err);
-    const errorMessage =
-      err instanceof Error ? err.message : "Unknown error occurred";
-
-    if (
-      errorMessage.includes("not supported") ||
-      errorMessage.includes("Bad Request")
-    ) {
-      const headers = new Headers({
-        "Content-Type": "application/json",
-        "X-Used-Gateway": "unknown",
-      });
-      return new Response(
-        JSON.stringify({
-          error: `Model "${modelToUse}" is not supported by the LLM Gateway. Please select a different model.`,
-          code: "MODEL_NOT_SUPPORTED",
-          usedGateway: "unknown",
-        }),
-        { status: 400, headers }
-      );
-    }
-
-    if (errorMessage.includes("429") || errorMessage.includes("rate limit")) {
-      const headers = new Headers({
-        "Content-Type": "application/json",
-        "X-Used-Gateway": "unknown",
-      });
-      return new Response(
-        JSON.stringify({
-          error: "Rate limit exceeded. Please wait a moment and try again.",
-          code: "RATE_LIMITED",
-          usedGateway: "unknown",
-        }),
-        { status: 429, headers }
-      );
-    }
-
-    if (
-      errorMessage.includes("quota") ||
-      errorMessage.includes("insufficient")
-    ) {
-      const headers = new Headers({
-        "Content-Type": "application/json",
-        "X-Used-Gateway": "unknown",
-      });
-      return new Response(
-        JSON.stringify({
-          error: "API quota exceeded. Please check your API key limits.",
-          code: "QUOTA_EXCEEDED",
-          usedGateway: "unknown",
-        }),
-        { status: 402, headers }
-      );
-    }
-
-    const headers = new Headers({
-      "Content-Type": "application/json",
-      "X-Used-Gateway": "unknown",
-      "Cache-Control": "no-store",
-    });
-    return new Response(
-      JSON.stringify({
-        error: "Internal server error",
-        details: errorMessage,
-        usedGateway: "unknown",
-      }),
-      {
-        status: 500,
-        headers,
-      }
-    );
+    return errorResponseForChat(err, modelToUse);
   }
 }

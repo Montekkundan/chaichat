@@ -71,10 +71,17 @@ export default function WelcomeChat({ initialName: _initialName }: WelcomeChatPr
 	// Global drag & drop for full screen
 	const [isDragOver, setIsDragOver] = useState(false);
 	const [dragCounter, setDragCounter] = useState(0);
-	const { models } = useLLMModels();
-	const supportsAttachments = useMemo(() => {
-		try { return modelSupportsVision(models, selectedModel); } catch { return false; }
-	}, [models, selectedModel]);
+    const { models } = useLLMModels();
+    const supportsAttachments = useMemo(() => {
+        try {
+            // TODO: Allow attachments for AI Gateway regardless of model metadata until modalities are exposed
+            const src = typeof window !== "undefined" ? window.localStorage.getItem("chaichat_models_source") : null;
+            if (src === "aigateway") return true;
+            return modelSupportsVision(models, selectedModel);
+        } catch {
+            return false;
+        }
+    }, [models, selectedModel]);
 	const [storageReady, setStorageReady] = useState<{ ready: boolean; reason?: string }>({ ready: false });
 	useEffect(() => {
 		const compute = () => {

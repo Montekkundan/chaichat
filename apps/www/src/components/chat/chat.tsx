@@ -178,9 +178,10 @@ export default function Chat({ initialName }: ChatProps = {}) {
 	const [dragCounter, setDragCounter] = useState(0);
 	const source = gateway === "vercel-ai-gateway" ? "aigateway" : "llmgateway";
 	const { models } = useLLMModels({ source, controlled: true });
-	const supportsAttachments = useMemo(() => {
-		try { return modelSupportsVision(models, selectedModel); } catch { return false; }
-	}, [models, selectedModel]);
+    const supportsAttachments = useMemo(() => {
+        if (gateway === "vercel-ai-gateway") return true;
+        try { return modelSupportsVision(models, selectedModel); } catch { return false; }
+    }, [models, selectedModel, gateway]);
 	const [storageReady, setStorageReady] = useState<{ ready: boolean; reason?: string }>({ ready: false });
 	useEffect(() => {
 		const compute = () => { try { setStorageReady(isStorageReady()); } catch { setStorageReady({ ready: false, reason: "Storage not configured" }); } };

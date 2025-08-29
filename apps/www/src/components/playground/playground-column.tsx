@@ -199,6 +199,8 @@ export function PlaygroundColumn({
 
 	// Determine model and storage capabilities
 	const supportsAttachments = useMemo(() => {
+		// TODO: Allow attachments for AI Gateway regardless of model metadata until modalities are exposed
+		if (columnSource === "aigateway") return true;
 		// While models load, don't block drag/drop
 		if (isModelsLoading) return true;
 		try {
@@ -206,7 +208,7 @@ export function PlaygroundColumn({
 		} catch {
 			return true;
 		}
-	}, [models, column.modelId, isModelsLoading]);
+	}, [models, column.modelId, isModelsLoading, columnSource]);
 
 	const [storageReady, setStorageReady] = useState<{ ready: boolean; reason?: string }>({ ready: false });
 	useEffect(() => {
@@ -412,8 +414,12 @@ export function PlaygroundColumn({
 		const nextFiles = [...files, ...previews];
 		setFiles(nextFiles);
 		// Broadcast to synced columns for preview reuse
-		try { setSharedAttachments(nextFiles.map(f => ({ name: f.name, url: f.url, contentType: f.contentType, size: f.size }))); } catch { }
-	}, [user?.id, files, setSharedAttachments]);
+		try {
+			if (column.synced) {
+				setSharedAttachments(nextFiles.map(f => ({ name: f.name, url: f.url, contentType: f.contentType, size: f.size })));
+			}
+		} catch { }
+	}, [files, setSharedAttachments, isModelsLoading, supportsAttachments, column.synced]);
 
 	// Mirror shared attachments (previews) into this column when synced
 	_useEffect(() => {
@@ -427,6 +433,18 @@ export function PlaygroundColumn({
 			});
 		}
 	}, [column.synced, sharedAttachments]);
+
+	// When this column becomes synced, broadcast its current local previews so
+	// other synced columns can mirror them.
+	useEffect(() => {
+		if (!column.synced) return;
+		if (files.length === 0) return;
+		try {
+			setSharedAttachments(files.map(f => ({ name: f.name, url: f.url, contentType: f.contentType, size: f.size })));
+		} catch { }
+		// We intentionally depend on `column.synced` to run once on toggle-on
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [column.synced, files, setSharedAttachments]);
 
 	const handleLocalFileChange = async (
 		e: React.ChangeEvent<HTMLInputElement>,
@@ -457,7 +475,11 @@ export function PlaygroundColumn({
 		});
 		const nextFiles2 = [...files, ...previews];
 		setFiles(nextFiles2);
-		try { setSharedAttachments(nextFiles2.map(f => ({ name: f.name, url: f.url, contentType: f.contentType, size: f.size }))); } catch { }
+		try {
+			if (column.synced) {
+				setSharedAttachments(nextFiles2.map(f => ({ name: f.name, url: f.url, contentType: f.contentType, size: f.size })));
+			}
+		} catch { }
 		// reset input so same file can be selected again
 		e.target.value = "";
 	};
@@ -599,7 +621,11 @@ export function PlaygroundColumn({
 
 				const newList = files.filter((f) => !f.local).concat(uploaded);
 				setFiles(newList);
-				try { setSharedAttachments(newList.map(f => ({ name: f.name, url: f.url, contentType: f.contentType, size: f.size }))); } catch { }
+				try {
+					if (column.synced) {
+						setSharedAttachments(newList.map(f => ({ name: f.name, url: f.url, contentType: f.contentType, size: f.size })));
+					}
+				} catch { }
 				attachmentsToSend = newList;
 			} catch (err) {
 				console.error("Upload before send failed", err);
@@ -617,7 +643,9 @@ export function PlaygroundColumn({
 			updateColumnInput(column.id, "");
 		}
 		setFiles([]); // Clear files after sending
-		try { setSharedAttachments([]); } catch { }
+		try {
+			if (column.synced) setSharedAttachments([]);
+		} catch { }
 
 		setIsSubmitting(true);
 
@@ -642,7 +670,7 @@ export function PlaygroundColumn({
 				await sendToSyncedColumns(trimmedInput, attachmentsToSend);
 			} else {
 				// Handle individual column send with attachments
-				await sendToColumn(column.id, trimmedInput);
+				await sendToColumn(column.id, trimmedInput, attachmentsToSend);
 			}
 
 			// Clear input

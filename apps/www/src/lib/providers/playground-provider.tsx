@@ -107,7 +107,7 @@ interface PlaygroundContextType {
 	toggleColumnSync: (columnId: string) => void;
 	updateSharedInput: (input: string) => void;
 	updateColumnInput: (columnId: string, input: string) => void;
-	sendToColumn: (columnId: string, message: string) => Promise<void>;
+    sendToColumn: (columnId: string, message: string, attachments?: UploadedFile[]) => Promise<void>;
 	sendToSyncedColumns: (message: string, attachments?: UploadedFile[]) => Promise<void>;
 	registerColumnScrollApi: (
 		columnId: string,
@@ -728,8 +728,8 @@ export function PlaygroundProvider({
 	}, [state.columns]);
 
 	// Message sending
-	const sendToColumn = useCallback(
-		async (columnId: string, messageText: string) => {
+    const sendToColumn = useCallback(
+        async (columnId: string, messageText: string, attachments?: UploadedFile[]) => {
 			const column = state.columns.find((col) => col.id === columnId);
 			if (!column) return;
 
@@ -762,18 +762,27 @@ export function PlaygroundProvider({
 				} catch { }
 
 				// Create user message
-				const userMessage: PlaygroundMessage = {
-					id: `user-${messageTimestamp}-${columnId}`,
-					role: "user",
-					content: messageText,
-					parts: createTextParts(messageText),
-					createdAt: new Date(),
-					model: column.modelId,
-					gateway:
-						column.gatewaySource === "aigateway"
-							? "vercel-ai-gateway"
-							: "llm-gateway",
-				};
+                const fileParts: UIMessage["parts"] = Array.isArray(attachments)
+                    ? attachments.map((att) => ({
+                        type: "file" as const,
+                        url: att.url,
+                        mediaType: att.contentType,
+                        filename: att.name,
+                    }))
+                    : [];
+
+                const userMessage: PlaygroundMessage = {
+                    id: `user-${messageTimestamp}-${columnId}`,
+                    role: "user",
+                    content: messageText,
+                    parts: ([{ type: "text", text: messageText } as const] as UIMessage["parts"]).concat(fileParts),
+                    createdAt: new Date(),
+                    model: column.modelId,
+                    gateway:
+                        column.gatewaySource === "aigateway"
+                            ? "vercel-ai-gateway"
+                            : "llm-gateway",
+                };
 
 				// Add user message immediately
 				updateColumn(columnId, {
@@ -867,14 +876,14 @@ export function PlaygroundProvider({
 					headers: {
 						"Content-Type": "application/json",
 					},
-					body: JSON.stringify({
-						messages: messagesForAPI,
-						model: column.modelId,
-						temperature: column.config.temperature,
-						config: pickConfigForModel(column.modelId, column.config),
-						userApiKeys,
-						gateway:
-							column.gatewaySource === "aigateway"
+                        body: JSON.stringify({
+                            messages: messagesForAPI,
+                            model: column.modelId,
+                            temperature: column.config.temperature,
+                            config: pickConfigForModel(column.modelId, column.config),
+                            userApiKeys,
+                            gateway:
+                                column.gatewaySource === "aigateway"
 								? "vercel-ai-gateway"
 								: "llm-gateway",
 					}),

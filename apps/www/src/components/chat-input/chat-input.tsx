@@ -175,11 +175,12 @@ export function ChatInput({
 	const isOnlyWhitespace = (text: string) => !/[^\s]/.test(text);
 
 	// Determine if selected model supports image inputs
-	const { models } = useLLMModels({
-		source: modelsSource === "aigateway" ? "aigateway" : "llmgateway",
-		controlled: true,
-	});
-	const supportsAttachments = modelSupportsVision(models, selectedModel);
+    const { models } = useLLMModels({
+        source: modelsSource === "aigateway" ? "aigateway" : "llmgateway",
+        controlled: true,
+    });
+    // TODO: Allow attachments for AI Gateway regardless of model metadata until modalities are exposed
+    const supportsAttachments = modelsSource === "aigateway" ? true : modelSupportsVision(models, selectedModel);
 
 	const uploadHelpers = generateReactHelpers<UploadRouter>();
 	const { useUploadThing } = uploadHelpers;
@@ -270,64 +271,6 @@ export function ChatInput({
 			window.removeEventListener("storage", onStorageChanged);
 		};
 	}, []);
-
-	// Handle paste events (defined after startUpload to avoid TS errors)
-	const _handlePaste = useCallback(
-		async (e: ClipboardEvent) => {
-			const items = e.clipboardData?.items;
-			if (!items) return;
-
-			const hasImageContent = Array.from(items).some((item) =>
-				item.type.startsWith("image/"),
-			);
-
-
-			if (hasImageContent) {
-				const imageFiles: File[] = [];
-
-				for (const item of Array.from(items)) {
-					if (item.type.startsWith("image/")) {
-						const file = item.getAsFile();
-						if (file) {
-							const newFile = new File(
-								[file],
-								`pasted-image-${Date.now()}.${file.type.split("/")[1]}`,
-								{ type: file.type },
-							);
-							imageFiles.push(newFile);
-						}
-					}
-				}
-
-				if (imageFiles.length > 0) {
-					// Validate against limits and mime types
-					const { validFiles, errors } = filterValidFiles(
-						imageFiles,
-						files.length,
-					);
-					if (errors.length) {
-						toast({ title: errors.join("\n"), status: "error" });
-					}
-
-					if (validFiles.length === 0) return;
-
-					// Create local preview objects and queue files
-					const previews = validFiles.map((file) => {
-						pendingFilesRef.current.push(file);
-						return {
-							name: file.name,
-							url: URL.createObjectURL(file),
-							contentType: file.type,
-							size: file.size,
-							local: true,
-						} as import("./file-items").UploadedFile;
-					});
-					onFileUpload(previews);
-				}
-			}
-		},
-		[isUserAuthenticated, onFileUpload, files.length],
-	);
 
 	const handleDragEnter = useCallback((e: React.DragEvent) => {
 		if (!supportsAttachments || !storageReady.ready) return;

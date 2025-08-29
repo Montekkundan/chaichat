@@ -44,7 +44,6 @@ import {
 import { cn } from "~/lib/utils";
 import { useState } from "react";
 import Image from "next/image";
-import { Badge } from "./ui/badge";
 
 const data = {
 	nav: [
