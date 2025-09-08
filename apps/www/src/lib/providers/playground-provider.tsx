@@ -382,7 +382,7 @@ export function PlaygroundProvider({
 		config: ModelConfig,
 	): ModelConfig {
 		const providersInPath = modelId.toLowerCase().split("/");
-		const hasOpenAI = providersInPath.includes("openai");
+		const hasOpenAI = providersInPath.includes("openai") || providersInPath.includes("gpt-oss");
 		const hasGoogleOrGemini =
 			providersInPath.includes("google") || providersInPath.includes("gemini");
 		const base: ModelConfig = {

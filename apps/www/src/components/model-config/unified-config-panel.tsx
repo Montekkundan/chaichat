@@ -46,10 +46,10 @@ export function UnifiedConfigPanel({
 	const rootProvider = providerId || modelId.split("/")[0];
 
 	// Provider detection with comprehensive patterns
-	const isOpenAI = useMemo(
-		() => /^(openai|azure-openai|openai-chat)$/i.test(rootProvider ?? ""),
-		[rootProvider],
-	);
+	const isOpenAI = useMemo(() => {
+		const segments = (modelId || "").split("/");
+		return segments.some((seg) => /^(openai|azure-openai|openai-chat|gpt-oss)$/i.test(seg ?? ""));
+	}, [modelId]);
 	const isGoogle = useMemo(
 		() =>
 			/^(google|gemini|google-ai-studio|google-generative-ai)$/i.test(
@@ -62,17 +62,20 @@ export function UnifiedConfigPanel({
 		[rootProvider],
 	);
 	const isReasoningModel = useMemo(() => {
-		const { modelName } = parseProviderAndModel(modelId);
+		if (!isOpenAI) return false;
+		const segs = (modelId || "").toLowerCase().split("/");
+		const leaf = segs[segs.length - 1] || "";
 		return (
-			isOpenAI &&
-			(modelName === "o1" ||
-				modelName.startsWith("o1-") ||
-				modelName === "o3" ||
-				modelName.startsWith("o3-") ||
-				modelName === "gpt-5" ||
-				modelName.startsWith("gpt-5") ||
-				modelName === "o4-mini" ||
-				modelName.startsWith("o4-mini-"))
+			leaf === "o1" ||
+			leaf.startsWith("o1-") ||
+			leaf === "o3" ||
+			leaf.startsWith("o3-") ||
+			leaf === "gpt-5" ||
+			leaf.startsWith("gpt-5") ||
+			leaf === "o4-mini" ||
+			leaf.startsWith("o4-mini-") ||
+			leaf === "gpt-oss" ||
+			leaf.startsWith("gpt-oss-")
 		);
 	}, [modelId, isOpenAI]);
 

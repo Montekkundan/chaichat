@@ -154,19 +154,24 @@ export function parseProviderAndModel(modelId: string): {
 }
 
 export function isOpenAIReasoningModel(modelId: string): boolean {
-	const { providerId, modelName } = parseProviderAndModel(modelId);
-	if (providerId && providerId !== "openai") return false;
-	if (!modelName) return false;
-	return (
-		modelName === "o1" ||
-		modelName.startsWith("o1-") ||
-		modelName === "o3" ||
-		modelName.startsWith("o3-") ||
-		modelName === "gpt-5" ||
-		modelName.startsWith("gpt-5") ||
-		modelName === "o4-mini" ||
-		modelName.startsWith("o4-mini-")
-	);
+	const normalized = (modelId || "").toLowerCase();
+	const segments = normalized.split("/");
+	const last = segments[segments.length - 1] || normalized;
+	// OpenAI o-series and GPT-5
+	if (
+		last === "o1" ||
+		last.startsWith("o1-") ||
+		last === "o3" ||
+		last.startsWith("o3-") ||
+		last === "gpt-5" ||
+		last.startsWith("gpt-5") ||
+		last === "o4-mini" ||
+		last.startsWith("o4-mini-")
+	) {
+		return true;
+	}
+	// GPT OSS has configurable reasoning effort; treat as reasoning model
+	return last === "gpt-oss" || last.startsWith("gpt-oss-");
 }
 
 export function isGoogleModel(modelId: string): boolean {
@@ -176,9 +181,9 @@ export function isGoogleModel(modelId: string): boolean {
 }
 
 export function isOpenAIProvider(modelId: string): boolean {
-	const { providerId } = parseProviderAndModel(modelId);
-	const rootProvider = providerId || modelId.split("/")[0];
-	return /^(openai|azure-openai|openai-chat)$/i.test(rootProvider ?? "");
+	const segments = (modelId || "").split("/");
+	// Treat GPT OSS models as OpenAI-compatible for provider options
+	return segments.some((seg) => /^(openai|azure-openai|openai-chat|gpt-oss)$/i.test(seg ?? ""));
 }
 
 export function combineTextFromUIMessages(uiMessages: MessageAISDK[]): string {
@@ -334,7 +339,10 @@ export function buildProviderOptions(params: {
 	const rootProvider = providerId || modelId.split("/")[0];
 	const options: Record<string, Record<string, JSONValue>> = {};
 
-	if (/^(openai|azure-openai|openai-chat)$/i.test(rootProvider ?? "")) {
+	// GPT OSS models are OpenAI-compatible and accept OpenAI provider options
+	const providersInPath = (modelId || "").split("/");
+	const hasOpenAICompat = providersInPath.some((p) => /^(openai|azure-openai|openai-chat|gpt-oss)$/i.test(p ?? ""));
+	if (hasOpenAICompat) {
 		const openaiOpts: Record<string, JSONValue> = {};
 		if (openai) {
 			const {
