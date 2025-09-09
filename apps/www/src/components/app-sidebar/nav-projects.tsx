@@ -9,6 +9,7 @@ import {
 	SidebarGroup,
 	SidebarGroupLabel,
 	SidebarMenu,
+	SidebarMenuBadge,
 	SidebarMenuButton,
 	SidebarMenuItem,
 } from "~/components/ui/sidebar";
@@ -21,6 +22,7 @@ export function NavProjects({
 		url: string;
 		icon: LucideIcon | ReactElement;
 		activeIcon?: ReactElement;
+		badge?: string;
 	}[];
 }) {
 	
@@ -38,6 +40,7 @@ export function NavProjects({
 									<item.icon />
 								) : null}
 								<span>{item.name}</span>
+								{item.badge && <SidebarMenuBadge>{item.badge}</SidebarMenuBadge>}
 							</a>
 						</SidebarMenuButton>
 					</SidebarMenuItem>

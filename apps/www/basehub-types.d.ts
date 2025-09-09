@@ -99,7 +99,7 @@ export interface BlockColor {
     __typename: 'BlockColor'
 }
 
-export type BlockDocument = (Changelog | Components | ImageComponent | Pages | PagesItem | PagesItem_1 | Pages_1 | Registry | Tags | TagsItem | TweetComponent | VideoComponent | YoutubeComponent | _AgentStart | imageComponent_AsList | pagesItem1_AsList | pagesItem_AsList | tagsItem_AsList | tweetComponent_AsList | videoComponent_AsList | youtubeComponent_AsList) & { __isUnion?: true }
+export type BlockDocument = (Chailab | Changelog | Components | Documentation | DocumentationItem | ImageComponent | Pages | PagesItem | PagesItem_1 | Pages_1 | Registry | Tags | TagsItem | TweetComponent | VideoComponent | YoutubeComponent | _AgentStart | documentationItem_AsList | imageComponent_AsList | pagesItem1_AsList | pagesItem_AsList | tagsItem_AsList | tweetComponent_AsList | videoComponent_AsList | youtubeComponent_AsList) & { __isUnion?: true }
 
 export interface BlockDocumentSys {
     apiNamePath: Scalars['String']
@@ -158,7 +158,7 @@ export interface BlockImage {
     __typename: 'BlockImage'
 }
 
-export type BlockList = (Pages | Pages_1 | Tags | imageComponent_AsList | pagesItem1_AsList | pagesItem_AsList | tagsItem_AsList | tweetComponent_AsList | videoComponent_AsList | youtubeComponent_AsList) & { __isUnion?: true }
+export type BlockList = (Documentation | Pages | Pages_1 | Tags | documentationItem_AsList | imageComponent_AsList | pagesItem1_AsList | pagesItem_AsList | tagsItem_AsList | tweetComponent_AsList | videoComponent_AsList | youtubeComponent_AsList) & { __isUnion?: true }
 
 export interface BlockOgImage {
     height: Scalars['Int']
@@ -183,6 +183,19 @@ export interface BlockVideo {
     url: Scalars['String']
     width: Scalars['Int']
     __typename: 'BlockVideo'
+}
+
+export interface Chailab {
+    _analyticsKey: Scalars['String']
+    _dashboardUrl: Scalars['String']
+    _id: Scalars['String']
+    _idPath: Scalars['String']
+    _slug: Scalars['String']
+    _slugPath: Scalars['String']
+    _sys: BlockDocumentSys
+    _title: Scalars['String']
+    documentation: Documentation
+    __typename: 'Chailab'
 }
 
 export interface Changelog {
@@ -239,11 +252,46 @@ export interface Content_1 {
 }
 
 export interface Content_1RichText {
-    blocks: UnionImageComponentVideoComponentYoutubeComponentTweetComponent[]
+    blocks: UnionVideoComponentYoutubeComponentTweetComponentImageComponent[]
     content: Scalars['BSHBRichTextContentSchema']
     toc: Scalars['BSHBRichTextTOCSchema']
     __typename: 'Content_1RichText'
 }
+
+export interface Documentation {
+    _analyticsKey: Scalars['String']
+    _dashboardUrl: Scalars['String']
+    _id: Scalars['String']
+    _idPath: Scalars['String']
+    _meta: ListMeta
+    /** The key used to search from the frontend. */
+    _searchKey: Scalars['String']
+    _slug: Scalars['String']
+    _slugPath: Scalars['String']
+    _sys: BlockDocumentSys
+    _title: Scalars['String']
+    /** Returns the first item in the list, or null if the list is empty. Useful when you expect only one result. */
+    item: (DocumentationItem | null)
+    /** Returns the list of items after filtering and paginating according to the arguments sent by the client. */
+    items: DocumentationItem[]
+    __typename: 'Documentation'
+}
+
+export interface DocumentationItem {
+    _analyticsKey: Scalars['String']
+    _dashboardUrl: Scalars['String']
+    /** Array of search highlight information with field names and HTML markup */
+    _highlight: (SearchHighlight[] | null)
+    _id: Scalars['String']
+    _idPath: Scalars['String']
+    _slug: Scalars['String']
+    _slugPath: Scalars['String']
+    _sys: BlockDocumentSys
+    _title: Scalars['String']
+    __typename: 'DocumentationItem'
+}
+
+export type DocumentationItemOrderByEnum = '_sys_createdAt__ASC' | '_sys_createdAt__DESC' | '_sys_hash__ASC' | '_sys_hash__DESC' | '_sys_id__ASC' | '_sys_id__DESC' | '_sys_lastModifiedAt__ASC' | '_sys_lastModifiedAt__DESC' | '_sys_slug__ASC' | '_sys_slug__DESC' | '_sys_title__ASC' | '_sys_title__DESC'
 
 export interface GetUploadSignedURL {
     signedURL: Scalars['String']
@@ -400,6 +448,7 @@ export interface Query {
     /** The structure of the repository. Used by START. */
     _structure: Scalars['JSON']
     _sys: RepoSys
+    chailab: Chailab
     changelog: Changelog
     components: Components
     registry: Registry
@@ -504,7 +553,7 @@ export interface TweetComponent {
 
 export type TweetComponentOrderByEnum = '_sys_createdAt__ASC' | '_sys_createdAt__DESC' | '_sys_hash__ASC' | '_sys_hash__DESC' | '_sys_id__ASC' | '_sys_id__DESC' | '_sys_lastModifiedAt__ASC' | '_sys_lastModifiedAt__DESC' | '_sys_slug__ASC' | '_sys_slug__DESC' | '_sys_title__ASC' | '_sys_title__DESC' | 'tweetId__ASC' | 'tweetId__DESC' | 'untitled__ASC' | 'untitled__DESC'
 
-export type UnionImageComponentVideoComponentYoutubeComponentTweetComponent = (ImageComponent | TweetComponent | VideoComponent | YoutubeComponent) & { __isUnion?: true }
+export type UnionVideoComponentYoutubeComponentTweetComponentImageComponent = (ImageComponent | TweetComponent | VideoComponent | YoutubeComponent) & { __isUnion?: true }
 
 export interface Variant {
     apiName: Scalars['String']
@@ -649,6 +698,7 @@ export interface _agents {
 }
 
 export interface _components {
+    documentationItem: documentationItem_AsList
     image: imageComponent_AsList
     pagesItem: pagesItem_AsList
     pagesItem1: pagesItem1_AsList
@@ -657,6 +707,25 @@ export interface _components {
     video: videoComponent_AsList
     youtube: youtubeComponent_AsList
     __typename: '_components'
+}
+
+export interface documentationItem_AsList {
+    _analyticsKey: Scalars['String']
+    _dashboardUrl: Scalars['String']
+    _id: Scalars['String']
+    _idPath: Scalars['String']
+    _meta: ListMeta
+    /** The key used to search from the frontend. */
+    _searchKey: Scalars['String']
+    _slug: Scalars['String']
+    _slugPath: Scalars['String']
+    _sys: BlockDocumentSys
+    _title: Scalars['String']
+    /** Returns the first item in the list, or null if the list is empty. Useful when you expect only one result. */
+    item: (DocumentationItem | null)
+    /** Returns the list of items after filtering and paginating according to the arguments sent by the client. */
+    items: DocumentationItem[]
+    __typename: 'documentationItem_AsList'
 }
 
 export interface imageComponent_AsList {
@@ -846,8 +915,11 @@ export interface BlockDocumentGenqlSelection{
     _slugPath?: boolean | number
     _sys?: BlockDocumentSysGenqlSelection
     _title?: boolean | number
+    on_Chailab?: ChailabGenqlSelection
     on_Changelog?: ChangelogGenqlSelection
     on_Components?: ComponentsGenqlSelection
+    on_Documentation?: DocumentationGenqlSelection
+    on_DocumentationItem?: DocumentationItemGenqlSelection
     on_ImageComponent?: ImageComponentGenqlSelection
     on_Pages?: PagesGenqlSelection
     on_PagesItem?: PagesItemGenqlSelection
@@ -860,6 +932,7 @@ export interface BlockDocumentGenqlSelection{
     on_VideoComponent?: VideoComponentGenqlSelection
     on_YoutubeComponent?: YoutubeComponentGenqlSelection
     on__AgentStart?: _AgentStartGenqlSelection
+    on_documentationItem_AsList?: documentationItem_AsListGenqlSelection
     on_imageComponent_AsList?: imageComponent_AsListGenqlSelection
     on_pagesItem1_AsList?: pagesItem1_AsListGenqlSelection
     on_pagesItem_AsList?: pagesItem_AsListGenqlSelection
@@ -945,9 +1018,11 @@ export interface BlockListGenqlSelection{
     _slugPath?: boolean | number
     _sys?: BlockDocumentSysGenqlSelection
     _title?: boolean | number
+    on_Documentation?: DocumentationGenqlSelection
     on_Pages?: PagesGenqlSelection
     on_Pages_1?: Pages_1GenqlSelection
     on_Tags?: TagsGenqlSelection
+    on_documentationItem_AsList?: documentationItem_AsListGenqlSelection
     on_imageComponent_AsList?: imageComponent_AsListGenqlSelection
     on_pagesItem1_AsList?: pagesItem1_AsListGenqlSelection
     on_pagesItem_AsList?: pagesItem_AsListGenqlSelection
@@ -995,6 +1070,35 @@ export interface BlockVideoGenqlSelection{
     mimeType?: boolean | number
     url?: boolean | number
     width?: boolean | number
+    __typename?: boolean | number
+}
+
+export interface ChailabGenqlSelection{
+    _analyticsKey?: { __args: {
+    /**
+     * The scope of the analytics key. Use `send` for just ingesting data. Use `query` if you need to show an analytics data in your website.
+     * 
+     * Have in mind, if you expose your `query` analytics key in the frontend, you'll be exposing all of this block's analytics data to the public. This is generally safe, but it might not be in your case.
+     */
+    scope?: (AnalyticsKeyScope | null)} } | boolean | number
+    _dashboardUrl?: boolean | number
+    _id?: boolean | number
+    _idPath?: boolean | number
+    _slug?: boolean | number
+    _slugPath?: boolean | number
+    _sys?: BlockDocumentSysGenqlSelection
+    _title?: boolean | number
+    documentation?: (DocumentationGenqlSelection & { __args?: {
+    /** Filter by a field. */
+    filter?: (DocumentationItemFilterInput | null), 
+    /** Limit the number of items returned. Defaults to 500. */
+    first?: (Scalars['Int'] | null), 
+    /** Order by a field. */
+    orderBy?: (DocumentationItemOrderByEnum | null), 
+    /** Search configuration */
+    search?: (DocumentationItemSearchInput | null), 
+    /** Skip the first n items. */
+    skip?: (Scalars['Int'] | null)} })
     __typename?: boolean | number
 }
 
@@ -1086,13 +1190,66 @@ export interface Content_1GenqlSelection{
 }
 
 export interface Content_1RichTextGenqlSelection{
-    blocks?: UnionImageComponentVideoComponentYoutubeComponentTweetComponentGenqlSelection
+    blocks?: UnionVideoComponentYoutubeComponentTweetComponentImageComponentGenqlSelection
     content?: boolean | number
     toc?: boolean | number
     __typename?: boolean | number
 }
 
 export interface DateFilter {eq?: (Scalars['DateTime'] | null),isAfter?: (Scalars['DateTime'] | null),isBefore?: (Scalars['DateTime'] | null),isNull?: (Scalars['Boolean'] | null),neq?: (Scalars['DateTime'] | null),onOrAfter?: (Scalars['DateTime'] | null),onOrBefore?: (Scalars['DateTime'] | null)}
+
+export interface DocumentationGenqlSelection{
+    _analyticsKey?: { __args: {
+    /**
+     * The scope of the analytics key. Use `send` for just ingesting data. Use `query` if you need to show an analytics data in your website.
+     * 
+     * Have in mind, if you expose your `query` analytics key in the frontend, you'll be exposing all of this block's analytics data to the public. This is generally safe, but it might not be in your case.
+     */
+    scope?: (AnalyticsKeyScope | null)} } | boolean | number
+    _dashboardUrl?: boolean | number
+    _id?: boolean | number
+    _idPath?: boolean | number
+    _meta?: ListMetaGenqlSelection
+    /** The key used to search from the frontend. */
+    _searchKey?: boolean | number
+    _slug?: boolean | number
+    _slugPath?: boolean | number
+    _sys?: BlockDocumentSysGenqlSelection
+    _title?: boolean | number
+    /** Returns the first item in the list, or null if the list is empty. Useful when you expect only one result. */
+    item?: DocumentationItemGenqlSelection
+    /** Returns the list of items after filtering and paginating according to the arguments sent by the client. */
+    items?: DocumentationItemGenqlSelection
+    __typename?: boolean | number
+}
+
+export interface DocumentationItemGenqlSelection{
+    _analyticsKey?: { __args: {
+    /**
+     * The scope of the analytics key. Use `send` for just ingesting data. Use `query` if you need to show an analytics data in your website.
+     * 
+     * Have in mind, if you expose your `query` analytics key in the frontend, you'll be exposing all of this block's analytics data to the public. This is generally safe, but it might not be in your case.
+     */
+    scope?: (AnalyticsKeyScope | null)} } | boolean | number
+    _dashboardUrl?: boolean | number
+    /** Array of search highlight information with field names and HTML markup */
+    _highlight?: SearchHighlightGenqlSelection
+    _id?: boolean | number
+    _idPath?: boolean | number
+    _slug?: boolean | number
+    _slugPath?: boolean | number
+    _sys?: BlockDocumentSysGenqlSelection
+    _title?: boolean | number
+    __typename?: boolean | number
+}
+
+export interface DocumentationItemFilterInput {AND?: (DocumentationItemFilterInput | null),OR?: (DocumentationItemFilterInput | null),_id?: (StringFilter | null),_slug?: (StringFilter | null),_sys_apiNamePath?: (StringFilter | null),_sys_createdAt?: (DateFilter | null),_sys_hash?: (StringFilter | null),_sys_id?: (StringFilter | null),_sys_idPath?: (StringFilter | null),_sys_lastModifiedAt?: (DateFilter | null),_sys_slug?: (StringFilter | null),_sys_slugPath?: (StringFilter | null),_sys_title?: (StringFilter | null),_title?: (StringFilter | null)}
+
+export interface DocumentationItemSearchInput {
+/** Searchable fields for query */
+by?: (Scalars['String'][] | null),
+/** Search query */
+q?: (Scalars['String'] | null)}
 
 export interface GetUploadSignedURLGenqlSelection{
     signedURL?: boolean | number
@@ -1369,6 +1526,7 @@ export interface QueryGenqlSelection{
     /** Whether to include type options in the structure. */
     withTypeOptions?: (Scalars['Boolean'] | null)} } | boolean | number
     _sys?: RepoSysGenqlSelection
+    chailab?: ChailabGenqlSelection
     changelog?: ChangelogGenqlSelection
     components?: ComponentsGenqlSelection
     registry?: RegistryGenqlSelection
@@ -1532,7 +1690,7 @@ by?: (Scalars['String'][] | null),
 /** Search query */
 q?: (Scalars['String'] | null)}
 
-export interface UnionImageComponentVideoComponentYoutubeComponentTweetComponentGenqlSelection{
+export interface UnionVideoComponentYoutubeComponentTweetComponentImageComponentGenqlSelection{
     on_ImageComponent?:ImageComponentGenqlSelection,
     on_TweetComponent?:TweetComponentGenqlSelection,
     on_VideoComponent?:VideoComponentGenqlSelection,
@@ -1710,6 +1868,17 @@ export interface _agentsGenqlSelection{
 }
 
 export interface _componentsGenqlSelection{
+    documentationItem?: (documentationItem_AsListGenqlSelection & { __args?: {
+    /** Filter by a field. */
+    filter?: (DocumentationItemFilterInput | null), 
+    /** Limit the number of items returned. Defaults to 500. */
+    first?: (Scalars['Int'] | null), 
+    /** Order by a field. */
+    orderBy?: (DocumentationItemOrderByEnum | null), 
+    /** Search configuration */
+    search?: (DocumentationItemSearchInput | null), 
+    /** Skip the first n items. */
+    skip?: (Scalars['Int'] | null)} })
     image?: (imageComponent_AsListGenqlSelection & { __args?: {
     /** Filter by a field. */
     filter?: (ImageComponentFilterInput | null), 
@@ -1787,6 +1956,31 @@ export interface _componentsGenqlSelection{
     search?: (YoutubeComponentSearchInput | null), 
     /** Skip the first n items. */
     skip?: (Scalars['Int'] | null)} })
+    __typename?: boolean | number
+}
+
+export interface documentationItem_AsListGenqlSelection{
+    _analyticsKey?: { __args: {
+    /**
+     * The scope of the analytics key. Use `send` for just ingesting data. Use `query` if you need to show an analytics data in your website.
+     * 
+     * Have in mind, if you expose your `query` analytics key in the frontend, you'll be exposing all of this block's analytics data to the public. This is generally safe, but it might not be in your case.
+     */
+    scope?: (AnalyticsKeyScope | null)} } | boolean | number
+    _dashboardUrl?: boolean | number
+    _id?: boolean | number
+    _idPath?: boolean | number
+    _meta?: ListMetaGenqlSelection
+    /** The key used to search from the frontend. */
+    _searchKey?: boolean | number
+    _slug?: boolean | number
+    _slugPath?: boolean | number
+    _sys?: BlockDocumentSysGenqlSelection
+    _title?: boolean | number
+    /** Returns the first item in the list, or null if the list is empty. Useful when you expect only one result. */
+    item?: DocumentationItemGenqlSelection
+    /** Returns the list of items after filtering and paginating according to the arguments sent by the client. */
+    items?: DocumentationItemGenqlSelection
     __typename?: boolean | number
 }
 
@@ -2014,6 +2208,10 @@ export interface FragmentsMap {
     root: BlockVideo,
     selection: BlockVideoGenqlSelection,
 }
+  Chailab: {
+    root: Chailab,
+    selection: ChailabGenqlSelection,
+}
   Changelog: {
     root: Changelog,
     selection: ChangelogGenqlSelection,
@@ -2037,6 +2235,14 @@ export interface FragmentsMap {
   Content_1RichText: {
     root: Content_1RichText,
     selection: Content_1RichTextGenqlSelection,
+}
+  Documentation: {
+    root: Documentation,
+    selection: DocumentationGenqlSelection,
+}
+  DocumentationItem: {
+    root: DocumentationItem,
+    selection: DocumentationItemGenqlSelection,
 }
   GetUploadSignedURL: {
     root: GetUploadSignedURL,
@@ -2153,6 +2359,10 @@ export interface FragmentsMap {
   _components: {
     root: _components,
     selection: _componentsGenqlSelection,
+}
+  documentationItem_AsList: {
+    root: documentationItem_AsList,
+    selection: documentationItem_AsListGenqlSelection,
 }
   imageComponent_AsList: {
     root: imageComponent_AsList,

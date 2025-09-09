@@ -15,7 +15,7 @@ import {
 } from "../chat/utils";
 import { createGateway as createVercelGateway } from "@ai-sdk/gateway";
 import { createLLMGateway } from "@llmgateway/ai-sdk-provider";
-import { overlayPointsTool, setCameraTool, setRotationTool, overlayBarsTool, setShaderParamsTool, overlayGeoTool, setBaseMapTool, clearOverlaysTool, overlayCountryMetricTool, overlayIndiaStatesTool, fetchPopulationTool } from "./tools";
+import { overlayPointsTool, setCameraTool, setRotationTool, overlayBarsTool, setShaderParamsTool, overlayGeoTool, setBaseMapTool, clearOverlaysTool, overlayCountryMetricTool, fetchPopulationTool } from "./tools";
 
 const convex = new ConvexHttpClient(env.NEXT_PUBLIC_CONVEX_URL);
 
@@ -230,7 +230,6 @@ export async function POST(req: Request) {
           setBaseMap: setBaseMapTool,
           clearOverlays: clearOverlaysTool,
           overlayCountryMetric: overlayCountryMetricTool,
-          overlayIndiaStates: overlayIndiaStatesTool,
           fetchPopulation: fetchPopulationTool,
         },
         // Enable multi-step tool use so the model can chain overlayGeo + setCamera + setRotation, etc.
@@ -308,7 +307,6 @@ export async function POST(req: Request) {
           setBaseMap: setBaseMapTool,
           clearOverlays: clearOverlaysTool,
           overlayCountryMetric: overlayCountryMetricTool,
-          overlayIndiaStates: overlayIndiaStatesTool,
           fetchPopulation: fetchPopulationTool,
         },
           stopWhen: stepCountIs(6),

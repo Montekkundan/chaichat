@@ -35,6 +35,7 @@ import { Separator } from "../ui/separator";
 import { HistorySection } from "./history-section";
 // import { NavMain } from "./nav-main";
 import { NavTop } from "./nav-top";
+import { NavProjects } from "./nav-projects";
 // import { NavProjects } from "./nav-projects";
 
 
@@ -235,6 +236,7 @@ export function AppSidebar({
 				name: "World Analysis",
 				url: "/use-cases/world-analysis",
 				icon: Frame,
+				badge: "Preview",
 			},
 		],
 	};
@@ -257,7 +259,7 @@ export function AppSidebar({
 			<SidebarContent>
 				<NavTop items={data.navTop} />
 				<Separator className="!w-[90%] mx-auto" />
-				{/* <NavProjects projects={data.projects} /> */}
+				<NavProjects projects={data.projects} />
 				{/* <Separator className="!w-[90%] mx-auto"/> */}
 				{/* <NavMain items={data.navMain} />
 				<Separator className="!w-[90%] mx-auto"/> */}

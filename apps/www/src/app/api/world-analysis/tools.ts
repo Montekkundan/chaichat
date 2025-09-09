@@ -140,51 +140,6 @@ export const overlayCountryMetricTool = tool({
   execute: async (input) => ({ type: 'country-metric', ...input }),
 });
 
-// Lightweight built-in dataset: India states centroids and populations (approximate)
-const INDIA_STATES_DATA: Array<{ name: string; lat: number; lon: number; population: number }> = [
-  { name: 'Uttar Pradesh', lat: 27.130334, lon: 80.859666, population: 237882725 },
-  { name: 'Maharashtra', lat: 19.75148, lon: 75.71389, population: 124904071 },
-  { name: 'Bihar', lat: 25.644084, lon: 85.906508, population: 128500364 },
-  { name: 'West Bengal', lat: 22.986757, lon: 87.854976, population: 99609303 },
-  { name: 'Madhya Pradesh', lat: 23.473324, lon: 77.947998, population: 85358965 },
-  { name: 'Tamil Nadu', lat: 11.127123, lon: 78.656891, population: 77841267 },
-  { name: 'Rajasthan', lat: 27.023803, lon: 74.217933, population: 81032689 },
-  { name: 'Gujarat', lat: 22.258652, lon: 71.192381, population: 71067000 },
-  { name: 'Karnataka', lat: 15.317277, lon: 75.71389, population: 67562686 },
-  { name: 'Andhra Pradesh', lat: 15.9129, lon: 79.74, population: 53900000 },
-  { name: 'Telangana', lat: 17.9784, lon: 79.5941, population: 39362732 },
-  { name: 'Odisha', lat: 20.951666, lon: 85.098524, population: 46356334 },
-  { name: 'Kerala', lat: 10.850516, lon: 76.27108, population: 35699443 },
-  { name: 'Assam', lat: 26.200604, lon: 92.937573, population: 35607039 },
-  { name: 'Jharkhand', lat: 23.61018, lon: 85.27994, population: 39576757 },
-  { name: 'Punjab', lat: 31.14713, lon: 75.34122, population: 30141373 },
-  { name: 'Haryana', lat: 29.058776, lon: 76.085601, population: 28672000 },
-  { name: 'Chhattisgarh', lat: 21.278657, lon: 81.866144, population: 29436231 },
-  { name: 'Delhi', lat: 28.70406, lon: 77.10249, population: 18710922 },
-  { name: 'Jammu and Kashmir', lat: 33.2778, lon: 75.3412, population: 13300000 },
-]
-
-export const overlayIndiaStatesTool = tool({
-  description: 'Show markers for Indian states (topK by population or specific names).',
-  inputSchema: z.object({
-    intent: z.string().optional(),
-    names: z.array(z.string()).optional(),
-    topK: z.number().min(1).max(36).optional(),
-    color: z.string().optional(),
-  }),
-  execute: async ({ intent, names, topK, color }) => {
-    let rows = INDIA_STATES_DATA.slice()
-    if (Array.isArray(names) && names.length > 0) {
-      const set = new Set(names.map((s) => s.toLowerCase()))
-      rows = rows.filter((r) => set.has(r.name.toLowerCase()))
-    }
-    rows.sort((a, b) => b.population - a.population)
-    if (typeof topK === 'number') rows = rows.slice(0, topK)
-    const points = rows.map((r) => ({ lat: r.lat, lon: r.lon, value: r.population, color: color || '#F59E0B', size: undefined, label: r.name }))
-    return { type: 'points' as const, intent: intent || 'india-states', points, legend: { title: 'State population', units: 'people' } }
-  },
-});
-
 // Fetch latest population data from the web (RestCountries) and return as country-metric
 export const fetchPopulationTool = tool({
   description: 'Fetch current population for given ISO country codes (A2/A3) using RestCountries API or fetch top-k globally.',

@@ -9,6 +9,9 @@ import { useSidebar } from "~/components/ui/sidebar"
 import { cn } from "~/lib/utils"
 import { OverlayChat } from "./overlay-chat"
 import MorphPanel from "./usecase-panel"
+import { Button } from "~/components/ui/button"
+import { Play, Pause } from "@phosphor-icons/react"
+import { Tooltip, TooltipContent, TooltipTrigger } from "~/components/ui/tooltip"
 function StarfieldMaterial() {
   const materialRef = useRef<THREE.ShaderMaterial>(null);
 
@@ -943,7 +946,31 @@ function WorldAnalysis() {
         />
       </Canvas>
 
-      <SunGizmo />
+      {(() => { const SUN_GIZMO_SIZE = 140; return (
+        <>
+          <SunGizmo size={SUN_GIZMO_SIZE} />
+          <div className="absolute right-4 z-20 pointer-events-auto" style={{ top: 16 + SUN_GIZMO_SIZE + 8 }}>
+            <div className="flex items-center gap-1 mr-8">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button size="icon" variant="ghost" onClick={() => window.dispatchEvent(new CustomEvent('world-rotation-update', { detail: { running: true, speed: 0.1 } }))}>
+                    <Play size={16} />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Resume rotation</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button size="icon" variant="ghost" onClick={() => window.dispatchEvent(new CustomEvent('world-rotation-update', { detail: { running: false } }))}>
+                    <Pause size={16} />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Pause rotation</TooltipContent>
+              </Tooltip>
+            </div>
+          </div>
+        </>
+      )})()}
 
       {/* Bottom-right Use Case morph panel */}
       <div className="absolute bottom-4 right-4 z-20 pointer-events-auto">

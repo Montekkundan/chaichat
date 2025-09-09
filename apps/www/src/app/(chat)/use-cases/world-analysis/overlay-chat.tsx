@@ -7,10 +7,10 @@ import { getAllKeys } from "~/lib/local-keys";
 import { ModelSelector } from "~/components/chat-input/model-selector";
 import { Button } from "~/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "~/components/ui/tooltip";
-import { Play, Pause, PaperPlaneTilt, TrashSimple } from "@phosphor-icons/react";
+import { PaperPlaneTilt, TrashSimple } from "@phosphor-icons/react";
 import { motion, AnimatePresence } from "motion/react";
 import { Loader } from "~/components/ai-elements/loader";
-import { Input } from "~/components/ui/input";
+import { Textarea } from "~/components/ui/textarea";
 import { cn } from "~/lib/utils";
 
 type OverlayPoint = { lat: number; lon: number; value?: number; color?: string; size?: number; label?: string };
@@ -105,7 +105,11 @@ export type OverlayChatProps = {
 export function OverlayChat({ className, isUserAuthenticated, onOverlayPoints, onSetCamera, onOverlayBars, onSetShader, onOverlayGeo, onSetBaseMap }: OverlayChatProps) {
   const [selectedModel, setSelectedModel] = useState<string>("openai/gpt-4o-mini");
   const [input, setInput] = useState("");
-  const [expanded, setExpanded] = useState<boolean>(true);
+  const [showForm, setShowForm] = useState<boolean>(false);
+
+  const OPEN_WIDTH = 600;
+  const OPEN_HEIGHT = 220;
+  const COLLAPSED_WIDTH = 120;
 
   const apiPath = "/api/world-analysis";
 
@@ -184,6 +188,7 @@ export function OverlayChat({ className, isUserAuthenticated, onOverlayPoints, o
 
   // Fallback: scan all messages for tool results and apply side effects once
   const seenToolsRef = useRef<Set<string>>(new Set());
+  const inputWrapperRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     try {
       for (const m of messages) {
@@ -221,6 +226,17 @@ export function OverlayChat({ className, isUserAuthenticated, onOverlayPoints, o
     } catch {}
   }, [messages, onOverlayPoints, onSetCamera, onOverlayBars, onSetShader, onOverlayGeo, onSetBaseMap]);
 
+  // Close the morphing input when clicking outside
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (inputWrapperRef.current && !inputWrapperRef.current.contains(e.target as Node)) {
+        setShowForm(false);
+      }
+    }
+    if (showForm) document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showForm]);
+
   // Send handler
   const onSend = async () => {
     const text = input.trim();
@@ -236,6 +252,7 @@ export function OverlayChat({ className, isUserAuthenticated, onOverlayPoints, o
       parts: [{ type: "text", text }],
     });
     setInput("");
+    setShowForm(false);
   };
 
   return (
@@ -243,90 +260,98 @@ export function OverlayChat({ className, isUserAuthenticated, onOverlayPoints, o
       initial={{ y: 40, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       transition={{ type: "spring", stiffness: 260, damping: 22 }}
-      className={cn("pointer-events-auto w-full max-w-2xl bg-background/80 backdrop-blur border rounded-xl shadow-lg", className)}
+      className={cn(className)}
     >
-      <div className="flex items-center justify-between px-3 pt-2">
-        <div className="flex items-center gap-2">
-          <ModelSelector selectedModelId={selectedModel} setSelectedModelId={setSelectedModel} isUserAuthenticated={isUserAuthenticated} />
-        </div>
-        <div className="flex items-center gap-2">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button size="icon" variant="ghost" onClick={() => window.dispatchEvent(new CustomEvent('world-rotation-update', { detail: { running: true, speed: 0.1 } }))}>
-                <Play size={18} />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Resume rotation</TooltipContent>
-          </Tooltip>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button size="icon" variant="ghost" onClick={() => window.dispatchEvent(new CustomEvent('world-rotation-update', { detail: { running: false } }))}>
-                <Pause size={18} />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Pause rotation</TooltipContent>
-          </Tooltip>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                size="icon"
-                variant="ghost"
-                onClick={() => {
-                  try { window.dispatchEvent(new CustomEvent('world-clear-overlays')) } catch {}
-                }}
+      <div className="overflow-hidden px-3 pb-3">
+        <motion.div
+          ref={inputWrapperRef}
+          data-panel
+          className="relative z-20 flex flex-col items-center overflow-hidden rounded-xl border bg-background shadow-md"
+          initial={false}
+          animate={{ width: showForm ? OPEN_WIDTH : COLLAPSED_WIDTH, height: showForm ? OPEN_HEIGHT : 36, borderRadius: showForm ? 14 : 20 }}
+          style={{ maxWidth: "min(600px, calc(100vw - 32px))" }}
+          transition={{ type: "spring", stiffness: 350, damping: 35, mass: 0.7 }}
+        >
+          <AnimatePresence mode="wait" initial={false}>
+            {!showForm ? (
+              <motion.button
+                key="dock"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.15 }}
+                className="flex items-center justify-center h-[36px] w-full mt-auto whitespace-nowrap select-none cursor-pointer bg-transparent"
+                onClick={() => setShowForm(true)}
               >
-                <TrashSimple size={16} />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Clear overlays</TooltipContent>
-          </Tooltip>
-          <Button size="sm" variant="ghost" onClick={() => setExpanded((e) => !e)}>{expanded ? 'Collapse' : 'Expand'}</Button>
-        </div>
-      </div>
-      <AnimatePresence initial={false}>
-        {expanded && (
-          <motion.div
-            key="chat-body"
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.25 }}
-            className="overflow-hidden px-3 pb-3"
-          >
-            <div className="flex items-center gap-2">
-              <div className="relative w-full">
-                <Input
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  placeholder="Ask the world-analysis agent (bars, points, rotate Earth, adjust sun)"
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void onSend(); }
-                  }}
-                  className="pr-9"
-                />
-                <div className="absolute right-2 top-1/2 -translate-y-1/2">
-                  {status === "streaming" || status === "submitted" ? (
-                    <Loader size={12} />
-                  ) : (
-                    <button
-                      type="button"
-                      aria-label="Send"
-                      className="text-muted-foreground hover:text-foreground transition-colors"
-                      onClick={() => void onSend()}
-                      disabled={!input.trim()}
-                    >
-                      <PaperPlaneTilt size={16} />
-                    </button>
+                <div className="flex items-center justify-center gap-2 px-3">
+                  <span className="text-xs">Talk to AI</span>
+                </div>
+              </motion.button>
+            ) : (
+              <motion.div
+                key="form"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.15 }}
+                className="flex h-full w-full flex-col gap-2 p-2"
+              >
+                <div className="flex items-center justify-between">
+                  <ModelSelector selectedModelId={selectedModel} setSelectedModelId={setSelectedModel} isUserAuthenticated={isUserAuthenticated} />
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          try { window.dispatchEvent(new CustomEvent('world-clear-overlays')) } catch {}
+                        }}
+                      >
+                        <TrashSimple size={16} />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Clear overlays</TooltipContent>
+                  </Tooltip>
+                </div>
+                <div className="flex h-full items-stretch gap-2">
+                  <div className="relative h-full flex-1">
+                    <Textarea
+                      value={input}
+                      rows={4}
+                      onFocus={() => setShowForm(true)}
+                      onChange={(e) => setInput(e.target.value)}
+                      placeholder="Ask the world-analysis agent (bars, points, rotate Earth, adjust sun)"
+                      onKeyDown={(e) => {
+                        const isMetaEnter = (e.metaKey || e.ctrlKey) && e.key === "Enter";
+                        if (isMetaEnter) { e.preventDefault(); void onSend(); }
+                      }}
+                      className="h-full min-h-0 w-full resize-none bg-transparent pr-9 pb-9 border-0 shadow-none outline-none focus:outline-none focus:border-transparent focus-visible:border-transparent focus-visible:ring-0"
+                    />
+                    <div className="absolute bottom-2 right-2">
+                      {status === "streaming" || status === "submitted" ? (
+                        <Loader size={12} />
+                      ) : (
+                        <button
+                          type="button"
+                          aria-label="Send"
+                          className="text-muted-foreground transition-colors hover:text-foreground"
+                          onClick={() => void onSend()}
+                          disabled={!input.trim()}
+                        >
+                          <PaperPlaneTilt size={16} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  {status === "streaming" && (
+                    <Button size="sm" variant="secondary" className="self-end" onClick={stop}>Stop</Button>
                   )}
                 </div>
-              </div>
-              {status === "streaming" && (
-                <Button size="sm" variant="secondary" onClick={stop}>Stop</Button>
-              )}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </motion.div>
+      </div>
     </motion.div>
   );
 }
