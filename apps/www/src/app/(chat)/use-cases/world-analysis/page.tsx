@@ -804,7 +804,7 @@ function WorldAnalysis() {
   }, [])
 
   return (
-    <div className={cn("fixed inset-0")}>
+    <div className={cn("relative h-full w-full bg-[#06070b]", !collapsed && "mt-3.5 rounded-tl-xl")}>
       {/* Chat overlay (bottom) */}
       <div className="absolute bottom-4 flex justify-center left-4 pointer-events-none right-4 z-20">
         <OverlayChat
