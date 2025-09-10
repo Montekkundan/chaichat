@@ -847,8 +847,20 @@ function WorldAnalysis() {
               }
               // If only country codes/names were provided, load a public world dataset and filter
               if (!data && ((res.countryCodes?.length) || (res.countryNames?.length))) {
-                const datasetUrl = 'https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson'
-                const world: unknown = await fetch(datasetUrl, { cache: 'no-cache' }).then(r => r.json()).catch(() => null)
+                // Local-first: try proxy (server-side fetch) then public copy, then external
+                const proxyUrl = '/api/world-analysis/countries'
+                const localUrl = '/geo/countries.geojson'
+                const externalUrl = 'https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson'
+                let world: unknown = null
+                try {
+                  world = await fetch(proxyUrl, { cache: 'no-cache' }).then(r => r.ok ? r.json() : Promise.reject(new Error('proxy failed')))
+                } catch {}
+                if (!world) {
+                  try { world = await fetch(localUrl, { cache: 'force-cache' }).then(r => r.ok ? r.json() : Promise.reject(new Error('local missing'))) } catch {}
+                }
+                if (!world) {
+                  try { world = await fetch(externalUrl, { cache: 'no-cache' }).then(r => r.json()) } catch {}
+                }
                 const asFC = world as { type?: string; features?: Array<{ properties?: Record<string, unknown> }> }
                 if (asFC?.type === 'FeatureCollection') {
                   const names = new Set((res.countryNames || []).map((s) => String(s).toLowerCase()))

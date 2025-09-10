@@ -121,10 +121,12 @@ export function OverlayChat({ className, isUserAuthenticated, onOverlayPoints, o
       body: async () => {
         const gateway = (() => {
           try {
-            const src = window.localStorage.getItem("chaichat_models_source");
-            return src === "aigateway" ? "vercel-ai-gateway" : "llm-gateway";
+            const src = (window.localStorage.getItem("chaichat_models_source") || "").toLowerCase();
+            if (src === "llmgateway" || src === "llm" || src === "gateway-llm") return "llm-gateway" as const;
+            // Default to Vercel AI Gateway so tool calls work out of the box in prod
+            return "vercel-ai-gateway" as const;
           } catch {
-            return "llm-gateway" as const;
+            return "vercel-ai-gateway" as const;
           }
         })();
         const userApiKeys = await getAllKeys();
@@ -143,7 +145,7 @@ export function OverlayChat({ className, isUserAuthenticated, onOverlayPoints, o
         const collect = (value: unknown): void => {
           if (!value || typeof value !== 'object') return;
           const obj = value as Record<string, unknown>;
-          if (typeof obj.type === 'string' && ['points','camera','rotation','bars','shader','geo','texture'].includes(obj.type)) {
+          if (typeof obj.type === 'string' && ['points','camera','rotation','bars','shader','geo','texture','clear','country-metric'].includes(obj.type)) {
             payloads.push(obj as ToolResult);
           }
           for (const k of Object.keys(obj)) {
