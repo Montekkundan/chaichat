@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import { getAllKeys } from "~/lib/local-keys";
@@ -106,6 +106,7 @@ export function OverlayChat({ className, isUserAuthenticated, onOverlayPoints, o
   const [selectedModel, setSelectedModel] = useState<string>("openai/gpt-4o-mini");
   const [input, setInput] = useState("");
   const [showForm, setShowForm] = useState<boolean>(false);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null)
 
   const OPEN_WIDTH = 600;
   const OPEN_HEIGHT = 220;
@@ -168,11 +169,6 @@ export function OverlayChat({ className, isUserAuthenticated, onOverlayPoints, o
           } else if (toolResult.type === 'shader') {
             if (onSetShader) onSetShader(toolResult);
           } else if (toolResult.type === 'geo') {
-            try {
-              // Clear previous overlays on new region highlight and pause rotation
-              window.dispatchEvent(new CustomEvent('world-clear-overlays'))
-              window.dispatchEvent(new CustomEvent('world-rotation-update', { detail: { running: false } }))
-            } catch {}
             onOverlayGeo?.(toolResult);
           } else if (toolResult.type === 'texture') {
             onSetBaseMap?.(toolResult);
@@ -189,6 +185,34 @@ export function OverlayChat({ className, isUserAuthenticated, onOverlayPoints, o
   // Fallback: scan all messages for tool results and apply side effects once
   const seenToolsRef = useRef<Set<string>>(new Set());
   const inputWrapperRef = useRef<HTMLDivElement | null>(null);
+  const focusTextarea = useCallback(() => {
+    const ta = textareaRef.current || (inputWrapperRef.current?.querySelector('textarea') as HTMLTextAreaElement | null);
+    if (!ta) return false;
+    try {
+      ta.focus({ preventScroll: true });
+      const end = ta.value.length;
+      ta.setSelectionRange(end, end);
+      return document.activeElement === ta;
+    } catch {
+      return false;
+    }
+  }, []);
+
+  const focusTextareaWithRetry = useCallback(() => {
+    let attempts = 0;
+    const tick = () => {
+      attempts += 1;
+      const ok = focusTextarea();
+      if (!ok && attempts < 10) setTimeout(tick, 30);
+    };
+    setTimeout(tick, 0);
+  }, [focusTextarea]);
+
+  // Focus when panel expands
+  useEffect(() => {
+    if (!showForm) return;
+    focusTextareaWithRetry();
+  }, [showForm, focusTextareaWithRetry]);
   useEffect(() => {
     try {
       for (const m of messages) {
@@ -241,11 +265,6 @@ export function OverlayChat({ className, isUserAuthenticated, onOverlayPoints, o
   const onSend = async () => {
     const text = input.trim();
     if (!text) return;
-    // Clear previous overlays for a fresh request when the new prompt is not an obvious follow-up
-    const isFollowUp = /^(and|also|then|continue|now)\b/i.test(text) || /\badd\b|\boverlay\b|\bresume\b/i.test(text)
-    if (!isFollowUp) {
-      try { window.dispatchEvent(new CustomEvent('world-clear-overlays')); } catch {}
-    }
     seenToolsRef.current.clear();
     await sendMessage({
       role: "user",
@@ -280,8 +299,8 @@ export function OverlayChat({ className, isUserAuthenticated, onOverlayPoints, o
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.15 }}
-                className="flex items-center justify-center h-[36px] w-full mt-auto whitespace-nowrap select-none cursor-pointer bg-transparent"
-                onClick={() => setShowForm(true)}
+                className="mt-auto flex h-[36px] w-full cursor-pointer select-none items-center justify-center whitespace-nowrap bg-transparent"
+                onClick={() => { setShowForm(true); setTimeout(() => focusTextareaWithRetry(), 0) }}
               >
                 <div className="flex items-center justify-center gap-2 px-3">
                   <span className="text-xs">Talk to AI</span>
@@ -316,6 +335,7 @@ export function OverlayChat({ className, isUserAuthenticated, onOverlayPoints, o
                 <div className="flex h-full items-stretch gap-2">
                   <div className="relative h-full flex-1">
                     <Textarea
+                      ref={textareaRef}
                       value={input}
                       rows={4}
                       onFocus={() => setShowForm(true)}
@@ -323,9 +343,10 @@ export function OverlayChat({ className, isUserAuthenticated, onOverlayPoints, o
                       placeholder="Ask the world-analysis agent (bars, points, rotate Earth, adjust sun)"
                       onKeyDown={(e) => {
                         const isMetaEnter = (e.metaKey || e.ctrlKey) && e.key === "Enter";
-                        if (isMetaEnter) { e.preventDefault(); void onSend(); }
+                        const isShiftEnter = e.shiftKey && e.key === "Enter";
+                        if (isMetaEnter || isShiftEnter) { e.preventDefault(); void onSend(); }
                       }}
-                      className="h-full min-h-0 w-full resize-none bg-transparent pr-9 pb-9 border-0 shadow-none outline-none focus:outline-none focus:border-transparent focus-visible:border-transparent focus-visible:ring-0"
+                      className="h-full min-h-0 w-full resize-none bg-transparent pr-9 pb-9 border-0 shadow-none outline-none focus:border-transparent focus:outline-none focus-visible:border-transparent focus-visible:ring-0"
                     />
                     <div className="absolute bottom-2 right-2">
                       {status === "streaming" || status === "submitted" ? (

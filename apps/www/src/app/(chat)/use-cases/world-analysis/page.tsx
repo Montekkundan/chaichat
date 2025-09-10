@@ -277,6 +277,7 @@ const earthParameters: { atmosphereDayColor: string; atmosphereTwilightColor: st
   atmosphereDayColor: '#00aaff',
   atmosphereTwilightColor: '#ff6600'
 }
+const DEFAULT_ATMOSPHERE = { day: '#00aaff', twilight: '#ff6600' } as const
 
 const sunSpherical = new THREE.Spherical(1, Math.PI * 0.5, 0.5)
 const sunDirection = new THREE.Vector3()
@@ -628,6 +629,7 @@ function WorldAnalysis() {
   const [isDragging, setIsDragging] = useState(false)
   const [borders, setBorders] = useState<Array<Array<{ lat: number; lon: number }>>>([])
   const [textureOverride, setTextureOverride] = useState<{ day?: THREE.Texture | null; night?: THREE.Texture | null }>({})
+  const [geoMaskFC, setGeoMaskFC] = useState<SimpleFeatureCollection | null>(null)
 
   const textureLoader = useMemo(() => new THREE.TextureLoader().setCrossOrigin('anonymous'), [])
 
@@ -755,8 +757,12 @@ function WorldAnalysis() {
       setOverlayBars([])
       setBorders([])
       setTextureOverride({})
+      setGeoMaskFC(null)
       setOverlayOffset({ lonDeg: 0, latDeg: 0 })
       setOrientationRequest(null)
+      earthParameters.atmosphereDayColor = DEFAULT_ATMOSPHERE.day
+      earthParameters.atmosphereTwilightColor = DEFAULT_ATMOSPHERE.twilight
+      try { window.dispatchEvent(new CustomEvent('world-sun-updated')) } catch {}
     }
     window.addEventListener('world-clear-overlays', onClear)
     return () => window.removeEventListener('world-clear-overlays', onClear)
@@ -864,21 +870,51 @@ function WorldAnalysis() {
                 }
               }
               if (!data) return
-              setBorders(extractBordersFromGeoJSON(data))
+              const merged: SimpleFeatureCollection = { type: 'FeatureCollection', features: [] as SimpleFeature[] }
+              const append = (d: SimpleFeatureCollection | SimpleFeature | SimpleGeoJSONGeometry) => {
+                const t: string | undefined = (d as { type?: string })?.type
+                if (t === 'FeatureCollection') {
+                  merged.features.push(...((d as SimpleFeatureCollection).features || []))
+                } else if (t === 'Feature') {
+                  merged.features.push(d as SimpleFeature)
+                } else {
+                  merged.features.push({ type: 'Feature', geometry: d as SimpleGeoJSONGeometry })
+                }
+              }
+              if (geoMaskFC) append(geoMaskFC)
+              append(data)
+              setGeoMaskFC(merged)
+              setBorders(extractBordersFromGeoJSON(merged))
               if (res.style?.maskOthers) {
-                const tex = await rasterizeGeoMaskToTexture(data, {
+                const tex = await rasterizeGeoMaskToTexture(merged, {
                   plainColor: res.style?.plainColor,
                   fillColor: res.style?.fillColor,
                   fillOpacity: res.style?.fillOpacity,
                 })
                 if (tex) setTextureOverride({ day: tex, night: tex })
+                // Neutralize atmosphere tint so plainColor stays true (avoid yellowing)
+                earthParameters.atmosphereDayColor = '#000000'
+                earthParameters.atmosphereTwilightColor = '#000000'
+                try { window.dispatchEvent(new CustomEvent('world-sun-updated')) } catch {}
               }
             } catch {}
           }}
           onSetBaseMap={async (p) => {
             try {
-              if (p.mode === 'day' || p.mode === 'night') {
-                setTextureOverride({})
+              if (p.mode === 'day') {
+                const url = '/earth/day.jpg'
+                const tex = await new Promise<THREE.Texture | null>((resolve) => {
+                  textureLoader.load(url, (t) => { t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; resolve(t) }, () => resolve(null), () => resolve(null))
+                })
+                if (tex) setTextureOverride({ day: tex, night: tex })
+                return
+              }
+              if (p.mode === 'night') {
+                const url = '/earth/night.jpg'
+                const tex = await new Promise<THREE.Texture | null>((resolve) => {
+                  textureLoader.load(url, (t) => { t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; resolve(t) }, () => resolve(null), () => resolve(null))
+                })
+                if (tex) setTextureOverride({ day: tex, night: tex })
                 return
               }
               if (p.mode === 'paleo') {

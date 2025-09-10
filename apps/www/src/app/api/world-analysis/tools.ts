@@ -99,7 +99,26 @@ export const overlayGeoTool = tool({
       })
       .optional(),
   }),
-  execute: async (input) => ({ type: "geo", ...input }),
+  execute: async (input) => {
+    const DEFAULT_PLAIN = "#F59E0B"; // background color outside selection
+    const DEFAULT_FILL = "#064e3b";  // fill color for selected regions
+
+    const style = input.style || {};
+    const nextStyle = {
+      // Always mask others for clarity when highlighting a region
+      maskOthers: true,
+      // Keep borders configurable if the model explicitly set them; otherwise leave undefined
+      borderColor: style.borderColor,
+      borderWidth: style.borderWidth,
+      // Force constant colors
+      plainColor: DEFAULT_PLAIN,
+      fillColor: DEFAULT_FILL,
+      fillOpacity: style.fillOpacity,
+      showBorders: style.showBorders,
+    } as NonNullable<typeof input.style>;
+
+    return { type: "geo" as const, ...input, style: nextStyle };
+  },
 });
 
 // Control the base map/texture (day, night, paleo, or custom url)
