@@ -1,6 +1,6 @@
 import { api } from "@/convex/_generated/api";
 import { currentUser } from "@clerk/nextjs/server";
-import { JsonToSseTransformStream, createUIMessageStream, convertToModelMessages, streamText, wrapLanguageModel, stepCountIs } from "ai";
+import { convertToModelMessages, streamText, wrapLanguageModel, stepCountIs } from "ai";
 import type { ModelMessage } from "ai";
 import { ConvexHttpClient } from "convex/browser";
 import { env } from "~/env";
@@ -251,15 +251,15 @@ export async function POST(req: Request) {
         },
       });
 
-      const stream = createUIMessageStream({
-        execute: ({ writer }) => {
-          result.consumeStream();
-          writer.merge(result.toUIMessageStream({ sendReasoning: true }));
-        },
+      // Mirror chat route response style to avoid Edge stream issues
+      const baseResponse = result.toUIMessageStreamResponse({
+        sendReasoning: true,
+        sendSources: true,
       });
-
-      const headers = new Headers({ "X-Used-Gateway": usedGateway, "Cache-Control": "no-store" });
-      return new Response(stream.pipeThrough(new JsonToSseTransformStream()), { headers });
+      const headers = new Headers(baseResponse.headers);
+      headers.set("X-Used-Gateway", usedGateway);
+      headers.set("Cache-Control", "no-store");
+      return new Response(baseResponse.body, { status: baseResponse.status, headers });
     } catch (streamErr: unknown) {
       const errMsg = streamErr instanceof Error ? streamErr.message : String(streamErr);
       const responseBody: string | undefined = (streamErr as { responseBody?: string })?.responseBody;
@@ -322,14 +322,14 @@ export async function POST(req: Request) {
           }),
         });
 
-        const stream = createUIMessageStream({
-          execute: ({ writer }) => {
-            result.consumeStream();
-            writer.merge(result.toUIMessageStream({ sendReasoning: true }));
-          },
+        const baseResponse = result.toUIMessageStreamResponse({
+          sendReasoning: true,
+          sendSources: true,
         });
-        const headers = new Headers({ "X-Used-Gateway": usedGateway, "Cache-Control": "no-store" });
-        return new Response(stream.pipeThrough(new JsonToSseTransformStream()), { headers });
+        const headers = new Headers(baseResponse.headers);
+        headers.set("X-Used-Gateway", usedGateway);
+        headers.set("Cache-Control", "no-store");
+        return new Response(baseResponse.body, { status: baseResponse.status, headers });
       }
 
       throw streamErr;
