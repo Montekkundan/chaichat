@@ -187,6 +187,7 @@ export function OverlayChat({ className, isUserAuthenticated, onOverlayPoints, o
   // Fallback: scan all messages for tool results and apply side effects once
   const seenToolsRef = useRef<Set<string>>(new Set());
   const inputWrapperRef = useRef<HTMLDivElement | null>(null);
+  const modelSelectorOpenRef = useRef<boolean>(false);
   const focusTextarea = useCallback(() => {
     const ta = textareaRef.current || (inputWrapperRef.current?.querySelector('textarea') as HTMLTextAreaElement | null);
     if (!ta) return false;
@@ -254,13 +255,53 @@ export function OverlayChat({ className, isUserAuthenticated, onOverlayPoints, o
 
   // Close the morphing input when clicking outside
   useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      if (inputWrapperRef.current && !inputWrapperRef.current.contains(e.target as Node)) {
-        setShowForm(false);
+    const onModelSelectorOpenChanged = (e: Event) => {
+      try {
+        // biome-ignore lint/suspicious/noExplicitAny: event detail from CustomEvent
+        const open = (e as any)?.detail?.open === true;
+        modelSelectorOpenRef.current = open;
+      } catch {
+        modelSelectorOpenRef.current = false;
       }
+    };
+    window.addEventListener('model-selector-open-changed', onModelSelectorOpenChanged as EventListener);
+    return () => window.removeEventListener('model-selector-open-changed', onModelSelectorOpenChanged as EventListener);
+  }, []);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent | PointerEvent) {
+      const wrapper = inputWrapperRef.current;
+      const target = e.target as HTMLElement | null;
+      if (!wrapper || !target) return;
+      if (wrapper.contains(target)) return;
+      if (modelSelectorOpenRef.current) return;
+      const portalSelectors = [
+        '[data-radix-portal]',
+        '[data-radix-popper-content-wrapper]',
+        '[data-radix-popover-content]',
+        '[data-radix-dropdown-menu-content]',
+        '[data-radix-dialog-content]',
+        '[data-radix-drawer-content]',
+        '[data-model-selector-layer]',
+        '[role="menu"]',
+        '[role="dialog"]',
+        '[role="listbox"]',
+        '[role="tooltip"]',
+        '[data-model-filters-popover="true"]'
+      ];
+      for (const sel of portalSelectors) {
+        if (target.closest(sel)) return;
+      }
+      setShowForm(false);
     }
-    if (showForm) document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    if (showForm) {
+      document.addEventListener("pointerdown", handleClickOutside);
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener("pointerdown", handleClickOutside);
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
   }, [showForm]);
 
   // Send handler
