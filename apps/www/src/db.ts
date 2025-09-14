@@ -52,6 +52,8 @@ export interface Playground {
 		id: string;
 		modelId: string;
 		gatewaySource?: "aigateway" | "llmgateway";
+		mergeContext?: boolean;
+		systemPrompt?: string;
 	}[];
 }
 

@@ -1,10 +1,12 @@
-export type ProviderId = "llmgateway" | "aigateway" | "uploadthing" | "vercelblob";
+export type ProviderId = "llmgateway" | "aigateway" | "uploadthing" | "vercelblob" | "exa" | "firecrawl";
 
 export interface UserKeys {
 	llmGatewayApiKey?: string;
 	aiGatewayApiKey?: string;
 	uploadThingApiKey?: string;
 	vercelBlobApiKey?: string;
+	exaApiKey?: string;
+	firecrawlApiKey?: string;
 	storageProvider?: "uploadthing" | "vercelblob";
 }
 
@@ -96,6 +98,8 @@ export function getAllLocalKeys(): UserKeys {
 		aiGatewayApiKey: getLocalKey("aigateway"),
 		uploadThingApiKey: getLocalKey("uploadthing"),
 		vercelBlobApiKey: getLocalKey("vercelblob"),
+		exaApiKey: getLocalKey("exa"),
+		firecrawlApiKey: getLocalKey("firecrawl"),
 	};
 }
 
@@ -106,6 +110,8 @@ export function getAllSessionKeys(): UserKeys {
 		aiGatewayApiKey: getSessionKey("aigateway"),
 		uploadThingApiKey: getSessionKey("uploadthing"),
 		vercelBlobApiKey: getSessionKey("vercelblob"),
+		exaApiKey: getSessionKey("exa"),
+		firecrawlApiKey: getSessionKey("firecrawl"),
 	};
 }
 
@@ -122,12 +128,14 @@ export function getAllKeys(): UserKeys {
 			sessionKeys.uploadThingApiKey || localKeys.uploadThingApiKey,
 		vercelBlobApiKey:
 			sessionKeys.vercelBlobApiKey || localKeys.vercelBlobApiKey,
+		exaApiKey: sessionKeys.exaApiKey || localKeys.exaApiKey,
+		firecrawlApiKey: sessionKeys.firecrawlApiKey || localKeys.firecrawlApiKey,
 	};
 }
 
 // Clear all keys from both storages
 export function clearAllKeys(): void {
-	const providers: ProviderId[] = ["llmgateway", "aigateway", "uploadthing", "vercelblob"];
+	const providers: ProviderId[] = ["llmgateway", "aigateway", "uploadthing", "vercelblob", "exa", "firecrawl"];
 
 	for (const provider of providers) {
 		removeLocalKey(provider);

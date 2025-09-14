@@ -17,12 +17,16 @@ export default defineSchema({
     aiGatewayApiKey: v.optional(v.string()),
     uploadThingApiKey: v.optional(v.string()),
     vercelBlobApiKey: v.optional(v.string()),
+    // Web search providers
+    exaApiKey: v.optional(v.string()),
+    firecrawlApiKey: v.optional(v.string()),
 
     // User preferences
     theme: v.optional(v.string()),
     preferredModels: v.optional(v.array(v.string())),
     storageProvider: v.optional(v.union(v.literal("uploadthing"), v.literal("vercelblob"))),
     imageGenerationModel: v.optional(v.string()), // Preferred model for image generation
+    searchProvider: v.optional(v.union(v.literal("exa"), v.literal("firecrawl"))),
   }),
   messages: defineTable({
     chatId: v.id("chats"),
@@ -62,6 +66,8 @@ export default defineSchema({
         id: v.string(),
         modelId: v.string(),
         gatewaySource: v.optional(v.union(v.literal("aigateway"), v.literal("llmgateway"))),
+        mergeContext: v.optional(v.boolean()),
+        systemPrompt: v.optional(v.string()),
       }),
     ),
   }).index("by_user", ["userId"]),

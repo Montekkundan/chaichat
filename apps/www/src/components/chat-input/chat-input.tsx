@@ -28,6 +28,7 @@ import { FileList } from "./file-list";
 import { ModelSelector } from "./model-selector";
 import { useLLMModels } from "~/hooks/use-models";
 import { isStorageReady, modelSupportsVision } from "~/lib/model-capabilities";
+import { Globe } from "lucide-react";
 
 // TODO cleanup: use all user keys
 
@@ -381,10 +382,33 @@ export function ChatInput({
 	}, [supportsAttachments, storageReady, onFileUpload, files.length]);
 
 	// Web search toggle state
-	const [isSearchEnabled, _setIsSearchEnabled] = useState(false);
-	// const toggleSearch = () => {
-	//   setIsSearchEnabled((prev) => !prev);
-	// };
+	const [isSearchEnabled, setIsSearchEnabled] = useState(false);
+	useEffect(() => {
+		try { setIsSearchEnabled(localStorage.getItem("chaichat_search_enabled") === "true"); } catch {}
+		const onKeys = () => { /* reflect readiness elsewhere if desired */ };
+		window.addEventListener("apiKeysChanged", onKeys);
+		return () => window.removeEventListener("apiKeysChanged", onKeys);
+	}, []);
+	const toggleSearch = () => {
+		setIsSearchEnabled((prev) => {
+			const next = !prev;
+			try { localStorage.setItem("chaichat_search_enabled", next ? "true" : "false"); } catch {}
+			return next;
+		});
+	};
+
+	// Determine if search can be enabled based on provider and key presence
+	const [searchAllowed, setSearchAllowed] = useState<{ allowed: boolean; reason?: string }>({ allowed: false });
+	useEffect(() => {
+		try {
+			const sp = localStorage.getItem("chai-search-provider");
+			const hasExa = !!localStorage.getItem("chaichat_keys_exa");
+			const hasFirecrawl = !!localStorage.getItem("chaichat_keys_firecrawl");
+			if (sp === "exa") setSearchAllowed(hasExa ? { allowed: true } : { allowed: false, reason: "Set Exa API key" });
+			else if (sp === "firecrawl") setSearchAllowed(hasFirecrawl ? { allowed: true } : { allowed: false, reason: "Set Firecrawl API key" });
+			else setSearchAllowed({ allowed: false, reason: "Pick a search provider" });
+		} catch { setSearchAllowed({ allowed: false, reason: "Configure web search" }); }
+	}, [modelsSource]);
 
 	// Derived: does the current source have the required key?
 	const hasRequiredKey = modelsSource === "aigateway" ? hasAiKey : hasLlmKey;
@@ -806,33 +830,20 @@ export function ChatInput({
 							}
 							disabled={!hasRequiredKey}
 						/>
-						{/* TODO: Implement web search functionality */}
-						{/* {allowWebSearch && (
-							<PromptInputAction
-								tooltip={isSearchEnabled ? "Disable web search" : "Enable web search"}
+						<PromptInputAction
+							tooltip={searchAllowed.allowed ? (isSearchEnabled ? "Disable web search" : "Enable web search") : (searchAllowed.reason || "Configure web search")}
+						>
+							<Button
+								variant={isSearchEnabled ? "secondary" : "outline"}
+								size="sm"
+								className="flex items-center gap-1 rounded-full px-2 py-1"
+								onClick={toggleSearch}
+								disabled={!searchAllowed.allowed}
 							>
-								<Button
-									variant={isSearchEnabled ? "secondary" : "outline"}
-									size="sm"
-									className="flex items-center gap-1 rounded-full px-2 py-1"
-									onClick={toggleSearch}
-								>
-									<Globe size={18} />
-									<motion.span
-										initial={{ width: 0, opacity: 0 }}
-										animate={
-											isSearchEnabled
-												? { width: "auto", opacity: 1 }
-												: { width: 0, opacity: 0 }
-										}
-										transition={{ type: "spring", duration: 0.2 }}
-										className="overflow-hidden whitespace-nowrap text-xs"
-									>
-										Search
-									</motion.span>
-								</Button>
-							</PromptInputAction>
-						)} */}
+								<Globe size={18} />
+								<span className="overflow-hidden whitespace-nowrap text-xs">Search</span>
+							</Button>
+						</PromptInputAction>
 					</div>
 					<PromptInputAction
 						tooltip={

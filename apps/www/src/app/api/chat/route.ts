@@ -8,11 +8,14 @@ import {
   simulateStreamingMiddleware,
   streamText,
   wrapLanguageModel,
+  stepCountIs,
 } from "ai";
+import type { ToolSet } from "ai";
 import type { ModelMessage } from "ai";
 import { ConvexHttpClient } from "convex/browser";
 import { env } from "~/env";
 import { buildProviderOptions, isGoogleModel, isOpenAIReasoningModel, isOpenAIProvider, cleanMessagesForTools } from "./utils";
+import { makeWebSearchTool } from "./web-search-tool";
 import { errorResponseForChat, isNoStreamingError } from "./error-utils";
 import { normalizeGateway } from "./gateway-utils";
 import { hasImageParts as _hasImageParts, inlineExternalMedia as _inlineExternalMedia } from "./message-utils";
@@ -71,6 +74,9 @@ type ChatRequest = {
   userApiKeys?: Record<string, string | undefined>;
   // Preferred: which gateway to use (e.g. "llm-gateway" | "vercel-ai-gateway")
   gateway?: string;
+  // Web search settings
+  searchEnabled?: boolean;
+  searchProvider?: "exa" | "firecrawl";
   imageGeneration?: {
     prompt: string;
     size?: string;
@@ -96,6 +102,8 @@ export async function POST(req: Request) {
       config,
       userApiKeys = {},
       gateway,
+      searchEnabled,
+      searchProvider,
       imageGeneration,
     }: ChatRequest = body;
 
@@ -221,28 +229,12 @@ export async function POST(req: Request) {
 
     const usedGateway = normalizedGatewayRaw as "llm-gateway" | "vercel-ai-gateway";
 
-    console.log("API Route - Received gateway:", gateway);
-    console.log("API Route - Normalized gateway:", usedGateway);
-    console.log(
-      "API Route - Messages:",
-      messages?.map((m) => ({
-        role: m.role,
-        partsCount: m.parts?.length || 0,
-        parts: m.parts?.map((p) => ({
-          type: p.type,
-          content:
-            p.type === "text"
-              ? `${p.text?.substring(0, 50)}...`
-              : "image" in p
-                ? "IMAGE"
-                : p.type,
-        })),
-      }))
-    );
-
     // Declare API key variables at the top level
     let apiKey: string | undefined;
     let aiGatewayApiKey: string | undefined;
+    let exaApiKey: string | undefined;
+    let firecrawlApiKey: string | undefined;
+    let effectiveSearchProvider: "exa" | "firecrawl" | undefined = searchProvider;
 
     // Accept either populated messages or a top-level input (used by some transports on first send)
     const topLevelInput = (body as unknown as { input?: unknown })?.input;
@@ -264,7 +256,7 @@ export async function POST(req: Request) {
     }
 
     // Sanitize UI messages: strip tool content and placeholders
-    const sanitizedUiMessages = cleanMessagesForTools(messages, false);
+    const sanitizedUiMessages = cleanMessagesForTools(messages, Boolean(searchEnabled));
     if (!sanitizedUiMessages || !Array.isArray(sanitizedUiMessages)) {
       return new Response(
         JSON.stringify({
@@ -279,26 +271,6 @@ export async function POST(req: Request) {
       sanitizedUiMessages
     ) as ModelMessage[];
 
-    console.log(
-      "API Route - Converted messages:",
-      convertedMessages?.map((m) => ({
-        role: m.role,
-        content: Array.isArray(m.content)
-          ? m.content.map((c) => ({
-              type: c.type,
-              content:
-                c.type === "text"
-                  ? `${c.text?.substring(0, 100)}...`
-                  : c.type === "image"
-                    ? "IMAGE"
-                    : c,
-            }))
-          : typeof m.content === "string"
-            ? `${m.content.substring(0, 100)}...`
-            : m.content,
-      }))
-    );
-
     if (!convertedMessages || !Array.isArray(convertedMessages)) {
       return new Response(
         JSON.stringify({
@@ -312,8 +284,6 @@ export async function POST(req: Request) {
 
     // Check if this is a vision request (has image parts)
     const containsImages = _hasImageParts(convertedMessages);
-
-    console.log("API Route - Has image parts:", containsImages);
 
     modelToUse = model || "openai/gpt-4o";
 
@@ -337,19 +307,40 @@ export async function POST(req: Request) {
       }
     })();
 
-    console.log("API Route - Received userApiKeys:", {
-      hasLlmGatewayKey: !!userApiKeys?.llmGatewayApiKey,
-      hasAiGatewayKey: !!userApiKeys?.aiGatewayApiKey,
-      llmGatewayKeyLength: userApiKeys?.llmGatewayApiKey?.length || 0,
-      aiGatewayKeyLength: userApiKeys?.aiGatewayApiKey?.length || 0,
-    });
-
     if (userApiKeys?.llmGatewayApiKey) {
       apiKey = userApiKeys.llmGatewayApiKey;
     }
     if (userApiKeys?.aiGatewayApiKey) {
       aiGatewayApiKey = userApiKeys.aiGatewayApiKey;
     }
+    // Try to get search API keys from payload first
+    if (userApiKeys?.exaApiKey) exaApiKey = userApiKeys.exaApiKey;
+    if (userApiKeys?.firecrawlApiKey) firecrawlApiKey = userApiKeys.firecrawlApiKey;
+    // Also check headers for anonymous flow
+    try {
+      const raw = req.headers.get("x-local-keys");
+      if (raw) {
+        const headerKeys = JSON.parse(raw) as Record<string, unknown>;
+        if (!exaApiKey && typeof headerKeys?.exaApiKey === "string") exaApiKey = headerKeys.exaApiKey as string;
+        if (!firecrawlApiKey && typeof headerKeys?.firecrawlApiKey === "string") firecrawlApiKey = headerKeys.firecrawlApiKey as string;
+      }
+    } catch {}
+
+    // If available, fetch missing keys and search provider preference from Convex for logged-in users
+    try {
+      const user = await currentUser();
+      if (user?.id) {
+        const convexKeys = await convex.action(
+          api.userKeys.getUserKeysForAPI,
+          { userId: user.id }
+        );
+        if (!exaApiKey && convexKeys?.exaApiKey) exaApiKey = convexKeys.exaApiKey as string;
+        if (!firecrawlApiKey && convexKeys?.firecrawlApiKey) firecrawlApiKey = convexKeys.firecrawlApiKey as string;
+        if (!effectiveSearchProvider && (convexKeys?.searchProvider === "exa" || convexKeys?.searchProvider === "firecrawl")) {
+          effectiveSearchProvider = convexKeys.searchProvider as "exa" | "firecrawl";
+        }
+      }
+    } catch {}
 
     // Update providers with the actual API keys
     const { llmGatewayProvider, vercelGatewayProvider } = makeProviders({
@@ -424,6 +415,27 @@ export async function POST(req: Request) {
         system,
         bodyInput,
       });
+      // Optionally attach web-search tool if enabled and API key present
+      const tools: Record<string, unknown> = {};
+      let stopWhen: ReturnType<typeof stepCountIs> | undefined;
+      if (
+        searchEnabled &&
+        (effectiveSearchProvider === "exa"
+          ? !!exaApiKey
+          : effectiveSearchProvider === "firecrawl"
+            ? !!firecrawlApiKey
+            : false)
+      ) {
+        try {
+          if (effectiveSearchProvider === "exa" && exaApiKey) {
+            tools.webSearch = makeWebSearchTool({ provider: "exa", exaApiKey });
+          } else if (effectiveSearchProvider === "firecrawl" && firecrawlApiKey) {
+            tools.webSearch = makeWebSearchTool({ provider: "firecrawl", firecrawlApiKey });
+          }
+          stopWhen = stepCountIs(5);
+        } catch {}
+      }
+
       const result = await streamText({
         model: modelForRequest,
         ...(usedGateway === "vercel-ai-gateway" && isOAIReasoning && containsImages
@@ -433,6 +445,8 @@ export async function POST(req: Request) {
             : _payload.kind === "oai-reasoning"
               ? { system: _payload.system, prompt: _payload.prompt }
               : { system: _payload.system, messages: _payload.messages }),
+        ...(Object.keys(tools).length > 0 ? { tools: tools as unknown as ToolSet } : {}),
+        ...(stopWhen ? { stopWhen } : {}),
         ...(isOAIReasoning
           ? {}
           : {
@@ -485,6 +499,7 @@ export async function POST(req: Request) {
       // Return streaming response with gateway header
       const baseResponse = result.toUIMessageStreamResponse({
         sendReasoning: true,
+        sendSources: true,
       });
       const headers = new Headers(baseResponse.headers);
       headers.set("X-Used-Gateway", usedGateway);

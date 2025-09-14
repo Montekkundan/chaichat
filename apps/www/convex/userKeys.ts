@@ -12,7 +12,10 @@ export const storeKey = mutation({
       v.literal("aigateway"),
       v.literal("uploadthing"),
       v.literal("vercelblob"),
-      v.literal("storage")
+      v.literal("storage"),
+      v.literal("exa"),
+      v.literal("firecrawl"),
+      v.literal("search"),
     ),
     apiKey: v.string(),
   },
@@ -47,6 +50,15 @@ export const storeKey = mutation({
         break;
       case "storage":
         updateData.storageProvider = apiKey as "uploadthing" | "vercelblob";
+        break;
+      case "exa":
+        updateData.exaApiKey = apiKey;
+        break;
+      case "firecrawl":
+        updateData.firecrawlApiKey = apiKey;
+        break;
+      case "search":
+        updateData.searchProvider = apiKey as "exa" | "firecrawl";
         break;
     }
 
@@ -91,8 +103,11 @@ export const getKeys = action({
       aiGatewayApiKey: user.aiGatewayApiKey,
       uploadThingApiKey: user.uploadThingApiKey,
       vercelBlobApiKey: user.vercelBlobApiKey,
+      exaApiKey: user.exaApiKey,
+      firecrawlApiKey: user.firecrawlApiKey,
       storageProvider: user.storageProvider,
       imageGenerationModel: user.imageGenerationModel,
+      searchProvider: user.searchProvider,
     };
   },
 });
@@ -103,7 +118,9 @@ export const removeKey = mutation({
       v.literal("llmgateway"),
       v.literal("aigateway"),
       v.literal("uploadthing"),
-      v.literal("vercelblob")
+      v.literal("vercelblob"),
+      v.literal("exa"),
+      v.literal("firecrawl"),
     ),
   },
   handler: async (ctx, { provider }) => {
@@ -134,6 +151,12 @@ export const removeKey = mutation({
         case "vercelblob":
           updateData.vercelBlobApiKey = undefined;
           break;
+        case "exa":
+          updateData.exaApiKey = undefined;
+          break;
+        case "firecrawl":
+          updateData.firecrawlApiKey = undefined;
+          break;
       }
 
       await ctx.db.patch(user._id, updateData);
@@ -156,7 +179,10 @@ export const getUserKeysForAPI = action({
       aiGatewayApiKey: user.aiGatewayApiKey,
       uploadThingApiKey: user.uploadThingApiKey,
       vercelBlobApiKey: user.vercelBlobApiKey,
+      exaApiKey: user.exaApiKey,
+      firecrawlApiKey: user.firecrawlApiKey,
       storageProvider: user.storageProvider,
+      searchProvider: user.searchProvider,
     };
   },
 });

@@ -19,6 +19,19 @@ import {
 	ReasoningTrigger,
 } from "../ai-elements/reasoning";
 import type { ExtendedMessage } from "~/lib/providers/messages-provider";
+import {
+	Source,
+	Sources,
+	SourcesContent,
+	SourcesTrigger,
+} from "~/components/ai-elements/sources";
+import {
+	Tool as ToolCard,
+	ToolContent,
+	ToolHeader,
+	ToolInput,
+	ToolOutput,
+} from "~/components/ai-elements/tool";
 
 type ConversationProps = {
 	messages: (MessageType & {
@@ -119,6 +132,15 @@ export function Conversation({
 		}
 	};
 
+	// Safe accessors for unknown-typed objects
+	const getStringProp = (obj: unknown, key: string): string | undefined => {
+		if (obj && typeof obj === "object") {
+			const val = (obj as Record<string, unknown>)[key];
+			return typeof val === "string" ? val : undefined;
+		}
+		return undefined;
+	};
+
 	// Only show the inline loader for the latest assistant message, so that we dont show it for messages that have/had error
 	const latestMessageId =
 		messages.length > 0 ? (messages[messages.length - 1]?.id ?? null) : null;
@@ -128,7 +150,11 @@ export function Conversation({
 		return parts.some((part) => {
 			if (part.type === "text") return (part.text || "").trim().length > 0;
 			if (part.type === "reasoning") return (part.text || "").trim().length > 0;
-			return true;
+			// Consider only actually visible content as renderable
+			if (part.type === "file") return true;
+			if ((part as { type?: string }).type === "image") return true;
+			// Do NOT treat tool input/calls or other ephemeral parts as renderable
+			return false;
 		});
 	};
 
@@ -189,6 +215,100 @@ export function Conversation({
 						return (
 							<Message from={message.role} key={message.id}>
 								<MessageContent>
+									{(() => {
+										// Render sources list for assistant messages when present
+										if (!isAssistant) return null;
+										const rawParts = Array.isArray((message as MessageType).parts)
+											? ((message as MessageType).parts)
+											: [];
+										type SourcePart = { type?: string; url?: string; href?: string; title?: string };
+										const sourceParts: SourcePart[] = rawParts
+											.filter((p) => {
+												const t = getStringProp(p, "type");
+												return t === "source-url" || t === "source";
+											})
+											.map((p) => ({
+												type: getStringProp(p, "type"),
+												url: getStringProp(p, "url"),
+												href: getStringProp(p, "href"),
+												title: getStringProp(p, "title"),
+											}));
+
+										// Fallback: some providers may attach sources in metadata
+										const meta = (message as { metadata?: unknown }).metadata as { sources?: Array<{ url?: string; title?: string }> } | undefined;
+										const metaSources: Array<{ url?: string; title?: string }> = Array.isArray(meta?.sources) ? (meta?.sources as Array<{ url?: string; title?: string }>) : [];
+
+										const totalSources = sourceParts.length + metaSources.length;
+										if (totalSources === 0) return null;
+
+										return (
+											<Sources className="w-full">
+												<SourcesTrigger count={totalSources} />
+												<SourcesContent>
+													{sourceParts.map((sp, i) => {
+														const href = sp.url || sp.href || "";
+														const title = sp.title || href;
+														if (!href) return null;
+														return (
+															<Source key={`${message.id}-sp-${i}`} href={href} title={title} />
+														);
+													})}
+													{metaSources.map((ms, j) => {
+														const href = ms.url || "";
+														const title = ms.title || href;
+														if (!href) return null;
+														return (
+															<Source key={`${message.id}-ms-${j}`} href={href} title={title} />
+														);
+													})}
+												</SourcesContent>
+											</Sources>
+										);
+									})()}
+
+									{(() => {
+										// Render tool UI parts (e.g., webSearch) for assistant messages
+										if (!isAssistant) return null;
+										const parts = Array.isArray(message.parts) ? (message.parts as Array<unknown>) : [];
+										const toolParts = parts.filter((p) => {
+											const t = getStringProp(p, "type");
+											return typeof t === "string" && t.startsWith("tool-");
+										}) as Array<{
+											type: `tool-${string}`;
+											state: "input-streaming" | "input-available" | "output-available" | "output-error";
+											input?: unknown;
+											output?: unknown;
+											errorText?: string;
+										}>;
+
+										if (toolParts.length === 0) return null;
+
+										return (
+											<div className="w-full space-y-2">
+												{toolParts.map((tp, idx) => (
+													<ToolCard
+														key={`${message.id}-tool-${idx}`}
+														defaultOpen={tp.state === "output-available" || tp.state === "output-error"}
+													>
+														<ToolHeader type={tp.type} state={tp.state} />
+														<ToolContent>
+															<ToolInput input={tp.input} />
+															<ToolOutput
+																errorText={tp.errorText}
+																output={tp.output ? (
+																	<Response>
+																		{typeof tp.output === "string"
+																			? (tp.output as string)
+																		: JSON.stringify(tp.output, null, 2)}
+																	</Response>
+																) : null}
+															/>
+														</ToolContent>
+													</ToolCard>
+												))}
+											</div>
+										);
+									})()}
 									{shouldShowInlineLoader ? (
 										<Loader />
 									) : (

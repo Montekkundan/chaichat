@@ -27,6 +27,9 @@ export function ApiKeyManager() {
 	const [uploadThingKey, setUploadThingKey] = useState("");
 	const [vercelBlobKey, setVercelBlobKey] = useState("");
 	const [storageProvider, setStorageProvider] = useState<"uploadthing" | "vercelblob">("uploadthing");
+	const [exaKey, setExaKey] = useState("");
+	const [firecrawlKey, setFirecrawlKey] = useState("");
+	const [searchProvider, setSearchProvider] = useState<"exa" | "firecrawl">("exa");
 	const [showKey, setShowKey] = useState(false);
 	const [isLoading, setIsLoading] = useState(true);
 	const [useSessionStorage, setUseSessionStorage] = useState(false);
@@ -57,6 +60,9 @@ export function ApiKeyManager() {
 					if (convexKeys?.storageProvider) {
 						setStorageProvider(convexKeys.storageProvider);
 					}
+					if (convexKeys?.exaApiKey) setExaKey(convexKeys.exaApiKey);
+					if (convexKeys?.firecrawlApiKey) setFirecrawlKey(convexKeys.firecrawlApiKey);
+					if (convexKeys?.searchProvider === "exa" || convexKeys?.searchProvider === "firecrawl") setSearchProvider(convexKeys.searchProvider);
 				} else {
 					const localKeys = getAllKeys();
 					if (localKeys.llmGatewayApiKey) {
@@ -75,6 +81,12 @@ export function ApiKeyManager() {
 					if (storedProvider === "uploadthing" || storedProvider === "vercelblob") {
 						setStorageProvider(storedProvider);
 					}
+					const localExa = localStorage.getItem("chaichat_keys_exa");
+					if (localExa) setExaKey(localExa);
+					const localFirecrawl = localStorage.getItem("chaichat_keys_firecrawl");
+					if (localFirecrawl) setFirecrawlKey(localFirecrawl);
+					const sp = localStorage.getItem("chai-search-provider");
+					if (sp === "exa" || sp === "firecrawl") setSearchProvider(sp);
 				}
 			} catch (error) {
 				console.error("Failed to load existing key:", error);
@@ -193,6 +205,56 @@ export function ApiKeyManager() {
 		} catch (error) {
 			console.error("Failed to save storage provider:", error);
 		}
+	};
+
+	const handleSearchProviderChange = async (provider: "exa" | "firecrawl") => {
+		setSearchProvider(provider);
+		try {
+			if (isLoggedIn) {
+				await storeKeyMutation({ provider: "search", apiKey: provider });
+			} else {
+				localStorage.setItem("chai-search-provider", provider);
+			}
+			window.dispatchEvent(new CustomEvent("searchProviderChanged"));
+		} catch (error) {
+			console.error("Failed to save search provider:", error);
+		}
+	};
+
+	const handleExaKeyChange = async (value: string) => {
+		setExaKey(value);
+		const trimmed = value.trim();
+		try {
+			if (isLoggedIn) {
+				if (!trimmed) await removeKeyMutation({ provider: "exa" });
+				else await storeKeyMutation({ provider: "exa", apiKey: trimmed });
+			} else {
+				if (!trimmed) {
+					removeLocalKey("exa");
+					removeSessionKey("exa");
+				} else if (useSessionStorage) setSessionKey("exa", trimmed);
+				else setLocalKey("exa", trimmed);
+			}
+			window.dispatchEvent(new CustomEvent("apiKeysChanged"));
+		} catch (e) { console.error(e); }
+	};
+
+	const handleFirecrawlKeyChange = async (value: string) => {
+		setFirecrawlKey(value);
+		const trimmed = value.trim();
+		try {
+			if (isLoggedIn) {
+				if (!trimmed) await removeKeyMutation({ provider: "firecrawl" });
+				else await storeKeyMutation({ provider: "firecrawl", apiKey: trimmed });
+			} else {
+				if (!trimmed) {
+					removeLocalKey("firecrawl");
+					removeSessionKey("firecrawl");
+				} else if (useSessionStorage) setSessionKey("firecrawl", trimmed);
+				else setLocalKey("firecrawl", trimmed);
+			}
+			window.dispatchEvent(new CustomEvent("apiKeysChanged"));
+		} catch (e) { console.error(e); }
 	};
 
 	const handleUploadThingKeyChange = async (value: string) => {
@@ -559,10 +621,11 @@ export function ApiKeyManager() {
 					{/* UploadThing Key Configuration */}
 					{storageProvider === "uploadthing" && (
 						<div>
-							<label className="font-medium text-sm">UploadThing API Key</label>
+							<label htmlFor="uploadthing-key" className="font-medium text-sm">UploadThing API Key</label>
 							<div className="flex items-center gap-2 mt-2">
 								<div className="relative flex-1">
 									<Input
+										id="uploadthing-key"
 										type={showKey ? "text" : "password"}
 										placeholder="Enter your UploadThing API key"
 										value={uploadThingKey}
@@ -615,10 +678,11 @@ export function ApiKeyManager() {
 					{/* Vercel Blob Key Configuration */}
 					{storageProvider === "vercelblob" && (
 						<div>
-							<label className="font-medium text-sm">Vercel Blob API Key</label>
+							<label htmlFor="vercelblob-key" className="font-medium text-sm">Vercel Blob API Key</label>
 							<div className="flex items-center gap-2 mt-2">
 								<div className="relative flex-1">
 									<Input
+										id="vercelblob-key"
 										type={showKey ? "text" : "password"}
 										placeholder="Enter your Vercel Blob API key"
 										value={vercelBlobKey}
@@ -665,6 +729,70 @@ export function ApiKeyManager() {
 									Vercel Blob
 								</a>
 							</p>
+						</div>
+					)}
+				</div>
+			</div>
+
+			{/* Web Search Configuration */}
+			<div className="rounded-lg border bg-card p-4">
+				<div className="mb-3 flex items-center justify-between">
+					<div className="flex items-center gap-3">
+						<div className="flex items-center gap-2">
+							<span className="font-medium">Web Search</span>
+						</div>
+					</div>
+				</div>
+				<div className="space-y-4">
+					<div>
+						<label className="font-medium text-sm">Search Provider</label>
+						<div className="mt-2 flex gap-2">
+							<label className="flex items-center space-x-2">
+								<input type="radio" name="searchProvider" value="exa" checked={searchProvider === "exa"} onChange={(e) => handleSearchProviderChange(e.target.value as "exa")} className="rounded" />
+								<span className="text-sm">Exa</span>
+							</label>
+							<label className="flex items-center space-x-2">
+								<input type="radio" name="searchProvider" value="firecrawl" checked={searchProvider === "firecrawl"} onChange={(e) => handleSearchProviderChange(e.target.value as "firecrawl")} className="rounded" />
+								<span className="text-sm">Firecrawl</span>
+							</label>
+						</div>
+					</div>
+
+					{searchProvider === "exa" && (
+						<div>
+							<label htmlFor="exa-key" className="font-medium text-sm">Exa API Key</label>
+							<div className="flex items-center gap-2 mt-2">
+								<div className="relative flex-1">
+									<Input id="exa-key" type={showKey ? "text" : "password"} placeholder="Enter your Exa API key" value={exaKey} onChange={(e) => handleExaKeyChange(e.target.value)} className="pr-20 text-sm" />
+									<div className="-translate-y-1/2 absolute top-1/2 right-2 flex gap-1">
+										<Button type="button" variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={toggleKeyVisibility} title={showKey ? "Hide key" : "Show key"}>
+											{showKey ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+										</Button>
+										{exaKey && (
+											<Button type="button" variant="ghost" size="sm" className="h-6 px-2" onClick={() => handleExaKeyChange("")}>Remove</Button>
+										)}
+									</div>
+								</div>
+							</div>
+						</div>
+					)}
+
+					{searchProvider === "firecrawl" && (
+						<div>
+							<label htmlFor="firecrawl-key" className="font-medium text-sm">Firecrawl API Key</label>
+							<div className="flex items-center gap-2 mt-2">
+								<div className="relative flex-1">
+									<Input id="firecrawl-key" type={showKey ? "text" : "password"} placeholder="Enter your Firecrawl API key" value={firecrawlKey} onChange={(e) => handleFirecrawlKeyChange(e.target.value)} className="pr-20 text-sm" />
+									<div className="-translate-y-1/2 absolute top-1/2 right-2 flex gap-1">
+										<Button type="button" variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={toggleKeyVisibility} title={showKey ? "Hide key" : "Show key"}>
+											{showKey ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+										</Button>
+										{firecrawlKey && (
+											<Button type="button" variant="ghost" size="sm" className="h-6 px-2" onClick={() => handleFirecrawlKeyChange("")}>Remove</Button>
+										)}
+									</div>
+								</div>
+							</div>
 						</div>
 					)}
 				</div>

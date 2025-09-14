@@ -362,6 +362,15 @@ export function MessagesProvider({ children, chatId }: MessagesProviderProps) {
 					...(hasOpenAI ? { openai: modelConfigState.openai } : {}),
 					...(hasGoogleOrGemini ? { google: modelConfigState.google } : {}),
 				};
+
+				// Web search toggles from localStorage
+				let searchEnabled = false;
+				let searchProvider: "exa" | "firecrawl" | undefined;
+				try {
+					searchEnabled = window.localStorage.getItem("chaichat_search_enabled") === "true";
+					const sp = window.localStorage.getItem("chai-search-provider");
+					if (sp === "exa" || sp === "firecrawl") searchProvider = sp;
+				} catch {}
 				return {
 					model: currentModel,
 					system: SYSTEM_PROMPT_DEFAULT,
@@ -369,6 +378,8 @@ export function MessagesProvider({ children, chatId }: MessagesProviderProps) {
 					gateway,
 					temperature: modelConfigState.temperature,
 					config,
+					searchEnabled,
+					searchProvider,
 				};
 			},
 			// biome-ignore lint/suspicious/noExplicitAny: Bridging type mismatch between `ai` and `@ai-sdk/react` transport types at compile time; runtime behavior is correct

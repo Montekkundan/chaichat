@@ -969,6 +969,16 @@ export function ModelSelector({
 		[className, getDisplayText],
 	);
 
+	// Broadcast open state so parents can avoid closing while interacting with the selector
+	useEffect(() => {
+		try {
+			const open = isDropdownOpen || isDrawerOpen;
+			window.dispatchEvent(
+				new CustomEvent("model-selector-open-changed", { detail: { open } }),
+			);
+		} catch {}
+	}, [isDropdownOpen, isDrawerOpen]);
+
 	if (isLoading && !isDropdownOpen && !isDrawerOpen) {
 		return (
 			<Button
@@ -1008,7 +1018,7 @@ export function ModelSelector({
 					}}
 				>
 					<DrawerTrigger asChild>{trigger}</DrawerTrigger>
-					<DrawerContent>
+					<DrawerContent data-model-selector-layer>
 						<DrawerHeader>
 							<DrawerTitle>Select Model</DrawerTitle>
 						</DrawerHeader>
@@ -1061,7 +1071,7 @@ export function ModelSelector({
 											<SlidersHorizontal className="h-4 w-4" />
 										</Button>
 									</PopoverTrigger>
-									<PopoverContent align="end" className="w-80 space-y-3 p-3">
+									<PopoverContent align="end" className="w-80 space-y-3 p-3" data-model-selector-layer>
 										<div className="grid grid-cols-2 gap-3">
 											<div className="flex items-center justify-between gap-2">
 												<Label htmlFor="f-streaming" className="text-xs">
@@ -1350,6 +1360,7 @@ export function ModelSelector({
 					sideOffset={4}
 					forceMount
 					side="top"
+					data-model-selector-layer
 					onPointerDownOutside={(e) => {
 						const target = e.target as HTMLElement | null;
 						if (target?.closest('[data-model-filters-popover="true"]')) {

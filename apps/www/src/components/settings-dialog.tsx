@@ -51,10 +51,11 @@ const data = {
 		{ name: "Appearance", icon: GearIcon, id: "appearance" },
 		{ name: "Gallery", icon: GearIcon, id: "gallery" },
 		{ name: "Playground", icon: GearIcon, id: "playground" },
+		{ name: "Web Search", icon: Key, id: "web-search" },
 	],
 };
 
-type SettingsSection = "api-keys" | "appearance" | "gallery" | "playground";
+type SettingsSection = "api-keys" | "appearance" | "gallery" | "playground" | "web-search";
 
 export function SettingsDialog({
 	open,
@@ -93,6 +94,9 @@ export function SettingsDialog({
 	}>>([]);
 	const [galleryLoading, setGalleryLoading] = useState(false);
 	const [selectedStorageProvider, setSelectedStorageProvider] = useState<"uploadthing" | "vercelblob">("uploadthing");
+	const [selectedSearchProvider, setSelectedSearchProvider] = useState<"exa" | "firecrawl">("exa");
+	const [hasExaKey, setHasExaKey] = useState(false);
+	const [hasFirecrawlKey, setHasFirecrawlKey] = useState(false);
 
 	// Track last applied URL to avoid redundant fetches and flicker
 	const lastAppliedUrlRef = React.useRef<string | null>(null);
@@ -366,6 +370,27 @@ export function SettingsDialog({
 		// Only re-run when the URL text changes or restoration status flips
 	}, [themeUrl, isRestoringUrl, resolvedTheme, isUserAction, tweakcnTheme]);
 
+	// Track search provider and key presence
+	React.useEffect(() => {
+		const sync = () => {
+			try {
+				const sp = localStorage.getItem("chai-search-provider");
+				if (sp === "exa" || sp === "firecrawl") setSelectedSearchProvider(sp);
+				setHasExaKey(!!localStorage.getItem("chaichat_keys_exa"));
+				setHasFirecrawlKey(!!localStorage.getItem("chaichat_keys_firecrawl"));
+			} catch {}
+		};
+		sync();
+		window.addEventListener("searchProviderChanged", sync as EventListener);
+		window.addEventListener("apiKeysChanged", sync as EventListener);
+		window.addEventListener("storage", sync);
+		return () => {
+			window.removeEventListener("searchProviderChanged", sync as EventListener);
+			window.removeEventListener("apiKeysChanged", sync as EventListener);
+			window.removeEventListener("storage", sync);
+		};
+	}, []);
+
 	// biome-ignore lint/correctness/useExhaustiveDependencies: <explanation>
 	React.useEffect(() => {
 		const handleStorageProviderChange = () => {
@@ -638,6 +663,36 @@ export function SettingsDialog({
 										)}
 									</div>
 								</div>
+							</div>
+						</div>
+					</div>
+				);
+			case "web-search":
+				return (
+					<div className="space-y-6">
+						<div>
+							<h3 className="font-semibold text-lg">Web Search</h3>
+							<p className="text-sm" style={{ color: "var(--foreground)", opacity: 0.8 }}>
+								Pick a provider and make sure the corresponding API key is set in API Keys.
+							</p>
+						</div>
+						<div className="rounded-lg border bg-card p-4 space-y-4">
+							<div>
+								<h4 className="mb-2 font-medium">Provider</h4>
+								<div className="mt-2 flex gap-4">
+									<label className="flex items-center space-x-2">
+										<input type="radio" name="searchProvider" value="exa" checked={selectedSearchProvider === "exa"} onChange={() => { localStorage.setItem("chai-search-provider", "exa"); window.dispatchEvent(new CustomEvent("searchProviderChanged")); setSelectedSearchProvider("exa"); }} className="rounded" />
+										<span>Exa {hasExaKey ? "(key set)" : "(missing key)"}</span>
+									</label>
+									<label className="flex items-center space-x-2">
+										<input type="radio" name="searchProvider" value="firecrawl" checked={selectedSearchProvider === "firecrawl"} onChange={() => { localStorage.setItem("chai-search-provider", "firecrawl"); window.dispatchEvent(new CustomEvent("searchProviderChanged")); setSelectedSearchProvider("firecrawl"); }} className="rounded" />
+										<span>Firecrawl {hasFirecrawlKey ? "(key set)" : "(missing key)"}</span>
+									</label>
+								</div>
+							</div>
+							<div>
+								<h4 className="mb-2 font-medium">Usage</h4>
+								<p className="text-muted-foreground text-xs">Enable the search toggle in the chat input or playground columns to allow the model to call the web search tool. Citations will render under the response, and reasoning steps will be shown.</p>
 							</div>
 						</div>
 					</div>
