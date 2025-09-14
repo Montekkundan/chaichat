@@ -45,6 +45,18 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
 import { useEffect as _useEffect } from "react";
 import { cn } from "~/lib/utils";
 import { modelSupportsVision, isStorageReady } from "~/lib/model-capabilities";
+import {
+    Context,
+    ContextTrigger,
+    ContextContent,
+    ContextContentHeader,
+    ContextContentBody,
+    ContextContentFooter,
+    ContextInputUsage,
+    ContextOutputUsage,
+    ContextReasoningUsage,
+    ContextCacheUsage,
+} from "~/components/ai-elements/context";
 
 interface PlaygroundColumnProps {
 	column: ChatColumn;
@@ -322,6 +334,36 @@ export function PlaygroundColumn({
 				completionPrice: formatPrice(completion),
 			};
 		}, [column.modelId, models, formatPrice]);
+
+    const tokenlensModelId = (column.modelId ? (column.modelId.replace("/", ":") as import("tokenlens").ModelId) : undefined);
+    const maxContextTokens = selectedModel?.context_length ?? 128000;
+    // Rough token estimation based on text length
+    const estimateTokens = (text: string) => Math.ceil(text.length / 4);
+    const getTextFromParts = (parts: import("@ai-sdk/react").UIMessage["parts"]) => {
+        if (!Array.isArray(parts)) return "";
+        return parts
+            .filter((p) => (p as { type?: string }).type === "text")
+            .map((p) => (p as { type: "text"; text: string }).text || "")
+            .join("\n");
+    };
+    const inputChars = (column.messages || [])
+        .filter((m) => m.role === "user")
+        .map((m) => (m.parts ? getTextFromParts(m.parts) : (m as { content?: string }).content || ""))
+        .join("\n");
+    const outputChars = (column.messages || [])
+        .filter((m) => m.role === "assistant")
+        .map((m) => (m.parts ? getTextFromParts(m.parts) : (m as { content?: string }).content || ""))
+        .join("\n");
+    const inputTokensEst = estimateTokens(inputChars);
+    const outputTokensEst = estimateTokens(outputChars);
+    const usedTokensEst = inputTokensEst + outputTokensEst;
+    const usageEst = {
+        inputTokens: inputTokensEst,
+        outputTokens: outputTokensEst,
+        totalTokens: usedTokensEst,
+        cachedInputTokens: 0,
+        reasoningTokens: 0,
+    } as const;
 
 	const {
 		columns,
@@ -824,6 +866,27 @@ export function PlaygroundColumn({
 											</span>
 										</Button>
 									</UnifiedConfigDropdown>
+									{/* Context usage indicator for this column */}
+									<div className="ml-1">
+											<Context
+												maxTokens={maxContextTokens}
+												usedTokens={usedTokensEst}
+												usage={usageEst}
+												modelId={tokenlensModelId}
+											>
+											<ContextTrigger />
+											<ContextContent>
+												<ContextContentHeader />
+												<ContextContentBody>
+													<ContextInputUsage />
+													<ContextOutputUsage />
+													<ContextReasoningUsage />
+													<ContextCacheUsage />
+												</ContextContentBody>
+												<ContextContentFooter />
+											</ContextContent>
+										</Context>
+									</div>
 								</div>
 
 								{/* Add Column button */}

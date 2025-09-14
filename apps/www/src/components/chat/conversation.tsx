@@ -286,10 +286,10 @@ export function Conversation({
 										return (
 											<div className="w-full space-y-2">
 												{toolParts.map((tp, idx) => (
-													<ToolCard
-														key={`${message.id}-tool-${idx}`}
-														defaultOpen={tp.state === "output-available" || tp.state === "output-error"}
-													>
+														<ToolCard
+															key={`${message.id}-tool-${idx}`}
+															defaultOpen={false}
+														>
 														<ToolHeader type={tp.type} state={tp.state} />
 														<ToolContent>
 															<ToolInput input={tp.input} />

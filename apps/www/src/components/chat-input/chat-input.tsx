@@ -29,6 +29,18 @@ import { ModelSelector } from "./model-selector";
 import { useLLMModels } from "~/hooks/use-models";
 import { isStorageReady, modelSupportsVision } from "~/lib/model-capabilities";
 import { Globe } from "lucide-react";
+import {
+    Context,
+    ContextTrigger,
+    ContextContent,
+    ContextContentHeader,
+    ContextContentBody,
+    ContextContentFooter,
+    ContextInputUsage,
+    ContextOutputUsage,
+    ContextReasoningUsage,
+    ContextCacheUsage,
+} from "~/components/ai-elements/context";
 
 // TODO cleanup: use all user keys
 
@@ -185,10 +197,59 @@ export function ChatInput({
 
 	const uploadHelpers = generateReactHelpers<UploadRouter>();
 	const { useUploadThing } = uploadHelpers;
-	const { startUpload, isUploading } = useUploadThing("chatFiles");
+    const { startUpload, isUploading } = useUploadThing("chatFiles");
 
-	// File input ref for manual file selection
-	const fileInputRef = useRef<HTMLInputElement>(null);
+    // File input ref for manual file selection
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    // Derive model metadata for context sizing
+    const selectedModelMeta = (() => {
+        const id = selectedModel;
+        if (!id) return undefined;
+        // Match either provider-prefixed or plain id/name
+        if (id.includes("/")) {
+            const firstSlash = id.indexOf("/");
+            const provider = id.substring(0, firstSlash);
+            const modelName = id.substring(firstSlash + 1);
+            return models.find((m) =>
+                m.providers?.some(
+                    (p) => p.providerId === provider && (p.modelName === modelName || p.modelName.endsWith(`/${modelName}`)),
+                ),
+            );
+        }
+        return models.find((m) => m.id === id || m.name === id);
+    })();
+
+    const maxContextTokens = selectedModelMeta?.context_length ?? 128000;
+    const tokenlensModelId = (selectedModel ? (selectedModel.replace("/", ":") as import("tokenlens").ModelId) : undefined);
+
+    // Estimate current conversation usage for progress display
+    const estimateTokens = (text: string) => Math.ceil(text.length / 4);
+    const getTextFromParts = (parts: import("@ai-sdk/react").UIMessage["parts"]) => {
+        if (!Array.isArray(parts)) return "";
+        return parts
+            .filter((p) => (p as { type?: string }).type === "text")
+            .map((p) => (p as { type: "text"; text: string }).text || "")
+            .join("\n");
+    };
+    const inputChars = useMessages().messages
+        .filter((m) => m.role === "user")
+        .map((m) => (m.parts ? getTextFromParts(m.parts) : (m as { content?: string }).content || ""))
+        .join("\n");
+    const outputChars = useMessages().messages
+        .filter((m) => m.role === "assistant")
+        .map((m) => (m.parts ? getTextFromParts(m.parts) : (m as { content?: string }).content || ""))
+        .join("\n");
+    const inputTokensEst = estimateTokens(inputChars);
+    const outputTokensEst = estimateTokens(outputChars);
+    const usedTokensEst = inputTokensEst + outputTokensEst;
+    const usageEst = {
+        inputTokens: inputTokensEst,
+        outputTokens: outputTokensEst,
+        totalTokens: usedTokensEst,
+        cachedInputTokens: 0,
+        reasoningTokens: 0,
+    } as const;
 
 	const uploadFile = useCallback(async (file: File): Promise<{ url: string; name: string; size: number; contentType: string } | null> => {
 		if (storageProvider === "vercelblob") {
@@ -830,6 +891,27 @@ export function ChatInput({
 							}
 							disabled={!hasRequiredKey}
 						/>
+						{/* Context usage indicator */}
+						<PromptInputAction>
+									<Context
+										maxTokens={maxContextTokens}
+										usedTokens={usedTokensEst}
+										usage={usageEst}
+										modelId={tokenlensModelId}
+									>
+								<ContextTrigger />
+								<ContextContent>
+									<ContextContentHeader />
+									<ContextContentBody>
+										<ContextInputUsage />
+										<ContextOutputUsage />
+										<ContextReasoningUsage />
+										<ContextCacheUsage />
+									</ContextContentBody>
+									<ContextContentFooter />
+								</ContextContent>
+							</Context>
+						</PromptInputAction>
 						<PromptInputAction
 							tooltip={searchAllowed.allowed ? (isSearchEnabled ? "Disable web search" : "Enable web search") : (searchAllowed.reason || "Configure web search")}
 						>

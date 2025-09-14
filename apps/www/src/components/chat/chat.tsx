@@ -265,7 +265,7 @@ export default function Chat({ initialName }: ChatProps = {}) {
 						</div>
 					</div>
 				</div>
-				<div className="absolute inset-0 sm:pt-3.5">
+				<div className="absolute inset-0">
 					{showOnboarding ? (
 						<div className="mx-auto flex w-full max-w-3xl flex-col space-y-12 px-4 pt-safe-offset-10 pb-10">
 							<div className="flex h-[calc(100vh-20rem)] items-start justify-center">
