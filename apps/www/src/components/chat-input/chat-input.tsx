@@ -29,18 +29,6 @@ import { ModelSelector } from "./model-selector";
 import { useLLMModels } from "~/hooks/use-models";
 import { isStorageReady, modelSupportsVision } from "~/lib/model-capabilities";
 import { Globe } from "lucide-react";
-import {
-    Context,
-    ContextTrigger,
-    ContextContent,
-    ContextContentHeader,
-    ContextContentBody,
-    ContextContentFooter,
-    ContextInputUsage,
-    ContextOutputUsage,
-    ContextReasoningUsage,
-    ContextCacheUsage,
-} from "~/components/ai-elements/context";
 
 // TODO cleanup: use all user keys
 
@@ -892,7 +880,7 @@ export function ChatInput({
 							disabled={!hasRequiredKey}
 						/>
 						{/* Context usage indicator */}
-						<PromptInputAction tooltip="Context usage">
+						{/* <PromptInputAction tooltip="Context usage">
 									<Context
 										maxTokens={maxContextTokens}
 										usedTokens={usedTokensEst}
@@ -911,7 +899,7 @@ export function ChatInput({
 									<ContextContentFooter />
 								</ContextContent>
 							</Context>
-						</PromptInputAction>
+						</PromptInputAction> */}
 						<PromptInputAction
 							tooltip={searchAllowed.allowed ? (isSearchEnabled ? "Disable web search" : "Enable web search") : (searchAllowed.reason || "Configure web search")}
 						>
