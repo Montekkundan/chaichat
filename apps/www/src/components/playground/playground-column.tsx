@@ -3,6 +3,7 @@
 import { api } from "@/convex/_generated/api";
 import { useUser } from "@clerk/nextjs";
 import { LinkIcon, LinkSimpleBreakIcon, Paperclip } from "@phosphor-icons/react";
+import { Globe } from "lucide-react";
 import { useAction } from "convex/react";
 import {
 	ChevronLeft,
@@ -16,6 +17,7 @@ import {
 	X,
 } from "lucide-react";
 import { Square } from "lucide-react";
+import { MessageSquare, MessageSquareText } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ModelSelector } from "~/components/chat-input/model-selector";
 import { Conversation } from "~/components/chat/conversation";
@@ -96,6 +98,38 @@ export function PlaygroundColumn({
 			window.removeEventListener("storage", onChange);
 		};
 	}, []);
+
+	// Web search toggle state synced with localStorage
+	const [searchEnabled, setSearchEnabled] = useState<boolean>(false);
+	const [isHydrated, setIsHydrated] = useState(false);
+	useEffect(() => {
+		setIsHydrated(true);
+		try {
+			setSearchEnabled(localStorage.getItem("chaichat_search_enabled") === "true");
+		} catch {}
+		const onStorage = () => {
+			try {
+				setSearchEnabled(localStorage.getItem("chaichat_search_enabled") === "true");
+			} catch {}
+		};
+		window.addEventListener("storage", onStorage);
+		return () => window.removeEventListener("storage", onStorage);
+	}, []);
+
+	const computeSearchDisabled = useCallback(() => {
+		try {
+			const sp = localStorage.getItem("chai-search-provider");
+			const hasExa = !!localStorage.getItem("chaichat_keys_exa");
+			const hasFire = !!localStorage.getItem("chaichat_keys_firecrawl");
+			if (sp === "exa") return !hasExa;
+			if (sp === "firecrawl") return !hasFire;
+			return true;
+		} catch {
+			return true;
+		}
+	}, []);
+
+	const searchDisabled = isHydrated ? computeSearchDisabled() : undefined;
 
 	// Upload function that handles both storage providers
 	const uploadFile = async (file: File): Promise<{ url: string; name: string; size: number; contentType: string } | null> => {
@@ -298,6 +332,7 @@ export function PlaygroundColumn({
 		moveColumnLeft,
 		moveColumnRight,
 		toggleColumnSync,
+		toggleColumnMergeContext,
 		updateSharedInput,
 		updateColumnInput,
 		sendToColumn,
@@ -823,6 +858,25 @@ export function PlaygroundColumn({
 										<LinkSimpleBreakIcon size={16} />
 									)}
 								</Button>
+								<Tooltip>
+									<TooltipTrigger asChild>
+										<Button
+											variant={"ghost"}
+											size={"icon"}
+											onClick={() => toggleColumnMergeContext(column.id)}
+											aria-label="Toggle Context Merge"
+										>
+											{column.mergeContext ? (
+												<MessageSquareText className="h-4 w-4 text-primary" />
+											) : (
+												<MessageSquare className="h-4 w-4 text-muted-foreground" />
+											)}
+										</Button>
+									</TooltipTrigger>
+									<TooltipContent sideOffset={6}>
+										{column.mergeContext ? "Context merge: On" : "Context merge: Off"}
+									</TooltipContent>
+								</Tooltip>
 								{/* Menu button for more options */}
 								<DropdownMenu>
 									<DropdownMenuTrigger asChild>
@@ -878,6 +932,18 @@ export function PlaygroundColumn({
 					</div>
 					<Separator />
 
+					<div className="py-2 px-3">
+						<label htmlFor={`system-${column.id}`} className="block mb-1 text-xs text-muted-foreground">System context for this column</label>
+						<textarea id={`system-${column.id}`}
+							value={column.systemPrompt ?? ""}
+							onChange={(e) => updateColumn(column.id, { systemPrompt: e.target.value })}
+							placeholder="Add system context (e.g., role, restrictions, preferences)"
+							className="w-full rounded-md border bg-background-100 p-2 text-xs resize-none"
+							style={{ height: 80 }}
+							spellCheck={false}
+						/>
+					</div>
+					<Separator />
 					{/* Messages content area */}
 					<div className="min-h-0 min-w-0 flex-1">
 						<div
@@ -1148,6 +1214,29 @@ export function PlaygroundColumn({
 										<SendIcon className="h-4 w-4" />
 									</button>
 								)}
+								{/* Left of send: search toggle */}
+								<Tooltip>
+									<TooltipTrigger asChild>
+										<span className="absolute right-9 bottom-2 inline-flex items-center justify-center">
+											<button
+												type="button"
+												aria-label="Toggle Web Search"
+												onClick={() => {
+													try {
+														const cur = localStorage.getItem("chaichat_search_enabled") === "true";
+														localStorage.setItem("chaichat_search_enabled", cur ? "false" : "true");
+														setSearchEnabled(!cur);
+													} catch {}
+												}}
+												className="rounded-md p-1 text-muted-foreground hover:text-primary disabled:opacity-50"
+												disabled={searchDisabled}
+											>
+												<Globe className={cn("h-4 w-4", searchEnabled ? "text-primary" : "text-muted-foreground")} />
+											</button>
+										</span>
+									</TooltipTrigger>
+									<TooltipContent side="top">{isHydrated ? (searchDisabled ? "Enable a search provider (Exa/Firecrawl) and add its API key" : (searchEnabled ? "Web search: On" : "Web search: Off")) : "Web search"}</TooltipContent>
+								</Tooltip>
 							</form>
 						</div>
 					</div>

@@ -76,6 +76,8 @@ export type ChatColumn = {
 	messages: PlaygroundMessage[];
 	input: string;
 	synced: boolean;
+	mergeContext?: boolean;
+	systemPrompt?: string;
 	config: ModelConfig;
 	isStreaming: boolean;
 	status?: "submitted" | "streaming" | "ready" | "error";
@@ -105,6 +107,7 @@ interface PlaygroundContextType {
 	moveColumnLeft: (columnId: string) => void;
 	moveColumnRight: (columnId: string) => void;
 	toggleColumnSync: (columnId: string) => void;
+	toggleColumnMergeContext: (columnId: string) => void;
 	updateSharedInput: (input: string) => void;
 	updateColumnInput: (columnId: string, input: string) => void;
     sendToColumn: (columnId: string, message: string, attachments?: UploadedFile[]) => Promise<void>;
@@ -175,6 +178,8 @@ const createDefaultColumn = (modelId?: string): ChatColumn => {
 		messages: [],
 		input: "",
 		synced: false,
+		mergeContext: false,
+		systemPrompt: "",
 		config: createDefaultConfig(),
 		isStreaming: false,
 		status: "ready",
@@ -215,6 +220,7 @@ import {
 	PLAYGROUND_MAX_COLUMNS_MIN,
 	PLAYGROUND_MAX_COLUMNS_STORAGE_KEY,
 } from "~/lib/config";
+import { SYSTEM_PROMPT_DEFAULT } from "~/lib/config";
 
 function clampMaxColumns(value: number): number {
 	if (Number.isNaN(value)) return PLAYGROUND_MAX_COLUMNS_DEFAULT;
@@ -552,6 +558,7 @@ export function PlaygroundProvider({
 				isStreaming: false,
 				status: "ready",
 				gatewaySource: "llmgateway",
+				systemPrompt: "",
 			};
 			return {
 				...prev,
@@ -636,6 +643,15 @@ export function PlaygroundProvider({
 			...prev,
 			columns: prev.columns.map((col) =>
 				col.id === columnId ? { ...col, synced: !col.synced } : col,
+			),
+		}));
+	}, []);
+
+	const toggleColumnMergeContext = useCallback((columnId: string) => {
+		setState((prev) => ({
+			...prev,
+			columns: prev.columns.map((col) =>
+				col.id === columnId ? { ...col, mergeContext: !col.mergeContext } : col,
 			),
 		}));
 	}, []);
@@ -756,6 +772,8 @@ export function PlaygroundProvider({
 							id: c.id,
 							modelId: c.modelId,
 							gatewaySource: c.gatewaySource ?? "llmgateway",
+							mergeContext: c.mergeContext ?? false,
+							systemPrompt: c.systemPrompt ?? "",
 						})),
 					};
 					await db.playgrounds.put(pgRecord);
@@ -818,6 +836,8 @@ export function PlaygroundProvider({
 								id: c.id,
 								modelId: c.modelId,
 								gatewaySource: c.gatewaySource ?? "llmgateway",
+								mergeContext: c.mergeContext ?? false,
+								systemPrompt: c.systemPrompt ?? "",
 							}));
 							// Using unknown here to bypass type until codegen includes playground endpoints
 							const convexPlaygroundId = await (
@@ -862,7 +882,91 @@ export function PlaygroundProvider({
 				}
 
 				// Prepare messages for API
-				const messagesForAPI = [...column.messages, userMessage];
+				const activeMerged = state.columns.filter((c) => c.mergeContext);
+				const shouldMerge = activeMerged.length > 1;
+				// Helpers to extract and sanitize text safely
+				const extractText = (m: PlaygroundMessage): string => {
+					try {
+						if (Array.isArray(m.parts)) {
+							const parts = m.parts as unknown as Array<{ type?: string; text?: string }>;
+							const texts = parts
+								.filter((p) => p && p.type === "text" && typeof p.text === "string")
+								.map((p) => p.text as string);
+							if (texts.length > 0) return texts.join("\n");
+						}
+					} catch {}
+					return (typeof m.content === "string" ? m.content : "");
+				};
+				const redact = (s: string): string => {
+					let out = s;
+					out = out.replace(/\b(Secret(?:Code)?|Admin\s*key|Master\s*password|Password|Unlock\s*code|Database\s*key)\s*[:=]\s*\S+/gi, "$1: [REDACTED]");
+					out = out.replace(/\b[A-Z]{3,}-\d+\b/g, "[REDACTED]");
+					return out;
+				};
+				const MERGE_MAX_PER_COLUMN = 2;
+				// Build per-column header + last-N messages, deduplicated
+				const seen = new Set<string>();
+				const mergedOtherMessages: PlaygroundMessage[] = shouldMerge
+					? activeMerged
+						.filter((c) => c.id !== column.id)
+						.flatMap((c) => {
+							const results: PlaygroundMessage[] = [];
+							const sys = (c.systemPrompt ?? "").trim();
+							const sysTag = sys ? `system: ${sys}` : "system: (unspecified)";
+							const headerText = `[context from ${c.id} | ${sysTag}]`;
+							const headerId = `ctx-head-${messageTimestamp}-${c.id}-${column.id}`;
+							if (!seen.has(headerText)) {
+								seen.add(headerText);
+								results.push({
+									id: headerId,
+									role: "user",
+									content: headerText,
+									parts: [{ type: "text", text: headerText }] as UIMessage["parts"],
+								} as PlaygroundMessage);
+							}
+							const lastN = c.messages.slice(-MERGE_MAX_PER_COLUMN);
+							for (const m of lastN) {
+								const text = redact(extractText(m)).trim();
+								if (!text) continue;
+								const uniqueKey = `${c.id}|${m.role}|${text}`;
+								if (seen.has(uniqueKey)) continue;
+								seen.add(uniqueKey);
+								const prefixed = `[from ${c.id}]\n${text}`;
+								results.push({
+									id: `ctx-${messageTimestamp}-${c.id}-${column.id}-${m.id}`,
+									role: m.role,
+									content: prefixed,
+									parts: [{ type: "text", text: prefixed }] as UIMessage["parts"],
+									model: m.model,
+									gateway: m.gateway,
+								} as PlaygroundMessage);
+							}
+							return results;
+						})
+					: [];
+				const getTs = (msg: PlaygroundMessage): number => {
+					if (msg.createdAt instanceof Date) return msg.createdAt.valueOf();
+					if (typeof msg.id === "string") {
+						const parts = msg.id.split("-");
+						const maybe = Number.parseInt(parts[1] || "");
+						if (!Number.isNaN(maybe)) return maybe;
+					}
+					return Date.now();
+				};
+				const messagesForAPI = shouldMerge
+					? (
+						[
+							...mergedOtherMessages,
+							...column.messages,
+							userMessage,
+						] as PlaygroundMessage[]
+						).sort((a, b) => getTs(a) - getTs(b))
+					: [...column.messages, userMessage];
+
+				// System prompt for this column
+				const system = (column.systemPrompt && column.systemPrompt.trim().length > 0)
+					? column.systemPrompt
+					: SYSTEM_PROMPT_DEFAULT;
 
 				// Make API call with abort support and track per column
 				const controller = new AbortController();
@@ -886,6 +990,7 @@ export function PlaygroundProvider({
                                 column.gatewaySource === "aigateway"
 								? "vercel-ai-gateway"
 								: "llm-gateway",
+							system,
 					}),
 					signal: controller.signal,
 				});
@@ -1403,7 +1508,82 @@ export function PlaygroundProvider({
 				// 2. Make parallel API calls for all models
 				const _apiPromises = userMessages.map(
 					async ({ column, userMessage }) => {
-						const messagesForAPI = [...column.messages, userMessage];
+						const activeMerged = state.columns.filter((c) => c.mergeContext);
+						const shouldMerge = activeMerged.length > 1;
+						const getTs = (msg: PlaygroundMessage): number => {
+							if (msg.createdAt instanceof Date) return msg.createdAt.valueOf();
+							if (typeof msg.id === "string") {
+								const parts = msg.id.split("-");
+								const maybe = Number.parseInt(parts[1] || "");
+								if (!Number.isNaN(maybe)) return maybe;
+							}
+							return Date.now();
+						};
+						const messagesForAPI = shouldMerge
+							? (
+								(() => {
+									const extractText = (m: PlaygroundMessage): string => {
+										try {
+											if (Array.isArray(m.parts)) {
+												const parts = m.parts as unknown as Array<{ type?: string; text?: string }>;
+												const texts = parts
+													.filter((p) => p && p.type === "text" && typeof p.text === "string")
+													.map((p) => p.text as string);
+												if (texts.length > 0) return texts.join("\n");
+											}
+										} catch {}
+										return (typeof m.content === "string" ? m.content : "");
+									};
+									const redact = (s: string): string => {
+										let out = s;
+										out = out.replace(/\b(Secret(?:Code)?|Admin\s*key|Master\s*password|Password|Unlock\s*code|Database\s*key)\s*[:=]\s*\S+/gi, "$1: [REDACTED]");
+										out = out.replace(/\b[A-Z]{3,}-\d+\b/g, "[REDACTED]");
+										return out;
+									};
+									const MERGE_MAX_PER_COLUMN = 2;
+									const seen = new Set<string>();
+									const others = state.columns.filter((c) => c.mergeContext).filter((c) => c.id !== column.id);
+									const annotated: PlaygroundMessage[] = [];
+									for (const c of others) {
+										const sys = (c.systemPrompt ?? "").trim();
+										const sysTag = sys ? `system: ${sys}` : "system: (unspecified)";
+										const headerText = `[context from ${c.id} | ${sysTag}]`;
+										if (!seen.has(headerText)) {
+											seen.add(headerText);
+											annotated.push({
+												id: `ctx-head-${messageTimestamp}-${c.id}-${column.id}`,
+												role: "user",
+												content: headerText,
+												parts: [{ type: "text", text: headerText }] as UIMessage["parts"],
+											} as PlaygroundMessage);
+										}
+										const lastN = c.messages.slice(-MERGE_MAX_PER_COLUMN);
+										for (const m of lastN) {
+											const text = redact(extractText(m)).trim();
+											if (!text) continue;
+											const uniqueKey = `${c.id}|${m.role}|${text}`;
+											if (seen.has(uniqueKey)) continue;
+											seen.add(uniqueKey);
+											const prefixed = `[from ${c.id}]\n${text}`;
+											annotated.push({
+												id: `ctx-${messageTimestamp}-${c.id}-${column.id}-${m.id}`,
+												role: m.role,
+												content: prefixed,
+												parts: [{ type: "text", text: prefixed }] as UIMessage["parts"],
+												model: m.model,
+												gateway: m.gateway,
+											} as PlaygroundMessage);
+										}
+									}
+									return ([...annotated, ...column.messages, userMessage] as PlaygroundMessage[]);
+								})()
+							).sort((a, b) => getTs(a) - getTs(b))
+							: [...column.messages, userMessage];
+
+						// System prompt for this column
+						const system = (column.systemPrompt && column.systemPrompt.trim().length > 0)
+							? column.systemPrompt
+							: SYSTEM_PROMPT_DEFAULT;
 
 						// Create assistant message placeholder
 						const assistantMessage: PlaygroundMessage = {
@@ -1459,6 +1639,7 @@ export function PlaygroundProvider({
 										column.gatewaySource === "aigateway"
 											? "vercel-ai-gateway"
 											: "llm-gateway",
+									system,
 								}),
 								signal: controller.signal,
 							});
@@ -1801,6 +1982,7 @@ export function PlaygroundProvider({
 
 				// Sync management
 				toggleColumnSync,
+				toggleColumnMergeContext,
 				updateSharedInput,
 				updateColumnInput,
 
