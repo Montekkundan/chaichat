@@ -892,7 +892,7 @@ export function ChatInput({
 							disabled={!hasRequiredKey}
 						/>
 						{/* Context usage indicator */}
-						<PromptInputAction>
+						<PromptInputAction tooltip="Context usage">
 									<Context
 										maxTokens={maxContextTokens}
 										usedTokens={usedTokensEst}
