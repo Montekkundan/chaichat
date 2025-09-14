@@ -457,7 +457,7 @@ export function ChatInput({
 			else if (sp === "firecrawl") setSearchAllowed(hasFirecrawl ? { allowed: true } : { allowed: false, reason: "Set Firecrawl API key" });
 			else setSearchAllowed({ allowed: false, reason: "Pick a search provider" });
 		} catch { setSearchAllowed({ allowed: false, reason: "Configure web search" }); }
-	}, [modelsSource]);
+	}, []);
 
 	// Derived: does the current source have the required key?
 	const hasRequiredKey = modelsSource === "aigateway" ? hasAiKey : hasLlmKey;
