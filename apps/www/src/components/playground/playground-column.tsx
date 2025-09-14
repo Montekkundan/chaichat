@@ -4,7 +4,7 @@ import { api } from "@/convex/_generated/api";
 import { useUser } from "@clerk/nextjs";
 import { LinkIcon, LinkSimpleBreakIcon, Paperclip } from "@phosphor-icons/react";
 import { Globe } from "lucide-react";
-import { AIDevtools } from "ai-sdk-devtools";
+import { DevtoolsOverlay } from "~/components/devtools/ai-devtools";
 import { useAction } from "convex/react";
 import {
 	ChevronLeft,
@@ -1294,8 +1294,8 @@ export function PlaygroundColumn({
 				</div>
 				</div>
 			</div>
-			{process.env.NODE_ENV === "development" && columnIndex === 0 && (
-				<AIDevtools />
+			{columnIndex === 0 && (
+				<DevtoolsOverlay modelId={tokenlensModelId as unknown as string} />
 			)}
 		</div>
 	);
