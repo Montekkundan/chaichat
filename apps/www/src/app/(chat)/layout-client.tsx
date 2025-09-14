@@ -2,6 +2,7 @@
 
 import { type ReactNode, useEffect } from "react";
 import { AppSidebar } from "~/components/app-sidebar/app-sidebar";
+import { DevtoolsOverlay } from "~/components/devtools/ai-devtools";
 import { SidebarProvider, useSidebar } from "~/components/ui/sidebar";
 
 export type MinimalUser = {
@@ -31,6 +32,7 @@ export default function ChatLayoutClient({
 		<SidebarProvider defaultOpen={defaultSidebarOpen}>
 			<AppSidebar initialUser={initialUser} />
 			<MainContentWithInset>{children}</MainContentWithInset>
+			<DevtoolsOverlay />
 		</SidebarProvider>
 	);
 }

@@ -10,7 +10,6 @@ import { ChatTitlesCookieManager } from "~/lib/chat-titles-cookie";
 import { APP_NAME, generateOGImageURL } from "~/lib/config";
 import { MessagesProvider } from "~/lib/providers/messages-provider";
 // import { ChatContextIndicator } from "~/components/chat/context-indicator";
-import { DevtoolsOverlay } from "~/components/devtools/ai-devtools";
 
 function truncateTitle(title: string, maxLength = 50): string {
 	if (title.length <= maxLength) return title;
@@ -112,7 +111,6 @@ export default async function Page({
 				{/* <ChatContextIndicator /> */}
 				<Chat initialName={firstName} />
 			</MessagesProvider>
-			<DevtoolsOverlay />
 		</LayoutMain>
 	);
 }
