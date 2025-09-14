@@ -4,6 +4,7 @@ import { api } from "@/convex/_generated/api";
 import { useUser } from "@clerk/nextjs";
 import { LinkIcon, LinkSimpleBreakIcon, Paperclip } from "@phosphor-icons/react";
 import { Globe } from "lucide-react";
+import { AIDevtools } from "ai-sdk-devtools";
 import { useAction } from "convex/react";
 import {
 	ChevronLeft,
@@ -45,18 +46,6 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
 import { useEffect as _useEffect } from "react";
 import { cn } from "~/lib/utils";
 import { modelSupportsVision, isStorageReady } from "~/lib/model-capabilities";
-import {
-    Context,
-    ContextTrigger,
-    ContextContent,
-    ContextContentHeader,
-    ContextContentBody,
-    ContextContentFooter,
-    ContextInputUsage,
-    ContextOutputUsage,
-    ContextReasoningUsage,
-    ContextCacheUsage,
-} from "~/components/ai-elements/context";
 
 interface PlaygroundColumnProps {
 	column: ChatColumn;
@@ -867,7 +856,7 @@ export function PlaygroundColumn({
 										</Button>
 									</UnifiedConfigDropdown>
 									{/* Context usage indicator for this column */}
-									<div className="ml-1">
+									{/* <div className="ml-1">
 											<Context
 												maxTokens={maxContextTokens}
 												usedTokens={usedTokensEst}
@@ -886,7 +875,7 @@ export function PlaygroundColumn({
 												<ContextContentFooter />
 											</ContextContent>
 										</Context>
-									</div>
+									</div> */}
 								</div>
 
 								{/* Add Column button */}
@@ -1301,10 +1290,13 @@ export function PlaygroundColumn({
 									<TooltipContent side="top">{isHydrated ? (searchDisabled ? "Enable a search provider (Exa/Firecrawl) and add its API key" : (searchEnabled ? "Web search: On" : "Web search: Off")) : "Web search"}</TooltipContent>
 								</Tooltip>
 							</form>
-						</div>
 					</div>
 				</div>
+				</div>
 			</div>
+			{process.env.NODE_ENV === "development" && columnIndex === 0 && (
+				<AIDevtools />
+			)}
 		</div>
 	);
 }
