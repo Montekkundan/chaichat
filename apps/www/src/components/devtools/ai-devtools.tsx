@@ -3,7 +3,7 @@
 import { AIDevtools } from "ai-sdk-devtools";
 
 type Props = {
-  enabled?: boolean;
+  enabled?: boolean; // defaults to true in all envs
   modelId?: string;
   endpoint?: string;
   position?: "bottom" | "right" | "overlay";
@@ -11,18 +11,17 @@ type Props = {
 };
 
 export function DevtoolsOverlay({
-  enabled,
+  enabled = true,
   modelId,
   endpoint = "/api/chat",
   position = "bottom",
   height = 360,
 }: Props) {
-  const isDev = typeof process !== "undefined" && process.env.NODE_ENV === "development";
   if (enabled === false) return null;
-  if (!isDev && enabled !== true) return null;
 
   return (
     <AIDevtools
+      enabled={enabled}
       modelId={modelId}
       config={{
         position,
@@ -42,4 +41,3 @@ export function DevtoolsOverlay({
     />
   );
 }
-
