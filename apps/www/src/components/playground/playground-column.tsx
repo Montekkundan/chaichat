@@ -2,49 +2,28 @@
 
 import { api } from "@/convex/_generated/api";
 import { useUser } from "@clerk/nextjs";
-import { LinkIcon, LinkSimpleBreakIcon, Paperclip } from "@phosphor-icons/react";
-import { Globe } from "lucide-react";
-import { useAction } from "convex/react";
-import {
-	ChevronLeft,
-	ChevronRight,
-	MoreHorizontal,
-	Plus,
-	RotateCcw,
-	SendIcon,
-	Settings,
-	Trash2,
-	X,
-} from "lucide-react";
-import { Square } from "lucide-react";
-import { MessageSquare, MessageSquareText } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ModelSelector } from "~/components/chat-input/model-selector";
-import { Conversation } from "~/components/chat/conversation";
-import { UnifiedConfigDropdown } from "~/components/model-config";
-import { filterValidFiles } from "~/lib/file-upload/validation";
 import { generateReactHelpers } from "@uploadthing/react";
+import { useAction } from "convex/react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect as _useEffect } from "react";
+import { Conversation } from "~/components/chat/conversation";
+import { filterValidFiles } from "~/lib/file-upload/validation";
 import type { UploadRouter } from "~/app/api/uploadthing/core";
 import { toast } from "~/components/ui/toast";
-import {
-	DropdownMenu,
-	DropdownMenuContent,
-	DropdownMenuItem,
-	DropdownMenuSeparator,
-	DropdownMenuTrigger,
-} from "~/components/ui/dropdown-menu";
 import { useLLMModels } from "~/hooks/use-models";
 import {
 	type ChatColumn,
 	usePlayground,
 } from "~/lib/providers/playground-provider";
-import type { LLMGatewayModel } from "~/types/llmgateway";
-import { Button } from "../ui/button";
-import { Separator } from "../ui/separator";
-import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
-import { useEffect as _useEffect } from "react";
-import { cn } from "~/lib/utils";
 import { modelSupportsVision, isStorageReady } from "~/lib/model-capabilities";
+import { cn } from "~/lib/utils";
+import type { LLMGatewayModel } from "~/types/llmgateway";
+import { Separator } from "../ui/separator";
+import { ColumnContainer } from "./components/column-container";
+import { ColumnEmptyState } from "./components/column-empty-state";
+import { ColumnHeader } from "./components/column-header";
+import { ColumnInput } from "./components/column-input";
+import { ColumnSystemContext } from "./components/column-system-context";
 
 interface PlaygroundColumnProps {
 	column: ChatColumn;
@@ -64,13 +43,13 @@ export function PlaygroundColumn({
 
 	// Drag and drop state
 	const [isDragOver, setIsDragOver] = useState(false);
-	const [dragCounter, setDragCounter] = useState(0);
+	const [, setDragCounter] = useState(0);
 	const [files, setFiles] = useState<import("~/components/chat-input/file-items").UploadedFile[]>([]);
 
 	// UploadThing setup
 	const uploadHelpers = generateReactHelpers<UploadRouter>();
 	const { useUploadThing } = uploadHelpers;
-	const { startUpload, isUploading } = useUploadThing("chatFiles");
+	const { startUpload } = useUploadThing("chatFiles");
 
 	// Track files selected/pasted but not yet uploaded
 	const pendingFilesRef = useRef<File[]>([]);
@@ -106,11 +85,11 @@ export function PlaygroundColumn({
 		setIsHydrated(true);
 		try {
 			setSearchEnabled(localStorage.getItem("chaichat_search_enabled") === "true");
-		} catch {}
+		} catch { }
 		const onStorage = () => {
 			try {
 				setSearchEnabled(localStorage.getItem("chaichat_search_enabled") === "true");
-			} catch {}
+			} catch { }
 		};
 		window.addEventListener("storage", onStorage);
 		return () => window.removeEventListener("storage", onStorage);
@@ -322,36 +301,6 @@ export function PlaygroundColumn({
 				completionPrice: formatPrice(completion),
 			};
 		}, [column.modelId, models, formatPrice]);
-
-    const tokenlensModelId = (column.modelId ? (column.modelId.replace("/", ":") as import("tokenlens").ModelId) : undefined);
-    const maxContextTokens = selectedModel?.context_length ?? 128000;
-    // Rough token estimation based on text length
-    const estimateTokens = (text: string) => Math.ceil(text.length / 4);
-    const getTextFromParts = (parts: import("@ai-sdk/react").UIMessage["parts"]) => {
-        if (!Array.isArray(parts)) return "";
-        return parts
-            .filter((p) => (p as { type?: string }).type === "text")
-            .map((p) => (p as { type: "text"; text: string }).text || "")
-            .join("\n");
-    };
-    const inputChars = (column.messages || [])
-        .filter((m) => m.role === "user")
-        .map((m) => (m.parts ? getTextFromParts(m.parts) : (m as { content?: string }).content || ""))
-        .join("\n");
-    const outputChars = (column.messages || [])
-        .filter((m) => m.role === "assistant")
-        .map((m) => (m.parts ? getTextFromParts(m.parts) : (m as { content?: string }).content || ""))
-        .join("\n");
-    const inputTokensEst = estimateTokens(inputChars);
-    const outputTokensEst = estimateTokens(outputChars);
-    const usedTokensEst = inputTokensEst + outputTokensEst;
-    const usageEst = {
-        inputTokens: inputTokensEst,
-        outputTokens: outputTokensEst,
-        totalTokens: usedTokensEst,
-        cachedInputTokens: 0,
-        reasoningTokens: 0,
-    } as const;
 
 	const {
 		columns,
@@ -768,531 +717,179 @@ export function PlaygroundColumn({
 					? "streaming"
 					: "ready";
 
+	const handleStop = useCallback(() => {
+		if (column.synced) {
+			stopSyncedColumns();
+		} else {
+			stopColumn(column.id);
+		}
+	}, [column.id, column.synced, stopColumn, stopSyncedColumns]);
+
+	const handleToggleSearch = useCallback(() => {
+		setSearchEnabled((prev) => {
+			const next = !prev;
+			try {
+				localStorage.setItem("chaichat_search_enabled", next ? "true" : "false");
+			} catch {}
+			return next;
+		});
+	}, []);
+
+	const uploadDisabledReason = uploadDisabled
+		? !supportsAttachments
+			? "Selected model does not support image inputs"
+			: !storageReady.ready
+				? storageReady.reason || "Storage not configured"
+				: !hasRequiredKey
+					? `Please add your ${columnSource === "aigateway" ? "Vercel AI Gateway" : "LLM Gateway"} API key`
+					: "Uploads unavailable"
+		: undefined;
+
+	const dragOverlay = (
+		<div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center rounded-xl border-2 border-dashed border-primary bg-primary/10 backdrop-blur-sm">
+			<div className="text-center text-primary">
+				<div className="font-medium">Drop images anywhere</div>
+				<div className="text-sm text-muted-foreground">Supported: JPEG, PNG, WebP, GIF</div>
+			</div>
+		</div>
+	);
+
 	return (
-		<div
-			className={cn(
-				"relative flex h-full min-h-0 flex-col rounded-xl border",
-				isDragOver && "ring-2 ring-primary ring-offset-2 ring-offset-background"
-			)}
+		<ColumnContainer
+			isDragOver={isDragOver}
 			onDragEnter={handleDragEnter}
 			onDragLeave={handleDragLeave}
 			onDragOver={handleDragOver}
 			onDrop={handleDrop}
+			dragOverlay={dragOverlay}
 		>
-			{/* Full-column drag overlay */}
-			{isDragOver && (
-				<div className="pointer-events-none absolute inset-0 z-20 bg-primary/10 backdrop-blur-sm rounded-xl border-2 border-dashed border-primary flex items-center justify-center">
-					<div className="text-center text-primary">
-						<div className="font-medium">Drop images anywhere</div>
-						<div className="text-sm text-muted-foreground">Supported: JPEG, PNG, WebP, GIF</div>
-					</div>
+			<div
+				id={`scroll-container-${column.id}_${columnIndex}`}
+				className="flex h-full min-h-0 flex-no-wrap flex-col"
+				style={{ overflowAnchor: "none" }}
+			>
+				<div className="sticky top-0 z-10 min-h-0 min-w-0 flex-shrink-0">
+					<ColumnHeader
+						column={column}
+						columnSource={columnSource}
+						onModelChange={handleModelChange}
+						onSourceChange={handleSourceChange}
+						onConfigChange={handleConfigChange}
+						onAddColumn={addColumn}
+						columnsLength={columns.length}
+						maxColumns={maxColumns}
+						onToggleSync={toggleColumnSync}
+						onToggleMergeContext={toggleColumnMergeContext}
+						onClearColumn={clearColumn}
+						onMoveLeft={moveColumnLeft}
+						onMoveRight={moveColumnRight}
+						onRemoveColumn={removeColumn}
+						canMoveLeft={canMoveLeft}
+						canMoveRight={canMoveRight}
+						canRemove={canRemove}
+						isUserAuthenticated={!!user?.id}
+					/>
 				</div>
-			)}
-			<div className="h-full min-h-0 w-full rounded-b-md">
-				<div
-					id={`scroll-container-${column.id}_${columnIndex}`}
-					className="flex h-full min-h-0 flex-no-wrap flex-col"
-					style={{ overflowAnchor: "none" }}
-				>
-					{/* Column header */}
-					<div className="sticky top-0 z-10 min-h-0 min-w-0 flex-shrink-0">
-						<div className="m-1 flex items-center justify-between py-2 pr-2 pl-3 backdrop-blur">
-							<div className="min-w-0 flex-1">
-								<div className="flex flex-1 flex-col">
-									<div className="relative grid gap-2">
-										<ModelSelector
-											selectedModelId={column.modelId}
-											setSelectedModelId={handleModelChange}
-											className="ease inline-flex h-[32px] w-full max-w-[288px] items-center justify-between truncate rounded-md border bg-background px-3 py-0.5 font-mono text-foreground leading-6 transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
-											isUserAuthenticated={!!user?.id}
-											source={columnSource}
-											onSourceChange={handleSourceChange}
-										/>
-									</div>
-								</div>
-							</div>
-
-							<div className="ml-1 flex items-center">
-								<div className="flex items-center">
-									{/* Sync badge */}
-									{column.synced && (
-										<div className="mx-2 hidden h-6 items-center rounded-full bg-secondary px-3 text-md text-secondary-foreground text-sm lg:flex">
-											Synced
-										</div>
-									)}
-
-									{/* Unified Model & Provider Configuration */}
-									<UnifiedConfigDropdown
-										selectedModelId={column.modelId}
-										value={{
-											temperature: column.config.temperature,
-											maxOutputTokens: column.config.maxOutputTokens,
-											topP: column.config.topP,
-											topK: column.config.topK,
-											frequencyPenalty: column.config.frequencyPenalty,
-											presencePenalty: column.config.presencePenalty,
-											openai: column.config.openai,
-											google: column.config.google,
-											anthropic: column.config.anthropic,
-										}}
-										onChange={(u) => handleConfigChange(u)}
-										gateway={
-											columnSource === "aigateway"
-												? "vercel-ai-gateway"
-												: "llm-gateway"
-										}
-									>
-										<Button
-											aria-label="Model & Provider Settings"
-											variant={"ghost"}
-											size={"icon"}
-										>
-											<span className="button_content__eYZtX button_flex___f_3o">
-												<span className="pointer-events-none flex rounded-md p-2">
-													<Settings className="h-4 w-4" />
-												</span>
-											</span>
-										</Button>
-									</UnifiedConfigDropdown>
-									{/* Context usage indicator for this column */}
-									{/* <div className="ml-1">
-											<Context
-												maxTokens={maxContextTokens}
-												usedTokens={usedTokensEst}
-												usage={usageEst}
-												modelId={tokenlensModelId}
-											>
-											<ContextTrigger />
-											<ContextContent>
-												<ContextContentHeader />
-												<ContextContentBody>
-													<ContextInputUsage />
-													<ContextOutputUsage />
-													<ContextReasoningUsage />
-													<ContextCacheUsage />
-												</ContextContentBody>
-												<ContextContentFooter />
-											</ContextContent>
-										</Context>
-									</div> */}
-								</div>
-
-								{/* Add Column button */}
-								<Tooltip>
-									<TooltipTrigger asChild>
-										<span>
-											<Button
-												variant={"ghost"}
-												onClick={addColumn}
-												disabled={columns.length >= maxColumns}
-												aria-disabled={columns.length >= maxColumns}
-											>
-												<Plus className="h-4 w-4" />
-											</Button>
-										</span>
-									</TooltipTrigger>
-									{columns.length >= maxColumns && (
-										<TooltipContent sideOffset={6}>
-											Cannot add more columns
-										</TooltipContent>
-									)}
-								</Tooltip>
-
-								<Button
-									onClick={() => toggleColumnSync(column.id)}
-									variant={"ghost"}
-									size={"icon"}
-								>
-									{column.synced ? (
-										<LinkIcon size={16} />
-									) : (
-										<LinkSimpleBreakIcon size={16} />
-									)}
-								</Button>
-								<Tooltip>
-									<TooltipTrigger asChild>
-										<Button
-											variant={"ghost"}
-											size={"icon"}
-											onClick={() => toggleColumnMergeContext(column.id)}
-											aria-label="Toggle Context Merge"
-										>
-											{column.mergeContext ? (
-												<MessageSquareText className="h-4 w-4 text-primary" />
-											) : (
-												<MessageSquare className="h-4 w-4 text-muted-foreground" />
-											)}
-										</Button>
-									</TooltipTrigger>
-									<TooltipContent sideOffset={6}>
-										{column.mergeContext ? "Context merge: On" : "Context merge: Off"}
-									</TooltipContent>
-								</Tooltip>
-								{/* Menu button for more options */}
-								<DropdownMenu>
-									<DropdownMenuTrigger asChild>
-										<Button
-											aria-label="Add Model"
-											variant={"ghost"}
-											size={"icon"}
-										>
-											<span className="button_content__eYZtX button_flex___f_3o button_center__bCjE5">
-												<span className="pointer-events-none flex rounded-md p-2">
-													<MoreHorizontal className="h-4 w-4" />
-												</span>
-											</span>
-										</Button>
-									</DropdownMenuTrigger>
-									<DropdownMenuContent align="end">
-										<button
-											type="button"
-											onClick={() => clearColumn(column.id)}
-											className="flex w-full items-center rounded px-2 py-1.5 text-left text-sm hover:bg-muted"
-										>
-											<RotateCcw className="mr-2 h-4 w-4" />
-											Clear Chat
-										</button>
-										<Separator className="my-1" />
-										<DropdownMenuItem
-											onClick={() => moveColumnLeft(column.id)}
-											disabled={!canMoveLeft}
-										>
-											<ChevronLeft className="mr-2 h-4 w-4" />
-											Scroll Left
-										</DropdownMenuItem>
-										<DropdownMenuItem
-											onClick={() => moveColumnRight(column.id)}
-											disabled={!canMoveRight}
-										>
-											<ChevronRight className="mr-2 h-4 w-4" />
-											Scroll Right
-										</DropdownMenuItem>
-										<DropdownMenuSeparator />
-										<DropdownMenuItem
-											onClick={() => removeColumn(column.id)}
-											disabled={!canRemove}
-											className="text-destructive"
-										>
-											<Trash2 className="mr-2 h-4 w-4" />
-											Delete Column
-										</DropdownMenuItem>
-									</DropdownMenuContent>
-								</DropdownMenu>
-							</div>
-						</div>
-					</div>
-					<Separator />
-
-					<div className="py-2 px-3">
-						<label htmlFor={`system-${column.id}`} className="block mb-1 text-xs text-muted-foreground">System context for this column</label>
-						<textarea id={`system-${column.id}`}
-							value={column.systemPrompt ?? ""}
-							onChange={(e) => updateColumn(column.id, { systemPrompt: e.target.value })}
-							placeholder="Add system context (e.g., role, restrictions, preferences)"
-							className="w-full rounded-md border bg-background-100 p-2 text-xs resize-none"
-							style={{ height: 80 }}
-							spellCheck={false}
-						/>
-					</div>
-					<Separator />
-					{/* Messages content area */}
-					<div className="min-h-0 min-w-0 flex-1">
-						<div
-							id={`scroll-container-inner-${column.id}_${columnIndex}`}
-							className="scrolling-touch scrolling-gpu relative h-full w-full overscroll-y-contain"
-						>
-							{column.messages.length > 0 ? (
-								<Conversation
-									messages={column.messages}
-									status={derivedStatus}
-									gateway={
-										columnSource === "aigateway"
-											? "vercel-ai-gateway"
-											: "llm-gateway"
-									}
-									scrollButtonBottomClass="bottom-2"
-									registerScrollApi={(api) => {
-										conversationScrollApiRef.current = api;
-										// Register with provider so synced sends can scroll all columns
-										try {
-											registerColumnScrollApi(column.id, api ?? null);
-										} catch { }
-									}}
-									onDelete={(id) => {
-										updateColumn(column.id, {
-											messages: column.messages.filter((msg) => msg.id !== id),
-										});
-									}}
-									onEdit={(id, newText) => {
-										updateColumn(column.id, {
-											messages: column.messages.map((msg) =>
-												msg.id === id
-													? {
-														...msg,
-														content: newText,
-														parts: [{ type: "text", text: newText }],
-													}
-													: msg,
-											),
-										});
-									}}
-									onReload={() => {
-										// Find the last user message and resend
-										const lastUserMessage = [...column.messages]
-											.reverse()
-											.find((msg) => msg.role === "user");
-										if (lastUserMessage?.content) {
-											// Remove messages after the last user message
-											const messagesReversed = [...column.messages].reverse();
-											const lastUserIndexFromEnd = messagesReversed.findIndex(
-												(msg) => msg.role === "user",
-											);
-											const lastUserIndex =
-												column.messages.length - 1 - lastUserIndexFromEnd;
-											const messagesUpToLastUser = column.messages.slice(
-												0,
-												lastUserIndex + 1,
-											);
-											updateColumn(column.id, {
-												messages: messagesUpToLastUser,
-											});
-
-											// Resend the message
-											if (column.synced) {
-												sendToSyncedColumns(lastUserMessage.content);
-											} else {
-												sendToColumn(column.id, lastUserMessage.content);
-											}
-										}
-									}}
-								/>
-							) : (
-								// Start page with model info (minimal)
-								<div className="flex size-full items-center justify-center px-4">
-									<div className="w-full max-w-xl rounded-lg border bg-white shadow-xs dark:bg-black">
-										<div className="p-5 text-sm">
-											<div className="flex items-center gap-2">
-												<div className="space-x-1">
-													<span className="font-medium text-zinc-800 dark:text-zinc-200">
-														{selectedModel?.name ?? column.modelId}
-													</span>
-													{selectedProviderLabel && (
-														<span className="text-zinc-600 dark:text-zinc-400">
-															· {selectedProviderLabel}
-														</span>
-													)}
-												</div>
-											</div>
-
-											{isModelsLoading ? (
-												<div className="mt-3 text-xs text-zinc-500 dark:text-zinc-400">
-													Loading model details…
-												</div>
-											) : modelsError ? (
-												<div className="mt-3 text-red-500 text-xs">
-													{modelsError}
-												</div>
-											) : (
-												<>
-													<div className="mt-2 text-xs text-zinc-600 leading-relaxed dark:text-zinc-400">
-														{selectedModel?.description ||
-															"Start a conversation to test this model."}
-													</div>
-													<div className="mt-3 flex flex-wrap gap-2 text-[11px]">
-														<span className="rounded border px-2 py-1">
-															Context: {selectedModel?.context_length ?? "-"}{" "}
-															tokens
-														</span>
-														<span className="rounded border px-2 py-1">
-															Input: {promptPrice}
-														</span>
-														<span className="rounded border px-2 py-1">
-															Output: {completionPrice}
-														</span>
-													</div>
-												</>
-											)}
-										</div>
-									</div>
-								</div>
-							)}
-						</div>
-					</div>
-
-					{/* Sticky bottom input */}
+				<Separator />
+				<ColumnSystemContext
+					columnId={column.id}
+					value={column.systemPrompt ?? ""}
+					onChange={(value) => updateColumn(column.id, { systemPrompt: value })}
+				/>
+				<Separator />
+				<div className="min-h-0 min-w-0 flex-1">
 					<div
-						className={cn(
-							"sticky bottom-0 min-h-0 min-w-0 flex-shrink-0 relative",
-						)}
+						id={`scroll-container-inner-${column.id}_${columnIndex}`}
+						className="scrolling-gpu scrolling-touch relative h-full w-full overscroll-y-contain"
 					>
-						<div className="flex items-center gap-2 border-t bg-background-200 p-3 pr-2.5">
-							<form
-								className="relative flex w-full flex-col items-center"
-								onSubmit={(e) => {
-									e.preventDefault();
-									handleSend();
+						{column.messages.length > 0 ? (
+							<Conversation
+								messages={column.messages}
+								status={derivedStatus}
+								gateway={columnSource === "aigateway" ? "vercel-ai-gateway" : "llm-gateway"}
+								scrollButtonBottomClass="bottom-2"
+								registerScrollApi={(api) => {
+									conversationScrollApiRef.current = api;
+									try {
+										registerColumnScrollApi(column.id, api ?? null);
+									} catch { }
 								}}
-							>
-								{/* File display */}
-								{files.length > 0 && (
-									<div className="mb-2 flex w-full flex-wrap gap-2">
-										{files.map((file, index) => (
-											<div key={`${file.name}-${file.size}-${index}`} className="relative mr-2 mb-0 flex items-center">
-												<div className="flex w-full items-center gap-3 rounded-2xl border border-input bg-background p-2 pr-3 transition-colors hover:bg-accent">
-													<div className="flex h-10 w-10 flex-shrink-0 items-center justify-center overflow-hidden rounded-md bg-accent-foreground">
-														{file.contentType.includes("image") ? (
-															<img
-																src={file.url}
-																alt={file.name}
-																className="h-full w-full object-cover"
-															/>
-														) : (
-															<div className="text-center text-gray-400 text-xs">
-																{file.name.split(".").pop()?.toUpperCase()}
-															</div>
-														)}
-													</div>
-													<div className="flex flex-col overflow-hidden">
-														<span className="truncate font-medium text-xs">{file.name}</span>
-														<span className="text-gray-500 text-xs">
-															{(file.size / 1024).toFixed(2)}kB
-														</span>
-													</div>
-												</div>
-												<button
-													type="button"
-													onClick={() => handleFileRemove(file)}
-													className="-translate-y-1/2 absolute top-1 right-1 z-10 inline-flex size-6 translate-x-1/2 items-center justify-center rounded-full border-[3px] border-background bg-black text-white shadow-none transition-colors"
-													aria-label="Remove file"
-												>
-													<X className="size-3" />
-												</button>
-											</div>
-										))}
-									</div>
-								)}
-								{/* File upload button */}
-								{files.length === 0 && (
-									<Tooltip>
-										<TooltipTrigger asChild>
-											<label
-												htmlFor={`file-upload-${column.id}`}
-												className={`absolute left-2 top-1/2 -translate-y-1/2 z-10 flex h-6 w-6 items-center justify-center rounded cursor-pointer hover:bg-muted/40 ${uploadDisabled ? 'cursor-not-allowed opacity-50' : ''}`}
-												aria-disabled={uploadDisabled}
-											>
-												<input
-													id={`file-upload-${column.id}`}
-													ref={fileInputRef}
-													type="file"
-													multiple
-													accept="image/*"
-													onChange={handleLocalFileChange}
-													className="hidden"
-													disabled={uploadDisabled}
-												/>
-												<Paperclip className="size-4 text-muted-foreground hover:text-primary" />
-											</label>
-										</TooltipTrigger>
-										{uploadDisabled ? (
-											<TooltipContent side="top">
-												<div className="text-xs">
-													{!supportsAttachments
-														? 'Selected model does not support image inputs'
-														: (!storageReady.ready
-															? (storageReady.reason || 'Storage not configured')
-															: (!hasRequiredKey
-																? `Please add your ${columnSource === 'aigateway' ? 'Vercel AI Gateway' : 'LLM Gateway'} API key`
-																: ''))}
-												</div>
-											</TooltipContent>
-										) : (
-											<TooltipContent side="top">Attach images</TooltipContent>
-										)}
-									</Tooltip>
-								)}
-								<textarea
-									placeholder={
-										hasRequiredKey
-											? column.synced
-												? "Type a synced message..."
-												: "Type your message…"
-											: `Please add your ${columnSource === "aigateway" ? "Vercel AI Gateway" : "LLM Gateway"} API key to start chatting`
+								onDelete={(id) => {
+									updateColumn(column.id, {
+										messages: column.messages.filter((msg) => msg.id !== id),
+									});
+								}}
+								onEdit={(id, newText) => {
+									updateColumn(column.id, {
+										messages: column.messages.map((msg) =>
+											msg.id === id
+												? {
+													...msg,
+													content: newText,
+													parts: [{ type: "text", text: newText }],
+												}
+												: msg,
+										),
+									});
+								}}
+								onReload={() => {
+									const lastUserMessage = [...column.messages]
+										.reverse()
+										.find((msg) => msg.role === "user");
+									if (lastUserMessage?.content) {
+										const messagesReversed = [...column.messages].reverse();
+										const lastUserIndexFromEnd = messagesReversed.findIndex((msg) => msg.role === "user");
+										const lastUserIndex = column.messages.length - 1 - lastUserIndexFromEnd;
+										const messagesUpToLastUser = column.messages.slice(0, lastUserIndex + 1);
+										updateColumn(column.id, { messages: messagesUpToLastUser });
+
+										if (column.synced) {
+											sendToSyncedColumns(lastUserMessage.content);
+										} else {
+											sendToColumn(column.id, lastUserMessage.content);
+										}
 									}
-									value={currentInput}
-									onChange={(e) => {
-										handleInputChange(e.target.value);
-										const target = e.target as HTMLTextAreaElement;
-										target.style.height = "auto";
-										target.style.height = `${Math.min(target.scrollHeight, 120)}px`;
-									}}
-									className={`max-h-[120px] min-h-[38px] w-full resize-none overflow-y-auto rounded-md border bg-background-100 py-2 pr-9 ${files.length === 0 ? 'pl-10' : 'pl-4'} text-sm focus:border-zinc-400 focus:outline-none focus:ring-0 disabled:cursor-not-allowed disabled:opacity-60 dark:focus:border-zinc-600`}
-									spellCheck="false"
-									rows={1}
-									style={{
-										fontFamily: "var(--font-geist-sans)",
-										height: "38px",
-										lineHeight: "1.5",
-									}}
-									disabled={!hasRequiredKey}
-									onKeyDown={(e) => {
-										if (e.key === "Enter" && !e.shiftKey) {
-											e.preventDefault();
-											if (!hasRequiredKey) return;
-											handleSend();
-										}
-									}}
-								/>
-								{/* Right icon overlay inside input */}
-								{column.isStreaming || derivedStatus === "streaming" ? (
-									<button
-										type="button"
-										aria-label="Stop"
-										onClick={() =>
-											column.synced ? stopSyncedColumns() : stopColumn(column.id)
-										}
-										className="absolute right-2 bottom-2 inline-flex items-center justify-center rounded-md p-1 text-muted-foreground hover:text-primary"
-									>
-										<Square className="h-4 w-4" />
-									</button>
-								) : (
-									<button
-										type="button"
-										aria-label="Send Message"
-										onClick={handleSend}
-										disabled={!hasRequiredKey || isSubmitting || !currentInput.trim()}
-										className="absolute right-2 bottom-2 inline-flex items-center justify-center rounded-md p-1 text-muted-foreground hover:text-primary disabled:opacity-50"
-									>
-										<SendIcon className="h-4 w-4" />
-									</button>
-								)}
-								{/* Left of send: search toggle */}
-								<Tooltip>
-									<TooltipTrigger asChild>
-										<span className="absolute right-9 bottom-2 inline-flex items-center justify-center">
-											<button
-												type="button"
-												aria-label="Toggle Web Search"
-												onClick={() => {
-													try {
-														const cur = localStorage.getItem("chaichat_search_enabled") === "true";
-														localStorage.setItem("chaichat_search_enabled", cur ? "false" : "true");
-														setSearchEnabled(!cur);
-													} catch {}
-												}}
-												className="rounded-md p-1 text-muted-foreground hover:text-primary disabled:opacity-50"
-												disabled={searchDisabled}
-											>
-												<Globe className={cn("h-4 w-4", searchEnabled ? "text-primary" : "text-muted-foreground")} />
-											</button>
-										</span>
-									</TooltipTrigger>
-									<TooltipContent side="top">{isHydrated ? (searchDisabled ? "Enable a search provider (Exa/Firecrawl) and add its API key" : (searchEnabled ? "Web search: On" : "Web search: Off")) : "Web search"}</TooltipContent>
-								</Tooltip>
-							</form>
+								}}
+							/>
+						) : (
+							<ColumnEmptyState
+								modelId={column.modelId}
+								selectedModel={selectedModel}
+								selectedProviderLabel={selectedProviderLabel}
+								isModelsLoading={isModelsLoading}
+								modelsError={modelsError}
+								promptPrice={promptPrice}
+								completionPrice={completionPrice}
+							/>
+						)}
 					</div>
 				</div>
+				<div className={cn("sticky bottom-0 min-h-0 min-w-0 flex-shrink-0", "relative")}>
+					<ColumnInput
+						columnId={column.id}
+						columnSource={columnSource}
+						columnSynced={column.synced}
+						columnIsStreaming={column.isStreaming}
+						derivedStatus={derivedStatus}
+						files={files}
+						onFileRemove={handleFileRemove}
+						onFileInputChange={handleLocalFileChange}
+						fileInputRef={fileInputRef}
+						uploadDisabled={uploadDisabled}
+						uploadDisabledReason={uploadDisabledReason}
+						onSend={handleSend}
+						onStop={handleStop}
+						onInputChange={handleInputChange}
+						currentInput={currentInput}
+						hasRequiredKey={hasRequiredKey}
+						isSubmitting={isSubmitting}
+						onToggleSearch={handleToggleSearch}
+						searchEnabled={searchEnabled}
+						searchDisabled={searchDisabled}
+						isHydrated={isHydrated}
+					/>
 				</div>
 			</div>
-		</div>
+		</ColumnContainer>
 	);
 }
