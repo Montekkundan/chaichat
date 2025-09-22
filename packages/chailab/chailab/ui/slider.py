@@ -2,7 +2,7 @@
 ChaiLab Slider Component - Based on shadcn/ui Slider
 """
 
-from typing import Optional, List
+from typing import Optional, List, Union
 from . import Component
 
 
@@ -21,9 +21,13 @@ class Slider(Component):
         orientation: 'horizontal' or 'vertical'
     """
 
+    component_type = "slider"
+    aliases = ("slider",)
+    default_label = "Slider"
+
     def __init__(
         self,
-        value: List[float] | float = 50,
+        value: Union[List[float], float] = 50,
         min: float = 0,
         max: float = 100,
         step: float = 1,

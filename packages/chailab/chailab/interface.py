@@ -1,63 +1,100 @@
-"""
-ChaiLab Interface - Gradio-like interface using shadcn/ui components
-"""
+"""ChaiLab Interface - Gradio-like interface using shadcn/ui components."""
+
+from __future__ import annotations
 
 import asyncio
+import inspect
 import json
-import threading
-import uvicorn
-from typing import Any, Callable, List, Union
+from typing import Any, Callable, Iterable, List, Sequence
+
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse
-from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
-import os
-import sys
+from fastapi.responses import HTMLResponse, JSONResponse
 
-# from .themes import generate_theme_css
+from .blocks import Blocks
+from .ui import Component, component_registry, Text
 
 
-class Interface:
-    """
-    ChaiLab Interface - Similar to Gradio's Interface but with shadcn/ui components
+def _ensure_sequence(value: Any) -> List[Any]:
+    if value is None:
+        return []
+    if isinstance(value, (list, tuple, set)):
+        return list(value)
+    return [value]
 
-    Args:
-        fn: The function to create a UI for
-        inputs: Input components (can be strings or shadcn/ui components)
-        outputs: Output components (can be strings or shadcn/ui components)
-        title: Title for the interface
-        description: Description for the interface
-        theme: Theme to use ('default', 'dark', 'blue', 'green', 'purple')
-    """
+
+class Interface(Blocks):
+    """Shadcn-powered analogue to ``gradio.Interface``."""
 
     def __init__(
         self,
         fn: Callable,
-        inputs: Union[str, Any, List[Union[str, Any]]] = None,
-        outputs: Union[str, Any, List[Union[str, Any]]] = None,
+        inputs: Sequence[str | Component] | str | Component | None = None,
+        outputs: Sequence[str | Component] | str | Component | None = None,
+        *,
         title: str = "ChaiLab Demo",
         description: str = "",
         theme: str = "default",
-        **kwargs
-    ):
+    ) -> None:
+        super().__init__(title=title, description=description, theme=theme)
         self.fn = fn
-        self.inputs = inputs or []
-        self.outputs = outputs or []
-        self.title = title
-        self.description = description
-        self.theme = theme
-        self.app = None
+        self.inputs = self._normalise_components(inputs, role="input")
+        self.outputs = self._normalise_components(outputs, role="output")
 
-        if not isinstance(self.inputs, list):
-            self.inputs = [self.inputs]
-        if not isinstance(self.outputs, list):
-            self.outputs = [self.outputs]
+    # ------------------------------------------------------------------
+    # Component helpers
+    # ------------------------------------------------------------------
+    def _normalise_components(
+        self,
+        components: Sequence[str | Component] | str | Component | None,
+        *,
+        role: str,
+    ) -> List[Component]:
+        normalised: List[Component] = []
+        for index, comp in enumerate(_ensure_sequence(components)):
+            instance = self._coerce_component(comp, role=role, index=index)
+            normalised.append(instance)
+        return normalised
 
+    def _coerce_component(self, component: str | Component, *, role: str, index: int) -> Component:
+        if isinstance(component, Component):
+            return component
+        if isinstance(component, str):
+            try:
+                component_cls = component_registry.resolve(component)
+            except (KeyError, TypeError):
+                if role == "output" and component.lower() in {"text", "textbox", "output"}:
+                    component_cls = Text
+                else:
+                    raise ValueError(f"Unknown component specification '{component}' for {role} #{index + 1}")
+            return component_cls()
+        if inspect.isclass(component) and issubclass(component, Component):
+            return component()
+        raise TypeError(f"Unsupported component type: {component!r}")
+
+    def _build_component_configs(self) -> dict[str, List[dict[str, Any]]]:
+        configs = {"inputs": [], "outputs": []}
+        for idx, component in enumerate(self.inputs):
+            configs["inputs"].append(
+                component.to_config(
+                    component_id=f"input_{idx}",
+                    label=component.props.get("label") or f"Input {idx + 1}",
+                )
+            )
+        for idx, component in enumerate(self.outputs):
+            configs["outputs"].append(
+                component.to_config(
+                    component_id=f"output_{idx}",
+                    label=component.props.get("label") or f"Output {idx + 1}",
+                )
+            )
+        return configs
+
+    # ------------------------------------------------------------------
+    # FastAPI application construction
+    # ------------------------------------------------------------------
     def _create_app(self):
-        """Create FastAPI application"""
         app = FastAPI(title=self.title, description=self.description)
-
-        # Add CORS middleware
         app.add_middleware(
             CORSMiddleware,
             allow_origins=["*"],
@@ -68,82 +105,76 @@ class Interface:
 
         @app.get("/", response_class=HTMLResponse)
         async def root():
-            return self._get_html()
+            return self._render_html()
+
+        @app.get("/config")
+        async def config():
+            return {
+                "title": self.title,
+                "description": self.description,
+                "theme": self.theme,
+                "components": self._build_component_configs(),
+            }
 
         @app.post("/api/predict")
         async def predict(request: Request):
-            data = await request.json()
-            inputs = data.get("inputs", [])
-
+            payload = await request.json()
+            inputs = payload.get("inputs", [])
+            if not isinstance(inputs, list):
+                return JSONResponse({"success": False, "error": "Inputs must be a list."}, status_code=400)
             try:
-                if len(inputs) == 1:
-                    result = self.fn(inputs[0])
-                else:
-                    result = self.fn(*inputs)
-
-                if not isinstance(result, (list, tuple)):
-                    result = [result]
-
-                return {"outputs": result, "success": True}
-            except Exception as e:
-                return {"error": str(e), "success": False}
+                outputs = await self._execute(inputs)
+            except Exception as exc:  # pragma: no cover - surface runtime error
+                return JSONResponse({"success": False, "error": str(exc)}, status_code=500)
+            return {"success": True, "outputs": outputs}
 
         return app
 
-    def _get_html(self):
-        """Generate HTML for the interface"""
-        # Create component configurations
-        input_configs = []
-        for i, inp in enumerate(self.inputs):
-            if isinstance(inp, str):
-                # Handle string components
-                _normalized = inp.lower()
-                _mapped = "input" if _normalized in ["text", "textbox", "input"] else _normalized
-                config = {
-                    "id": f"input_{i}",
-                    "type": _mapped,
-                    "props": {},
-                    "label": f"Input {i+1}"
-                }
-            else:
-                # Handle shadcn/ui components
-                config = {
-                    "id": f"input_{i}",
-                    "type": inp.__class__.__name__.lower(),
-                    "props": inp.get_props() if hasattr(inp, 'get_props') else {},
-                    "label": inp.props.get('label', f'Input {i+1}') if hasattr(inp, 'props') else f'Input {i+1}'
-                }
-            input_configs.append(config)
+    async def _execute(self, inputs: List[Any]) -> List[Any]:
+        args = inputs
+        fn = self.fn
 
-        output_configs = []
-        for i, out in enumerate(self.outputs):
-            if isinstance(out, str):
-                _normalized = out.lower()
-                _mapped = "text" if _normalized in ["text", "textbox", "output", "label"] else _normalized
-                config = {
-                    "id": f"output_{i}",
-                    "type": _mapped,
-                    "props": {},
-                    "label": f"Output {i+1}"
-                }
-            else:
-                config = {
-                    "id": f"output_{i}",
-                    "type": out.__class__.__name__.lower(),
-                    "props": out.get_props() if hasattr(out, 'get_props') else {},
-                    "label": out.props.get('label', f'Output {i+1}') if hasattr(out, 'props') else f'Output {i+1}'
-                }
-            output_configs.append(config)
+        if inspect.iscoroutinefunction(fn):
+            result = await fn(*args)
+        else:
+            try:
+                loop = asyncio.get_running_loop()
+            except RuntimeError:
+                loop = None
 
-        # Generate HTML with shadcn/ui styling
-        html = f"""
+            if loop and loop.is_running():
+                result = await loop.run_in_executor(None, lambda: fn(*args))
+            else:
+                result = fn(*args)
+
+        if inspect.isasyncgen(result):
+            result = [item async for item in result]
+        elif inspect.isgenerator(result):
+            result = list(result)
+
+        if not isinstance(result, (list, tuple)):
+            result = [result]
+        return list(result)
+
+    # ------------------------------------------------------------------
+    # Rendering helpers
+    # ------------------------------------------------------------------
+    def _render_html(self) -> str:
+        config = {
+            "title": self.title,
+            "description": self.description,
+            "components": self._build_component_configs(),
+        }
+        config_json = json.dumps(config)
+
+        return f"""
         <!DOCTYPE html>
-        <html lang="en">
+        <html lang=\"en\">
         <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <meta charset=\"UTF-8\" />
+            <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />
             <title>{self.title}</title>
-            <script src="https://cdn.tailwindcss.com"></script>
+            <script src=\"https://cdn.tailwindcss.com\"></script>
             <script>
                 tailwind.config = {{
                     theme: {{
@@ -188,9 +219,9 @@ class Interface:
                     }}
                 }}
             </script>
-            <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
-            <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
-            <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+            <script src=\"https://unpkg.com/react@18/umd/react.development.js\"></script>
+            <script src=\"https://unpkg.com/react-dom@18/umd/react-dom.development.js\"></script>
+            <script src=\"https://unpkg.com/@babel/standalone/babel.min.js\"></script>
             <style>
                 :root {{
                     --background: 0 0% 100%;
@@ -214,247 +245,190 @@ class Interface:
                     --ring: 222.2 84% 4.9%;
                     --radius: 0.5rem;
                 }}
-
-                .dark {{
-                    --background: 222.2 84% 4.9%;
-                    --foreground: 210 40% 98%;
-                    --card: 222.2 84% 4.9%;
-                    --card-foreground: 210 40% 98%;
-                    --popover: 222.2 84% 4.9%;
-                    --popover-foreground: 210 40% 98%;
-                    --primary: 210 40% 98%;
-                    --primary-foreground: 222.2 47.4% 11.2%;
-                    --secondary: 217.2 32.6% 17.5%;
-                    --secondary-foreground: 210 40% 98%;
-                    --muted: 217.2 32.6% 17.5%;
-                    --muted-foreground: 215 20.2% 65.1%;
-                    --accent: 217.2 32.6% 17.5%;
-                    --accent-foreground: 210 40% 98%;
-                    --destructive: 0 62.8% 30.6%;
-                    --destructive-foreground: 210 40% 98%;
-                    --border: 217.2 32.6% 17.5%;
-                    --input: 217.2 32.6% 17.5%;
-                    --ring: 212.7 26.8% 83.9%;
-                }}
-
-                @layer base {{
-                    * {{
-                        @apply border-border;
-                    }}
-                    body {{
-                        @apply bg-background text-foreground;
-                    }}
-                }}
             </style>
         </head>
-        <body class="min-h-screen bg-background p-4">
-            <div class="container max-w-4xl mx-auto">
-                <div class="rounded-lg border bg-card text-card-foreground shadow-sm p-6 space-y-6">
-                    <div class="space-y-2">
-                        <h1 class="text-2xl font-semibold">{self.title}</h1>
-                        {f'<p class="text-muted-foreground">{self.description}</p>' if self.description else ''}
-                    </div>
+        <body class=\"min-h-screen bg-background py-6\">
+            <div id=\"app\" class=\"container mx-auto max-w-4xl px-4\"></div>
+            <script type=\"text/babel\">
+                const interfaceConfig = {config_json};
 
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div class="space-y-4">
-                            <h3 class="text-lg font-medium">Inputs</h3>
-                            <div id="inputs" class="space-y-4"></div>
-                        </div>
-                        <div class="space-y-4">
-                            <h3 class="text-lg font-medium">Outputs</h3>
-                            <div id="outputs" class="space-y-4"></div>
-                        </div>
-                    </div>
+                function useInitialInputState() {{
+                    const state = {{}};
+                    interfaceConfig.components.inputs.forEach((config) => {{
+                        if (config.type === 'slider') {{
+                            const value = Array.isArray(config.props.value) ? config.props.value[0] : (config.props.value ?? config.props.min ?? 0);
+                            state[config.id] = value;
+                        }} else {{
+                            state[config.id] = config.props.value ?? '';
+                        }}
+                    }});
+                    return state;
+                }}
 
-                    <div class="flex justify-end">
-                        <button id="submit-btn" class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2">
-                            Submit
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            <script type="text/babel">
-                const componentConfigs = {json.dumps({
-                    "inputs": input_configs,
-                    "outputs": output_configs
-                })};
-
-                function InputComponent({{ config }}) {{
+                function InputComponent({{ config, value, onChange }}) {{
                     if (config.type === 'input') {{
                         return (
-                            <div className="space-y-2">
-                                <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                                    {{config.props.label || config.label}}
+                            <div className=\"space-y-2\">
+                                <label className=\"text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70\">
+                                    {{config.label}}
                                 </label>
                                 <input
                                     type={{config.props.type || 'text'}}
                                     placeholder={{config.props.placeholder || ''}}
-                                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                                    onChange={{(e) => window.inputValues = {{...window.inputValues, [config.id]: e.target.value}}}}
+                                    value={{value}}
+                                    disabled={{config.props.disabled}}
+                                    className=\"flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50\"
+                                    onChange={{(event) => onChange(event.target.value)}}
+                                />
+                                {{config.props.error ? (
+                                    <p className=\"text-sm text-destructive\">{{config.props.error}}</p>
+                                ) : null}}
+                            </div>
+                        );
+                    }}
+
+                    if (config.type === 'slider') {{
+                        return (
+                            <div className=\"space-y-4\">
+                                <div className=\"flex items-center justify-between\">
+                                    <label className=\"text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70\">
+                                        {{config.label}}
+                                    </label>
+                                    <span className=\"text-sm text-muted-foreground\">{{value}}</span>
+                                </div>
+                                <input
+                                    type=\"range\"
+                                    min={{config.props.min ?? 0}}
+                                    max={{config.props.max ?? 100}}
+                                    step={{config.props.step ?? 1}}
+                                    value={{value}}
+                                    disabled={{config.props.disabled}}
+                                    onChange={{(event) => onChange(parseFloat(event.target.value))}}
+                                    className=\"w-full h-2 rounded-lg bg-secondary\"
                                 />
                             </div>
                         );
                     }}
 
-                    // Default text input for other types
                     return (
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                                {{config.label}}
-                            </label>
-                            <input
-                                type="text"
-                                placeholder="Enter text..."
-                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                                onChange={{(e) => window.inputValues = {{...window.inputValues, [config.id]: e.target.value}}}}
-                            />
-                        </div>
-                    );
-                }}
-
-                function SliderComponent({{ config }}) {{
-                    const defaultValue = config.props && config.props.value ? config.props.value : 50;
-                    const [value, setValue] = React.useState(defaultValue);
-
-                    React.useEffect(() => {{
-                        if (!window.inputValues) window.inputValues = {{}};
-                        window.inputValues[config.id] = value;
-                    }}, [value, config.id]);
-
-                    return (
-                        <div className="space-y-2">
-                            <div className="flex justify-between items-center">
-                                <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                                    {{config.label}}
-                                </label>
-                                <span className="text-sm text-muted-foreground">{{value}}</span>
-                            </div>
-                            <input
-                                type="range"
-                                min={{config.props && config.props.min ? config.props.min : 0}}
-                                max={{config.props && config.props.max ? config.props.max : 100}}
-                                step={{config.props && config.props.step ? config.props.step : 1}}
-                                value={{value}}
-                                onChange={{(e) => setValue(parseFloat(e.target.value))}}
-                                className="w-full h-2 bg-secondary rounded-lg appearance-none cursor-pointer"
-                            />
+                        <div className=\"space-y-2\">
+                            <label className=\"text-sm font-medium leading-none\">{{config.label}}</label>
+                            <div className=\"text-sm text-muted-foreground\">Unsupported input: {{config.type}}</div>
                         </div>
                     );
                 }}
 
                 function OutputComponent({{ config, value }}) {{
                     return (
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                        <div className=\"space-y-2\">
+                            <label className=\"text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70\">
                                 {{config.label}}
                             </label>
-                            <div className="flex h-10 w-full rounded-md border border-input bg-muted px-3 py-2 text-sm ring-offset-background">
-                                {{value || 'Output will appear here'}}
+                            <div className=\"flex min-h-[40px] w-full items-center rounded-md border border-input bg-muted px-3 py-2 text-sm ring-offset-background\">
+                                {{value ?? config.props.placeholder ?? 'Output will appear here'}}
                             </div>
                         </div>
                     );
                 }}
 
                 function App() {{
+                    const [inputValues, setInputValues] = React.useState(() => useInitialInputState());
                     const [outputs, setOutputs] = React.useState([]);
+                    const [isLoading, setIsLoading] = React.useState(false);
+                    const [error, setError] = React.useState(null);
+
+                    const handleChange = (id, nextValue) => {{
+                        setInputValues((prev) => ({{ ...prev, [id]: nextValue }}));
+                    }};
 
                     const handleSubmit = async () => {{
-                        const inputs = componentConfigs.inputs.map(config => {{
-                            return window.inputValues?.[config.id] || '';
-                        }});
-
+                        const payload = interfaceConfig.components.inputs.map((config) => inputValues[config.id]);
+                        setIsLoading(true);
+                        setError(null);
                         try {{
                             const response = await fetch('/api/predict', {{
                                 method: 'POST',
-                                headers: {{
-                                    'Content-Type': 'application/json',
-                                }},
-                                body: JSON.stringify({{ inputs }}),
+                                headers: {{ 'Content-Type': 'application/json' }},
+                                body: JSON.stringify({{ inputs: payload }}),
                             }});
-
-                            const result = await response.json();
-                            if (result.success) {{
-                                setOutputs(result.outputs);
+                            const data = await response.json();
+                            if (data.success) {{
+                                setOutputs(data.outputs);
                             }} else {{
-                                console.error('Error:', result.error);
+                                setError(data.error || 'Unknown error');
                             }}
-                        }} catch (error) {{
-                            console.error('Error:', error);
+                        }} catch (err) {{
+                            setError(err.message);
+                        }} finally {{
+                            setIsLoading(false);
                         }}
                     }};
 
-                    React.useEffect(() => {{
-                        document.getElementById('submit-btn').addEventListener('click', handleSubmit);
-                        return () => {{
-                            document.getElementById('submit-btn')?.removeEventListener('click', handleSubmit);
-                        }};
-                    }}, []);
-
                     return (
-                        <div>
-                            <div id="inputs">
-                                {{componentConfigs.inputs.map(config => {{
-                                    if (config.type === 'slider') {{
-                                        return <SliderComponent key={{config.id}} config={{config}} />;
-                                    }} else {{
-                                        return <InputComponent key={{config.id}} config={{config}} />;
-                                    }}
-                                }}) }}
-                            </div>
-                            <div id="outputs">
-                                {{componentConfigs.outputs.map((config, index) => (
-                                    <OutputComponent
-                                        key={{config.id}}
-                                        config={{config}}
-                                        value={{outputs[index]}}
-                                    />
-                                ))}}
+                        <div className=\"space-y-6\">
+                            <div className=\"rounded-lg border bg-card text-card-foreground shadow-sm p-6 space-y-6\">
+                                <div className=\"space-y-2\">
+                                    <h1 className=\"text-2xl font-semibold\">{{interfaceConfig.title}}</h1>
+                                    {{interfaceConfig.description ? (
+                                        <p className=\"text-muted-foreground\">{{interfaceConfig.description}}</p>
+                                    ) : null}}
+                                </div>
+
+                                <div className=\"grid grid-cols-1 gap-6 md:grid-cols-2\">
+                                    <div className=\"space-y-4\">
+                                        <h3 className=\"text-lg font-medium\">Inputs</h3>
+                                        {{interfaceConfig.components.inputs.map((config) => (
+                                            <InputComponent
+                                                key={{config.id}}
+                                                config={{config}}
+                                                value={{inputValues[config.id]}}
+                                                onChange={{(value) => handleChange(config.id, value)}}
+                                            />
+                                        ))}}
+                                    </div>
+                                    <div className=\"space-y-4\">
+                                        <h3 className=\"text-lg font-medium\">Outputs</h3>
+                                        {{interfaceConfig.components.outputs.map((config, index) => (
+                                            <OutputComponent
+                                                key={{config.id}}
+                                                config={{config}}
+                                                value={{outputs[index]}}
+                                            />
+                                        ))}}
+                                    </div>
+                                </div>
+
+                                <div className=\"flex items-center justify-between\">
+                                    {{error ? (
+                                        <p className=\"text-sm text-destructive\">{{error}}</p>
+                                    ) : <span />}}
+                                    <button
+                                        onClick={{handleSubmit}}
+                                        disabled={{isLoading}}
+                                        className=\"inline-flex items-center justify-center whitespace-nowrap rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50\"
+                                    >
+                                        {{isLoading ? 'Running…' : 'Submit'}}
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     );
                 }}
 
-                const root = ReactDOM.createRoot(document.getElementById('inputs').parentNode.parentNode);
+                const root = ReactDOM.createRoot(document.getElementById('app'));
                 root.render(<App />);
             </script>
         </body>
         </html>
         """
-        return html
 
-    def launch(self, host: str = "127.0.0.1", port: int = 7860, share: bool = False, **kwargs):
-        """
-        Launch the ChaiLab interface
-
-        Args:
-            host: Host to run the server on
-            port: Port to run the server on
-            share: Whether to create a public URL (not implemented yet)
-        """
-        self.app = self._create_app()
-
-        print(f"Starting ChaiLab server at http://{host}:{port}")
-        print(f"{self.title}")
-        if self.description:
-            print(f"{self.description}")
-
-        if share:
-            print("Share functionality not implemented yet")
-
-        print("\nPress Ctrl+C to stop the server")
-
-        # Run the server
-        uvicorn.run(self.app, host=host, port=port, log_level="info")
-
-    def integrate(self, wandb=None, **kwargs):
-        """
-        Integrate with other libraries (similar to Gradio's integrate method)
-
-        Args:
-            wandb: W&B instance for experiment tracking
-        """
+    # ------------------------------------------------------------------
+    # Public helpers
+    # ------------------------------------------------------------------
+    def integrate(self, wandb=None, **kwargs):  # pragma: no cover - placeholder hook
         if wandb is not None:
             print("✅ W&B integration ready")
-            # Could add W&B logging functionality here
         return self
+
+
+__all__ = ["Interface"]

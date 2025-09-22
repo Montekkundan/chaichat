@@ -18,6 +18,16 @@ This folder contains essential examples to help you get started with ChaiLab. We
 - **Features**: System info, text processing, math operations, file I/O, JSON processing, ML simulation
 - **Perfect for**: Demonstrating Python's full capabilities with shadcn/ui
 
+#### `chat_random_response.py`
+- **Description**: Minimal chatbot powered by `ChatInterface`
+- **Features**: Stateless responses, shadcn chat UI
+- **Perfect for**: Showing how to build a chatbot in a few lines
+
+#### `chat_streaming_echo.py`
+- **Description**: Generator-based chat demo that emulates streaming replies
+- **Features**: `yield` support, history persistence, chat UI controls
+- **Perfect for**: Demonstrating incremental responses and history handling
+
 #### `python_capabilities_demo.py`
 - **Description**: Advanced Python capabilities demonstration
 - **Features**: Regex, data structures, cryptography, datetime, performance benchmarking

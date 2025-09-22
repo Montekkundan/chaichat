@@ -18,6 +18,10 @@ class Button(Component):
         on_click: JavaScript function to call on click (for future enhancement)
     """
 
+    component_type = "button"
+    aliases = ("button",)
+    default_label = "Button"
+
     def __init__(
         self,
         value: str = "Button",
@@ -43,6 +47,7 @@ class Button(Component):
             "size": self.props.get("size", "default"),
             "disabled": self.props.get("disabled", False),
             "on_click": self.props.get("on_click"),
+            "label": self.props.get("label", self.default_label),
         }
 
     def get_variant_classes(self):

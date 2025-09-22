@@ -17,6 +17,10 @@ class Label(Component):
         required: Whether the associated field is required
     """
 
+    component_type = "label"
+    aliases = ("label",)
+    default_label = "Label"
+
     def __init__(
         self,
         text: str = "",
@@ -39,6 +43,7 @@ class Label(Component):
             "html_for": self.props.get("html_for"),
             "disabled": self.props.get("disabled", False),
             "required": self.props.get("required", False),
+            "label": self.props.get("label", self.default_label),
         }
 
     def get_base_classes(self):

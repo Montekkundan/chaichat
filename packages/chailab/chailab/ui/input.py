@@ -20,6 +20,10 @@ class Input(Component):
         required: Whether the input is required
     """
 
+    component_type = "input"
+    aliases = ("input", "textbox", "text")
+    default_label = "Input"
+
     def __init__(
         self,
         value: str = "",
