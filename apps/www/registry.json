@@ -1,0 +1,49 @@
+{
+	"$schema": "https://ui.shadcn.com/schema/registry.json",
+	"name": "acme",
+	"homepage": "https://acme.com",
+	"items": [
+		{
+			"name": "model-selector",
+			"type": "registry:block",
+			"title": "Model Selector",
+			"description": "Dropdown to browse and select models (LLM Gateway or AI Gateway).",
+			"dependencies": ["@phosphor-icons/react", "@ai-sdk/gateway"],
+			"registryDependencies": [
+				"badge",
+				"button",
+				"drawer",
+				"dropdown-menu",
+				"input",
+				"label",
+				"popover",
+				"separator",
+				"switch",
+				"tooltip"
+			],
+			"files": [
+				{ "path": "src/registry/blocks/model-selector/model-selector.tsx", "type": "registry:component" },
+				{ "path": "src/registry/blocks/model-selector/use-models.ts", "type": "registry:hook" },
+				{ "path": "src/app/api/models/route.ts", "type": "registry:lib" },
+				{ "path": "src/app/api/models/ai-gateway/route.ts", "type": "registry:lib" }
+			],
+			"envVars": {
+				"LLM_GATEWAY_API_KEY": "",
+				"AI_GATEWAY_API_KEY": ""
+			}
+		},
+		{
+			"name": "playground-column",
+			"type": "registry:block",
+			"title": "Playground Column",
+			"description": "Minimal UI-only column with left/right/delete controls.",
+			"dependencies": [],
+			"registryDependencies": [
+				"button"
+			],
+			"files": [
+				{ "path": "src/registry/blocks/playground-column/playground-column.tsx", "type": "registry:component" }
+			]
+		}
+	]
+}

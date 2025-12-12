@@ -1,0 +1,54 @@
+name: Publish to PyPI
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version_type:
+        description: 'Version bump type'
+        required: true
+        default: 'patch'
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v4
+
+    - name: Update version (if manual trigger)
+      if: github.event_name == 'workflow_dispatch'
+      run: |
+        current_version=$(grep '__version__' chailab/_version.py | cut -d'"' -f2)
+        if [ "${{ github.event.inputs.version_type }}" = "patch" ]; then
+          new_version=$(echo $current_version | awk -F. '{print $1"."$2"."($3+1)}')
+        elif [ "${{ github.event.inputs.version_type }}" = "minor" ]; then
+          new_version=$(echo $current_version | awk -F. '{print $1"."($2+1)".0"}')
+        else
+          new_version=$(echo $current_version | awk -F. '{print ($1+1)".0.0"}')
+        fi
+        echo "Updating version from $current_version to $new_version"
+        sed -i "s/__version__ = \"$current_version\"/__version__ = \"$new_version\"/" chailab/_version.py
+
+    - name: Build package
+      run: uv build
+
+    - name: Publish to PyPI
+      run: uv publish --trusted-publishing always

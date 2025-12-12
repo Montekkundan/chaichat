@@ -1,0 +1,40 @@
+{
+  "name": "chaichat-opentui-chat",
+  "version": "0.1.0",
+  "private": false,
+  "description": "CLI chat demo using OpenTUI with a bottom input.",
+  "type": "module",
+  "license": "MIT",
+  "author": "",
+  "bin": {
+    "chaichat-cli": "dist/index.js"
+  },
+  "main": "dist/index.js",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist/**",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "dev": "bun src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "bun dist/index.js",
+    "check-types": "tsc -p tsconfig.json --noEmit",
+    "prepublishOnly": "bun run build"
+  },
+  "engines": {
+    "bun": ">=1.2.0"
+  },
+  "dependencies": {
+    "@llmgateway/ai-sdk-provider": "^2.0.1",
+    "@opentui/core": "^0.1.9",
+    "ai": "^5.0.8",
+    "chalk": "^5.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.12",
+    "typescript": "^5.6.3"
+  }
+}
